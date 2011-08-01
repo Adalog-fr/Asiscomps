@@ -94,7 +94,6 @@ package body Units_List is
       Current    : Link := Head;
    begin
       if Current = null then
-         Trace ("Adding " & Upper_Unit);
          Head     := new Node'(Upper_Unit'Length, Upper_Unit, null);
          Cursor   := Head;
          Previous := null;
@@ -111,7 +110,6 @@ package body Units_List is
 
       -- Not found
       -- Current still points to the last node
-      Trace ("Adding " & Upper_Unit);
       Current.Next := new Node'(Upper_Unit'Length, Upper_Unit, null);
       if Cursor = null then
          Cursor   := Current.Next;
@@ -197,7 +195,7 @@ package body Units_List is
 
    exception
       when others =>
-         Trace ("Exception in Pre-proc of Units_List ", Element);
+         Trace ("Exception in Pre-proc of Units_List ", Element); --## rule line off no_trace
          raise;
    end Pre_Procedure_With;
 
@@ -228,7 +226,6 @@ package body Units_List is
    procedure Delete_Current is
       To_Free : Link := Cursor;
    begin
-      Trace ("Deleting " & To_Free.Value);
       if Previous = null then
          Head := Cursor.Next;
       else
@@ -414,11 +411,9 @@ package body Units_List is
             end if;
             if Start = Unit_Spec'First or else Unit_Spec (Start-1) = '+' then
                Add (To_Upper(Unit_Spec (Start .. Stop)));
-               Trace ("unit: " & Unit_Spec (Start .. Stop));
             else
                Ignored_Inx                 := Ignored_Inx + 1;
                Ignored_Units (Ignored_Inx) := new Wide_String'(To_Upper(Unit_Spec (Start .. Stop)));
-               Trace ("ignored: " & Unit_Spec (Start .. Stop));
             end if;
             exit when Stop = Unit_Spec'Last;
             Start := Stop + 2;

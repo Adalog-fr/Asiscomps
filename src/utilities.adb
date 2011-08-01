@@ -87,11 +87,9 @@ package body Utilities is
    -- Asis_Exception_Messages --
    -----------------------------
 
-   procedure Asis_Exception_Messages (Occur : Ada.Exceptions.Exception_Occurrence) is
-      use Ada.Exceptions, Ada.Characters.Handling, Asis.Errors, Asis.Implementation;
+   procedure Asis_Exception_Messages is
+      use Asis.Errors, Asis.Implementation;
    begin
-      User_Message ("FAILURE !!!");
-      User_Message ("Exception: " & To_Wide_String (Exception_Name (Occur)));
       User_Message ("Status   : " & Error_Kinds'Wide_Image (Status));
       User_Message ("Diagnosis: " & Diagnosis);
    end Asis_Exception_Messages;
@@ -176,7 +174,7 @@ package body Utilities is
            & ')';
       end Span_Image;
    begin
-      Trace ("Failing element " & Span_Image (Element_Span (Element)), Element);
+      Trace ("Failing element " & Span_Image (Element_Span (Element)), Element); --## rule line off no_trace
       Failure (Message);
    end Failure;
 
@@ -218,22 +216,13 @@ package body Utilities is
 
    procedure Safe_Open (File : in out Ada.Wide_Text_IO.File_Type;
                         Name : String;
-                        Mode : Open_Mode)
+                        Mode : Open_Mode;
+                        Overwrite_Option : Boolean)
    is
-      use Ada.Wide_Text_IO, Ada.Characters.Handling;
+      use Ada.Wide_Text_IO;
    begin
       if Overwrite_Option then
          Create (File, Out_File, Name);
-         Trace ("Creating output " & To_Wide_String (Name));
-
-         case Mode is
-            when Create =>
-               null;
-            when Append =>
-               -- Further open must not overwrite the file
-               Overwrite_Option := False;
-         end case;
-
       else
          begin
             case Mode is
@@ -246,14 +235,12 @@ package body Utilities is
                when Append =>
                   Open (File, Append_File, Name);
                   -- OK if file exists
-                  Trace ("Appending output to " & To_Wide_String (Name));
             end case;
 
          exception
             when Name_Error =>
                -- File does not exist (either mode)
                Create (File, Out_File, Name);
-               Trace ("Creating output " & To_Wide_String (Name));
          end;
       end if;
    exception
@@ -263,9 +250,25 @@ package body Utilities is
          begin
             Raise_Exception (Exception_Identity (Occur),
                              Message => "Error opening " & Name &
-                                        ' ' & Open_Mode'Image (Mode));
+                                        " for " & Open_Mode'Image (Mode));
          end;
    end Safe_Open;
+
+   --------------
+   -- To_Lower --
+   --------------
+
+   function To_Lower (Item : in Wide_String) return Wide_String is
+      use Ada.Strings.Wide_Maps, Ada.Strings.Wide_Maps.Wide_Constants;
+
+      Result : Wide_String (1 .. Item'Length);
+   begin
+      for I in Item'Range loop
+         Result (I - (Item'First - 1)) := Value (Lower_Case_Map, Item (I));
+      end loop;
+
+      return Result;
+   end To_Lower;
 
    --------------
    -- To_Upper --

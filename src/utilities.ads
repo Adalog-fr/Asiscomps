@@ -33,8 +33,7 @@
 ----------------------------------------------------------------------
 
 with  -- Standard Ada units
-  Ada.Wide_Text_IO,
-  Ada.Exceptions;
+  Ada.Wide_Text_IO;
 
 with  -- Asis
   Asis;
@@ -47,7 +46,6 @@ package Utilities is
 
    Verbose_Option   : Boolean := False;
    Debug_Option     : Boolean := False;
-   Overwrite_Option : Boolean := False;
 
    Error_Is_Out     : Boolean := False;
    -- The variable above tells whether Current_Error and Current_Output are the same
@@ -66,6 +64,9 @@ package Utilities is
    --  String facilities
    --
 
+   function To_Lower (Item : in Wide_String) return Wide_String;
+   --  The language provides this only for String, this is the same for Wide_String
+
    function To_Upper (Item : in Wide_String) return Wide_String;
    --  The language provides this only for String, this is the same for Wide_String
 
@@ -80,7 +81,6 @@ package Utilities is
                     When_True  : in Wide_String;
                     When_False : in Wide_String) return Wide_String;
    --  Returns When_True if Condition is True, When_False otherwise
-
 
    --
    --  Error
@@ -108,7 +108,7 @@ package Utilities is
 
    procedure Assert (Condition : Boolean; Message : Wide_String);
 
-   procedure Asis_Exception_Messages (Occur : Ada.Exceptions.Exception_Occurrence);
+   procedure Asis_Exception_Messages;
 
    --
    --  Safe open
@@ -120,5 +120,6 @@ package Utilities is
    -- Append: if the file exists, it is appended to, unless -w option
    procedure Safe_Open (File : in out Ada.Wide_Text_IO.File_Type;
                         Name : String;
-                        Mode : Open_Mode);
+                        Mode : Open_Mode;
+                        Overwrite_Option : Boolean);
 end Utilities;

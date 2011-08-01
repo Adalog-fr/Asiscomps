@@ -71,11 +71,24 @@ package A4G_Bugs is
 
 
    --
+   -- From Asis.Declarations
+   --
+
+   -- Reason      : Does not (not always?) follow a chain of renamings
+   -- Bug report  : [E901-003]
+   -- Gnat version: GAP 2005
+   -- Fixed in    : current wavefront, not released
+   function Corresponding_Base_Entity (Declaration : in Asis.Declaration) return Asis.Expression;
+
+
+
+   --
    -- From Asis.Expressions
    --
 
    -- Reason      : Bug when Argument is A_Selected_Component or An_Indexed_Component
    --             : Bug when Argument is the selector of A_Selected_Component (sometimes)
+   --             : Bug when Argument is An_Explicit_Dereference
    -- Bug report  : [E217-012] [E317-009]
    -- Gnat version: GAP 1.1.0
    -- Fixed in    : current wavefront, not released
