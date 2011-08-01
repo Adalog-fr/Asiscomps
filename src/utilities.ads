@@ -81,6 +81,9 @@ package Utilities is
    -- Remove multiple spaces, line delimiters and comments within the string
    -- Lower bound of returned string is 1.
 
+   function Starts_With (Name : Wide_String; Pattern : Wide_String) return Boolean;
+   -- Returns True iff the beginning of Name is equal to Pattern
+
    function Integer_Img (Item : in Integer) return Wide_String;
    -- Like Integer'Wide_Image, without the !*#!! initial space.
    -- (avoids depending on the Gnat specific attribute 'Img)
@@ -126,6 +129,7 @@ package Utilities is
                     With_Source : Boolean           := False);
 
    procedure Assert (Condition : Boolean; Message : Wide_String);
+   procedure Assert (Condition : Boolean; Message : Wide_String; Element : Asis.Element);
 
    procedure Asis_Exception_Messages;
 

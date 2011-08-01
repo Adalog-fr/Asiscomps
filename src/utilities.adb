@@ -38,6 +38,7 @@ with   -- Standard Ada units
   Ada.Strings.Wide_Maps.Wide_Constants;
 
 with  -- ASIS units
+  Asis.Compilation_Units,
   Asis.Elements,
   Asis.Errors,
   Asis.Implementation,
@@ -55,34 +56,46 @@ package body Utilities is
    ----------------
 
    procedure Trace_Elem (Element : Asis.Element) is
-      use Ada.Wide_Text_IO, Asis, Asis.Elements;
+      use Ada.Wide_Text_IO;
+      use Asis, Asis.Compilation_Units, Asis.Elements, Asis.Text;
+      S : constant Span := Element_Span (Element);
    begin
       Put (Current_Trace.all, Element_Kinds'Wide_Image (Element_Kind (Element)));
-      Put (Current_Trace.all, " => ");
-      case Element_Kind (Element) is
-         when Not_An_Element =>
-            null;
-         when A_Pragma =>
-            Put (Current_Trace.all, Pragma_Kinds'Wide_Image (Pragma_Kind (Element)));
-         when A_Defining_Name =>
-            Put (Current_Trace.all, Defining_Name_Kinds'Wide_Image (Defining_Name_Kind (Element)));
-         when A_Declaration =>
-            Put (Current_Trace.all, Declaration_Kinds'Wide_Image (Declaration_Kind (Element)));
-         when A_Definition =>
-            Put (Current_Trace.all, Definition_Kinds'Wide_Image (Definition_Kind (Element)));
-         when An_Expression =>
-            Put (Current_Trace.all, Expression_Kinds'Wide_Image (Expression_Kind (Element)));
-         when An_Association =>
-            Put (Current_Trace.all, Association_Kinds'Wide_Image (Association_Kind (Element)));
-         when A_Statement =>
-            Put (Current_Trace.all, Statement_Kinds'Wide_Image (Statement_Kind (Element)));
-         when A_Path =>
-            Put (Current_Trace.all, Path_Kinds'Wide_Image (Path_Kind (Element)));
-         when A_Clause =>
-            Put (Current_Trace.all, Clause_Kinds'Wide_Image (Clause_Kind (Element)));
-         when An_Exception_Handler =>
-            null;
-      end case;
+      if not Is_Nil (Element) then
+         Put (Current_Trace.all, " => ");
+         case Element_Kind (Element) is
+            when Not_An_Element =>
+               -- Impossible actually, but we don't feel like calling Failure from here
+               null;
+            when A_Pragma =>
+               Put (Current_Trace.all, Pragma_Kinds'Wide_Image (Pragma_Kind (Element)));
+            when A_Defining_Name =>
+               Put (Current_Trace.all, Defining_Name_Kinds'Wide_Image (Defining_Name_Kind (Element)));
+            when A_Declaration =>
+               Put (Current_Trace.all, Declaration_Kinds'Wide_Image (Declaration_Kind (Element)));
+            when A_Definition =>
+               Put (Current_Trace.all, Definition_Kinds'Wide_Image (Definition_Kind (Element)));
+            when An_Expression =>
+               Put (Current_Trace.all, Expression_Kinds'Wide_Image (Expression_Kind (Element)));
+            when An_Association =>
+               Put (Current_Trace.all, Association_Kinds'Wide_Image (Association_Kind (Element)));
+            when A_Statement =>
+               Put (Current_Trace.all, Statement_Kinds'Wide_Image (Statement_Kind (Element)));
+            when A_Path =>
+               Put (Current_Trace.all, Path_Kinds'Wide_Image (Path_Kind (Element)));
+            when A_Clause =>
+               Put (Current_Trace.all, Clause_Kinds'Wide_Image (Clause_Kind (Element)));
+            when An_Exception_Handler =>
+               null;
+         end case;
+
+         Put (Current_Trace.all, " at ");
+         Put (Current_Trace.all, Text_Name (Enclosing_Compilation_Unit (Element)));
+         Put (Current_Trace.all, ':');
+         Put (Current_Trace.all, Integer_Img (S.First_Line));
+         Put (Current_Trace.all, ':');
+         Put (Current_Trace.all, Integer_Img (S.First_Column));
+      end if;
       New_Line (Current_Trace.all);
    end Trace_Elem;
 
@@ -105,6 +118,17 @@ package body Utilities is
    begin
       if not Condition then
          Failure (Message);
+      end if;
+   end Assert;
+
+   ------------
+   -- Assert --
+   ------------
+
+   procedure Assert (Condition : Boolean; Message : Wide_String; Element : Asis.Element) is
+   begin
+      if not Condition then
+         Failure (Message, Element);
       end if;
    end Assert;
 
@@ -180,6 +204,16 @@ package body Utilities is
       Trace ("Failing element " & Span_Image (Element_Span (Element)), Element); --## rule line off no_trace
       Failure (Message);
    end Failure;
+
+   -----------------
+   -- Starts_With --
+   -----------------
+
+   function Starts_With (Name : Wide_String; Pattern : Wide_String) return Boolean is
+   begin
+      return Name'Length >= Pattern'Length
+        and then Name (Name'First .. Name'First + Pattern'Length - 1) = Pattern;
+   end Starts_With;
 
    --------------
    -- User_Log --
@@ -407,12 +441,13 @@ package body Utilities is
    -----------------
 
    function Integer_Img (Item : in Integer) return Wide_String is
-      Result : constant Wide_String := Integer'Wide_Image (Item);
+      Result : constant Wide_String := Integer'Wide_Image (Item); --## Rule line OFF Use_Img_Function
+      subtype Slide is Wide_String (1 .. Result'Length-1);
    begin
       if Item < 0 then
          return Result;
       else
-         return Result (2 .. Result'Last);
+         return Slide (Result (2 .. Result'Last));
       end if;
    end Integer_Img;
 
@@ -469,7 +504,7 @@ package body Utilities is
 
    procedure Trace (Message : Wide_String; Value : Integer) is
    begin
-      Trace (Message & ", value= " & Integer'Wide_Image (Value));
+      Trace (Message & ", value= " & Integer_Img (Value));
    end Trace;
 
    ------------

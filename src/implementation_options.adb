@@ -103,9 +103,9 @@ package body Implementation_Options is
    begin
       if Debug_Mode then
          return Default;
-      else
-         return Default & " -nbb";
       end if;
+
+      return Default & " -nbb";   -- No Bug Box
    end Initialize_String;
 
   -----------------------
@@ -113,16 +113,16 @@ package body Implementation_Options is
    -----------------------
 
    function Parameters_String (Project_File  : String := "";
-                               Other_Options : Wide_String := "") return Wide_String is
+                               Other_Options : Wide_String := "") return Wide_String
+   is
       use Ada.Characters.Handling, Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
       Default_Options : Unbounded_Wide_String;
-
    begin
       if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-CA");
+         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
       end if;
       if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -FM");
+         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
       end if;
       return
         To_Wide_String (Default_Options)

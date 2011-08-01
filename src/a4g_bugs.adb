@@ -208,15 +208,12 @@ package body A4G_Bugs is
 
    function Corresponding_Expression_Type (Expression : in Asis.Expression) return Asis.Declaration
    is
-      -- Since this is a (partial) rewriting of the function, there is no call to Trace_Bug
       use Ada.Exceptions, Asis.Declarations, Asis.Definitions, Asis.Elements, Asis.Expressions;
       use Thick_Queries;
 
       Result : Asis.Element;
       Temp   : Asis.Element;
    begin
-      --return Asis.Expressions.Corresponding_Expression_Type (Expression);
-
       if Expression_Kind (Expression) = An_Explicit_Dereference then
          -- For An_Explicit_Dereference, ASIS returns the type of the pointer
          -- instead of the type of the dereference.
@@ -361,13 +358,16 @@ package body A4G_Bugs is
             -- Must be true this time...
             return Result;
          end if;
+         Trace_Bug ("A4G_Bugs.Corresponding_Expression_Type (1)");
       end if;
 
       case Declaration_Kind (Result) is
          when A_Component_Declaration =>
             -- Bug
-            Result := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication
-                                                                             (Object_Declaration_View (Result))));
+            Trace_Bug ("A4G_Bugs.Corresponding_Expression_Type (2)");
+            Result := Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                      (Component_Subtype_Indication
+                                                       (Object_Declaration_View (Result))));
 
          when A_Type_Declaration | A_Subtype_Declaration | A_Formal_Type_Declaration =>
             -- OK
@@ -375,6 +375,7 @@ package body A4G_Bugs is
 
          when A_Variable_Declaration | A_Constant_Declaration | A_Deferred_Constant_Declaration =>
             -- Bug
+            Trace_Bug ("A4G_Bugs.Corresponding_Expression_Type (3)");
             Result := Object_Declaration_View (Result);
             if Definition_Kind (Result) = A_Type_Definition then
                -- The object is declared with an anonymous type

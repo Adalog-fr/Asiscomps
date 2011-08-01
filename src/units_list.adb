@@ -177,7 +177,7 @@ package body Units_List is
                        Add_Stubs  : in     Boolean;
                        My_Context : in out Asis.Context)
    is
-      use Asis, Asis.Compilation_Units, Asis.Elements;
+      use Asis, Asis.Compilation_Units;
       use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps;
       use String_List;
 
@@ -213,7 +213,7 @@ package body Units_List is
       end Must_Ignore;
 
       procedure Do_Process_With (My_Unit : Compilation_Unit) is
-         use Asis.Clauses;
+         use Asis.Clauses, Asis.Elements;
 
          procedure Add_Withed_Unit (Withed_Name : Asis.Expression) is
             use Asis.Expressions;
@@ -262,7 +262,9 @@ package body Units_List is
 
       procedure Do_Process_Stub (My_Unit : Compilation_Unit) is
       begin
-         if Is_Nil (My_Unit) then
+         -- NB: A protected body can be a compilation unit if it is a subunit,
+         --     but it cannot contain stubs.
+         if Is_Nil (My_Unit) or else Unit_Kind (My_Unit) = A_Protected_Body_Subunit then
             return;
          end if;
 
@@ -343,10 +345,10 @@ package body Units_List is
             if Spec'Length = 1 then
                -- '@' alone
                Raise_Specification_Error ("Missing file name after @");
-            else
-               Process_Indirect_File (To_String (Spec (Spec'First+1 .. Spec'Last)));
-               return;
             end if;
+
+            Process_Indirect_File (To_String (Spec (Spec'First + 1 .. Spec'Last)));
+            return;
          end if;
 
          --
@@ -378,7 +380,6 @@ package body Units_List is
       end Process_Unit_Spec;
 
    begin  -- Register
-
       Process_Unit_Spec (Unit_Spec);
 
       --

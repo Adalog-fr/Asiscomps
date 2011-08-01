@@ -40,6 +40,8 @@ package Implementation_Options is
    function Initialize_String (Debug_Mode : Boolean := False) return Wide_String;
    function Parameters_String (Project_File  : String := "";
                                Other_Options : Wide_String := "") return Wide_String;
+   Default_C_Parameter : Wide_Character := 'A';   -- -CA
+   Default_F_Parameter : Wide_Character := 'M';   -- -FM
 
    -- Parameters for Wide_Text_IO:
    Form_Parameters : constant String := "WCEM=h"; -- Use Hex encoding

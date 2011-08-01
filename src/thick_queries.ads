@@ -91,6 +91,16 @@ package Thick_Queries is
    --  Appropriate Element_Kinds:
    --     Any element
 
+   function Definition_Compilation_Unit (Element : in Asis.Element) return Asis.Compilation_Unit;
+   -- Returns the compilation unit in which Element is declared
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Defining_Name
+   --    An_Expression
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component (checks the selector)
+
 
    function Declarative_Items (Element : in Asis.Element; Include_Pragmas : in Boolean := False)
                               return Asis.Declaration_List;
@@ -135,6 +145,30 @@ package Thick_Queries is
    --    A_While_Loop_Statement
    --    A_For_Loop_Statement
 
+   function Exception_Handlers (Element : Asis.Element) return Asis.Exception_Handler_List;
+   -- Returns the exception handlers of any construct with exception hanlders.
+   -- Appropriate Element_Kinds:
+   --    A_Declaration
+   --    A_Statement
+   --
+   -- Appropriate Declaration_Kinds:
+   --    A_Function_Body_Declaration
+   --    A_Procedure_Body_Declaration
+   --    A_Package_Body_Declaration
+   --    A_Task_Body_Declaration
+   --    An_Entry_Body_Declaration
+   --
+   -- Appropriate Statement_Kinds:
+   --    An_Accept_Statement
+   --    A_Block_Statement
+
+   function Last_Effective_Statement (Stats : Asis.Statement_List) return Asis.Statement;
+   -- Returns the last statement from Stats, unless it is a block statement, in which case
+   -- the last statement of the block is returned (recursively, of course).
+
+   function Are_Null_Statements (Stats : Asis.Statement_List; Except_Labelled : Boolean := False) return Boolean;
+   -- Checks whether Stats contain only null statement(s)
+   -- If Except_Labelled is True, returns False also if there is a labelled statement
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
@@ -163,6 +197,10 @@ package Thick_Queries is
    -- enclosing compilation unit (Standard for predefined elements).
    -- If With_Profile is true, "mangles" the name with a profile to provide a name
    -- that is unique even if overloaded.
+   --
+   -- Returns "" if the Full_Name_Image cannot be computed. This happens:
+   --   - if The_Name is a predefined operator and With_Profile is True.
+   --   - if The_Name is a subprogram name or formal parameter from a dispatching call
    --
    -- Appropriate Element_Kinds:
    --    A_Defining_Name
@@ -203,16 +241,45 @@ package Thick_Queries is
    -- Like Subtype_Mark, but returns the selector if the subtype mark is a selected component
    -- Moreover, it avoids the ambiguity between Asis.Subtype_Mark and Asis.Definitions.Subtype_Mark
 
-   function Is_Class_Wide_Subtype (The_Subtype : Asis.Declaration) return Boolean;
-   -- Unwinds subtype declarations and returns true if the given subtype declaration
-   -- ultimately designates a class-wide type.
+   function Is_Access (The_Subtype : Asis.Declaration) return Boolean;
+   -- Returns True if The_Subtype is a declaration of an access type
+   -- Returns False in all other cases
+
+   function Is_Class_Wide_Subtype (The_Subtype : Asis.Element) return Boolean;
+   -- Unwinds subtype declarations and returns true if the given subtype declaration,
+   -- or the type designated by the provided name, ultimately designates a class-wide type.
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Declaration
+   --    A_Defining_Name
+   --    An_Expression
    --
    -- Appropriate Declaration_Kinds:
    --    A_Subtype_Declaration
+   --
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component (applies on selector)
+   --    An_Attribute_Reference
 
-   function Is_Limited (The_Subtype : Asis.Declaration) return Boolean;
-   -- Returns True if The_Subtype is a declaration of an (explicit or implicit) limited type
+   function Is_Limited (The_Element : Asis.Element) return Boolean;
+   -- Returns True if The_Element is a declaration or definition of an (explicit or implicit) limited type
+   -- or an expression whose type is limited.
    -- Returns False in all other cases
+   --
+   -- Appropriate Element_Kinds
+   --   A_Declaration
+   --   A_Definition
+   --   A_Defining_Name
+   --   An_Expression
+   --
+   --  Appropriate Expression_Kinds:
+   --       An_Identifier
+   --       An_Operator_Symbol
+   --       A_Character_Literal
+   --       An_Enumeration_Literal
+   --       A_Selected_Component (applies to selector)
+
 
    function Ultimate_Type_Declaration (The_Subtype : Asis.Declaration) return Asis.Declaration;
    -- Unwinds subtype declarations, derivations, private types and returns the real declaration
@@ -248,7 +315,7 @@ package Thick_Queries is
    --       A_Tagged_Record_Type_Definition
    --       An_Access_Type_Definition
 
-   function Is_Type_Declaration_Kind (The_Subtype : Asis.Declaration; Kind : Asis.Declaration_Kinds) return Boolean;
+   function Is_Type_Declaration_Kind (The_Subtype : Asis.Declaration; The_Kind : Asis.Declaration_Kinds) return Boolean;
    -- Unwinds subtype declarations and derivations and returns true if the given subtype
    -- declaration ultimately designates a type of the given kind.
    --
@@ -263,7 +330,7 @@ package Thick_Queries is
 
 
    function Contains_Type_Declaration_Kind (The_Subtype : Asis.Declaration;
-                                            Kind        : Asis.Declaration_Kinds) return Boolean;
+                                            The_Kind    : Asis.Declaration_Kinds) return Boolean;
    -- Like Is_Type_Declaration_Kind, but for composite types, returns True if any subcomponent is
    -- of the given kind.
    --
@@ -277,11 +344,28 @@ package Thick_Queries is
    --       A_Formal_Type_Declaration
 
 
+   function Size_Clause_Expression (Name : Asis.Element) return Asis.Expression;
+   -- Returns the Expression of the size clause that applies to the indicated type or object
+   -- Returns Nil_Element if there is no applicable size clause.
+   --
+   -- Appropriate Element_Kinds:
+   --     A_Defining_Name
+   --     An_Expression
+   --
+   --  Appropriate Expression_Kinds:
+   --       An_Identifier
+   --       A_Selected_Component (applies to selector)
+   --       An_Attribute_Reference (T'Base or T'Class)
+
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
    -- Queries about names and expressions                                                         --
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
+
+   function Simple_Name (The_Name : Asis.Expression) return Asis.Expression;
+   -- Gets rid of selection, i.e. returns the selector of its argument if a selected_name,
+   -- its argument otherwise.
 
    function Ultimate_Name (The_Name : Asis.Element) return Asis.Element;
    -- For a name defined by a renaming declaration: returns the name of the entity, which is not
@@ -314,6 +398,13 @@ package Thick_Queries is
    -- Return False in all other cases, including when Obj does not designate an Object
 
 
+   function Corresponding_Expression_Type_Definition (The_Element : Asis.Expression) return Asis.Definition;
+   -- return the type definition of the type of The_Element
+   -- Unlike Corresponding_Expression_Type, works if the the type of The_Element is
+   -- an anonymous type
+   -- This query is a candidate for ASIS05, and already profided by ASIS-for-GNAT,
+   -- but we don't use it as long as it is not standard
+
    function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition;
    -- return the type definition of the ultimate ancestor type of The_Element
    -- (going up all subtype and derived type declaration).
@@ -324,10 +415,13 @@ package Thick_Queries is
    -- return the Type_Kind of the ultimate ancestor of The_Element
    -- (going up all subtype and derived type declaration).
 
+   function Is_Access_Expression (The_Element : Asis.Expression) return Boolean;
+   -- Return True if The_Element is of an access type or of a formal access type.
+   -- Return False in all other cases
 
    type Expression_Usage_Kinds is (Untouched, Read, Write, Read_Write);
    function Expression_Usage_Kind (Expr : Asis.Expression) return Expression_Usage_Kinds;
-   -- Returns Untouched if Expr is part of a renaming declaration
+   -- Returns Untouched if Expr is part of a renaming declaration or the prefix of an attribute
    -- Returns Write if Expr designates a variable which is the
    --  target of an assignment statement, or an actual corresponding
    --  to an out parameter in a procedure or entry call.
@@ -412,6 +506,34 @@ package Thick_Queries is
    --    A_Function_Call
 
 
+   type Call_Kind is (A_Regular_Call,     A_Predefined_Entity_Call, An_Attribute_Call,
+                      A_Dereference_Call, A_Dispatching_Call);
+   type Call_Descriptor (Kind : Call_Kind) is
+      record
+         case Kind is
+            when A_Regular_Call =>
+               Declaration : Asis.Declaration;
+            when others =>
+               null;
+         end case;
+      end record;
+   function Corresponding_Call_Description (Call : Asis.Element) return Call_Descriptor;
+   -- Given a procedure, entry or function call, returns the descriptor of the called
+   -- entity.
+   -- If the call is to a good ol' statically determinable callable entity, the descriptor
+   -- is A_Regular_Call, and the Declaration field contains the real declaration, after unwinding
+   -- all possible renamings.
+   -- Otherwise, the Kind discriminant tells why the declaration is not available.
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Statement
+   --    An_Expression
+   -- Appropriate Statement_Kinds:
+   --    A_Procedure_Call_Statement
+   --    An_Entry_Call_Statement
+   -- Appropriate Expression_Kinds:
+   --    A_Function_Call
+
    function Called_Profile (Call : Asis.Element) return Asis.Parameter_Specification_List;
    -- Given a procedure, entry or function call, returns the parameter profile of the called
    -- entity.
@@ -474,9 +596,9 @@ package Thick_Queries is
          Formals     : Profile_Table (1..Formals_Length);
       end record;
    function Types_Profile (Declaration : in Asis.Declaration) return Profile_Descriptor;
-   -- Given a callable entity declaration, returns a list of Defining_Name
-   -- First element is the result type for a function, Nil_Element for other callable entities
-   -- Other elements are (in order of declaration) the *types* of the parameters.
+   -- Given a callable entity declaration, returns a description of the profile
+   -- Result_Type is the result *type* for a function, Nil_Element for other callable entities
+   -- Formals are (in order of declaration) the *types* of the parameters.
    -- Multiple declarations are separated, i.e. "A,B : Integer" yields two entries in the table.
 
 
@@ -510,7 +632,12 @@ package Thick_Queries is
    subtype Biggest_Natural          is Biggest_Int range 0          .. Biggest_Int'Last;
    subtype Extended_Biggest_Natural is Biggest_Int range Not_Static .. Biggest_Int'Last;
 
+   function Biggest_Int_Img (Item : Biggest_Int) return Wide_String;
+   -- Like Biggest_Int'Wide_Image, without the !*#!! initial space.
+   -- (avoids depending on the Gnat specific attribute 'Img)
+
    type Extended_Biggest_Natural_List is array (Positive range <>) of Extended_Biggest_Natural;
+   Nil_Extended_Biggest_Natural_List : constant Extended_Biggest_Natural_List (1 .. 0) := (others => 0);
 
    type Biggest_Float is digits System.Max_Digits; -- The same for floatting point numbers
 
@@ -529,6 +656,7 @@ package Thick_Queries is
    --     Parenthesized expression
    --     'Pred, 'Succ, 'Pos, 'Val, 'First, 'Last
    --     Conversions and qualified expressions
+   --     Comparison operators
    --  Integer: (provided values are within System.Min_Int .. System.Max_Int)
    --     Literal
    --     Named number
@@ -555,15 +683,17 @@ package Thick_Queries is
    -- Elem must designate a type, a variable, a constant, a formal parameter,
    -- or a generic formal object.
    --
-   -- Returns the expressions that constrain the values of a discrete type.
+   -- Returns the expressions that constrain the values of a discrete or real type.
    -- Returned list has two elements
+   -- Enumerated type     : returns (First_Defining_Name, Last_Defining_Name)
    -- Signed integer type : returns (First_Expression, Last_Expression)
    -- Subtype of modular  : returns (First_Expression, Last_Expression)
    -- Modular type        : returns (Nil_Element, Mod_Expression)
-   -- Enumerated type     : returns (First_Defining_Name, Last_Defining_Name)
+   -- Real type           : returns (First_Expression, Last_Expression) if range explicitely specified
+   --                               (Nil_Element, Nil_Element) otherwise
    -- The expressions are replaced by Nil_Element if they cannot be determined (formal type, root type)
    --
-   -- Returns the bounds that constrain the indexes of an array type.
+   -- Returns the expressions that constrain the indexes of an array object or type.
    -- Returned list has an even number of elements (First(1), Last (1), First (2), Last (2), ...)
    -- Each pair of elements is the same as above
    --
@@ -573,6 +703,7 @@ package Thick_Queries is
    --   An_Expression
    --   A_Declaration
    --   A_Definition
+   --   A_Defining_Name
    --
    -- Appropriate Expression_Kind:
    --   An_Identifier
@@ -621,10 +752,11 @@ package Thick_Queries is
          Confidence : Result_Confidence;
          Overlap    : Variable_Overlap;
       end record;
-   Same_Variable : constant Proximity := (Certain, Complete);
+   Same_Variable       : constant Proximity := (Certain, Complete);
+   Different_Variables : constant Proximity := (Certain, None);
 
    function Variables_Proximity (Left, Right : Asis.Element) return Proximity;
-   -- Determines if Left and Right can possibly refer to (par of) the same variables.
+   -- Determines if Left and Right can possibly refer to (part of) the same variables.
    -- If Left or Right is not a variable, always returns (Certain, None)
    -- Overlap => None is only returned with Confidence => Certain
    --

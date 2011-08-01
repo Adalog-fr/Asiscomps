@@ -91,6 +91,21 @@ package body Thick_Queries is
       User_Error_Proc := To;
    end Set_Error_Procedure;
 
+   ---------------------
+   -- Biggest_Int_Img --
+   ---------------------
+
+   function Biggest_Int_Img (Item : Biggest_Int) return Wide_String is
+      Result : constant Wide_String := Biggest_Int'Wide_Image (Item); --## Rule line OFF Use_Img_Function
+      subtype Slide is Wide_String (1 .. Result'Length-1);
+   begin
+      if Item < 0 then
+         return Result;
+      else
+         return Slide (Result (2 .. Result'Last));
+      end if;
+   end Biggest_Int_Img;
+
    --------------------------
    -- Attribute_Name_Image --
    --------------------------
@@ -124,14 +139,69 @@ package body Thick_Queries is
          Result := Selector (Result);
       end if;
 
-      if Expression_Kind (Result) = An_Explicit_Dereference
-        or else Expression_Type_Kind (Result) = An_Access_Type_Definition
-      then
+      if Expression_Kind (Result) = An_Explicit_Dereference or else Is_Access_Expression (Result) then
          Result := Nil_Element;
       end if;
 
       return Result;
    end Called_Simple_Name;
+
+   ------------------------------------
+   -- Corresponding_Call_Description --
+   ------------------------------------
+
+   function Corresponding_Call_Description (Call : Asis.Element) return Call_Descriptor is
+      use Asis.Expressions;
+      Callee : Asis.Declaration;
+      Name   : Asis.Expression;
+   begin
+      if Expression_Kind (Call) = A_Function_Call then
+         Callee := A4G_Bugs.Corresponding_Called_Function (Call);
+      else
+         Callee := A4G_Bugs.Corresponding_Called_Entity (Call);
+      end if;
+
+      if Declaration_Kind (Callee) in A_Renaming_Declaration then
+         Name := A4G_Bugs.Corresponding_Base_Entity (Callee);
+         case Expression_Kind (Name) is
+            when An_Attribute_Reference =>
+               return (Kind => An_Attribute_Call);
+            when An_Explicit_Dereference =>
+               -- No possible implicit dereference here
+               return (Kind => A_Dereference_Call);
+            when An_Indexed_Component =>
+               -- Renaming of a member of an entry family
+               Name := Prefix (Name);
+               if Expression_Kind (Name) = A_Selected_Component then
+                  Name := Selector (Name);
+               end if;
+               Callee := Corresponding_Name_Declaration (Name);
+            when others =>
+               Callee:= Corresponding_Name_Declaration (Name);
+         end case;
+      end if;
+
+      if not Is_Nil (Callee) then
+         return (Kind => A_Regular_Call, Declaration => Callee);
+      end if;
+
+      if Is_Dispatching_Call (Call) then
+         return (Kind => A_Dispatching_Call);
+      end if;
+
+      Name := Called_Simple_Name (Call);
+      if Is_Nil (Name) then
+         return (Kind => A_Dereference_Call);
+      end if;
+
+      if Expression_Kind (Name) = An_Attribute_Reference then
+         return (Kind => An_Attribute_Call);
+      end if;
+
+      -- Short of being anything else, must be a predefined entity...
+      return (Kind => A_Predefined_Entity_Call);
+   end Corresponding_Call_Description;
+
 
    --------------------
    -- Called_Profile --
@@ -148,40 +218,38 @@ package body Thick_Queries is
          Callee := A4G_Bugs.Corresponding_Called_Entity (Call);
       end if;
 
-      if Is_Nil (Callee) then
-         -- Called subprogram not statically known
-         if Expression_Kind (Call) = A_Function_Call then
-            Name := Prefix (Call);
-         else
-            Name := Called_Name (Call);
-         end if;
-
-         if Expression_Kind (Name) = An_Explicit_Dereference then
-            Name := Prefix (Name);
-         end if;
-
-         if Expression_Kind (Name) = A_Selected_Component then
-            Name := Selector (Name);
-         end if;
-
-         if Expression_Type_Kind (Name) = An_Access_Type_Definition then
-            -- access to subprogram (or entry)
-            return Access_To_Subprogram_Parameter_Profile (Ultimate_Expression_Type (Name));
-
-         else
-            -- Dispatching Call, or call to a subprogram defined by an attribute (see Corresponding_Called_Entity
-            -- in the ASIS specification).
-            -- We have no way to get a profile. Sigh...
-            return Nil_Element_List;
-         end if;
-
-      else
+      if not Is_Nil (Callee) then
          if Declaration_Kind (Callee) in A_Procedure_Instantiation .. A_Function_Instantiation then
             Callee := Corresponding_Declaration (Callee);
          end if;
 
          return Parameter_Profile (Callee);
       end if;
+
+      -- Called subprogram not statically known
+      if Expression_Kind (Call) = A_Function_Call then
+         Name := Prefix (Call);
+      else
+         Name := Called_Name (Call);
+      end if;
+
+      if Expression_Kind (Name) = An_Explicit_Dereference then
+         Name := Prefix (Name);
+      end if;
+
+      if Expression_Kind (Name) = A_Selected_Component then
+         Name := Selector (Name);
+      end if;
+
+      if Is_Access_Expression (Name) then
+         -- access to subprogram (or entry)
+         return Access_To_Subprogram_Parameter_Profile (Ultimate_Expression_Type (Name));
+      end if;
+
+      -- Dispatching Call, or call to a subprogram defined by an attribute (see Corresponding_Called_Entity
+      -- in the ASIS specification).
+      -- We have no way to get a profile. Sigh...
+      return Nil_Element_List;
    end Called_Profile;
 
    -----------------
@@ -474,9 +542,9 @@ package body Thick_Queries is
    begin
       if Is_Nil (The_Type) then
          return Not_A_Type_Definition;
-      else
-         return Type_Kind (The_Type);
       end if;
+
+      return Type_Kind (The_Type);
    end Expression_Type_Kind;
 
 
@@ -501,16 +569,13 @@ package body Thick_Queries is
             when An_Expression =>
                case Expression_Kind (Elem) is
                   when A_Selected_Component =>
-                     if Is_Equal (Previous, Prefix (Elem) )
-                       and then Expression_Type_Kind (Previous) = An_Access_Type_Definition
-                     then
+                     if Is_Equal (Previous, Prefix (Elem)) and then Is_Access_Expression (Previous) then
                         -- We have the prefix of an implicit dereference
                         -- => it is actually a Read of the variable
                         return Read;
-                     else
-                        Previous := Elem;
-                        Elem     := Enclosing_Element (Elem);
                      end if;
+                     Previous := Elem;
+                     Elem     := Enclosing_Element (Elem);
 
                   when An_Identifier =>
                      Impossible ("enclosing element is an identifier", Elem);
@@ -518,14 +583,19 @@ package body Thick_Queries is
                   when An_Indexed_Component
                     | A_Slice
                     =>
-                     if Is_Equal (Previous, Prefix (Elem)) then
-                        -- Previous is the prefix
-                        Previous := Elem;
-                        Elem     := Enclosing_Element (Elem);
-                     else
+                     if not Is_Equal (Previous, Prefix (Elem)) then
                         -- Previous is part of the indexing or of the slice
                         return Read;
                      end if;
+
+                     -- Previous is the prefix
+                     if Is_Equal (Previous, Prefix (Elem)) and then Is_Access_Expression (Previous) then
+                        -- The prefix is an implicit dereference
+                        -- => it is actually a Read of the variable
+                        return Read;
+                     end if;
+                     Previous := Elem;
+                     Elem     := Enclosing_Element (Elem);
 
                   when A_Type_Conversion
                     | A_Qualified_Expression
@@ -674,17 +744,17 @@ package body Thick_Queries is
          end case;
       end if;
 
-      if Expression_Kind (Name) = A_Selected_Component then
-         case Definition_Kind (Ultimate_Expression_Type (Prefix (Name))) is
-            when A_Task_Definition | A_Protected_Definition =>
-               return Prefix (Name);
-            when others =>
-               return Nil_Element;
-         end case;
-      else
+      if Expression_Kind (Name) /= A_Selected_Component then
          -- Certainly not an external call
          return Nil_Element;
       end if;
+
+      case Definition_Kind (Ultimate_Expression_Type (Prefix (Name))) is
+         when A_Task_Definition | A_Protected_Definition =>
+            return Prefix (Name);
+         when others =>
+            return Nil_Element;
+      end case;
 
    end External_Call_Target;
 
@@ -718,7 +788,11 @@ package body Thick_Queries is
       Decl_Name_Enclosing : Asis.Element;
    begin   -- Full_Name_Image
       if Expression_Kind (The_Name) = An_Attribute_Reference then
-         return Full_Name_Image (Prefix (The_Name)) & ''' & Attribute_Name_Image (The_Name);
+         if Expression_Kind (Prefix (The_Name)) = A_Function_Call then
+            return Full_Name_Image (Prefix (Prefix (The_Name)), With_Profile) & ''' & Attribute_Name_Image (The_Name);
+         else
+            return Full_Name_Image (Prefix (The_Name), With_Profile) & ''' & Attribute_Name_Image (The_Name);
+         end if;
       end if;
 
       if Element_Kind (The_Name) = A_Defining_Name then
@@ -729,10 +803,26 @@ package body Thick_Queries is
          Decl_Name := Corresponding_Name_Definition (The_Name);
       end if;
 
-      -- Get rid of (annoying) special case:
-      -- A predefined operator that has no declaration.
-     if Is_Nil (Decl_Name) and then Expression_Kind (The_Name) = An_Operator_Symbol then
-         return "STANDARD." & Name_Image (The_Name) & Profile_Image (The_Name, With_Profile);
+      -- Get rid of (annoying) special cases where we have no declaration:
+      -- A predefined operator
+      -- A name of a dispatching call
+      if Is_Nil (Decl_Name) then
+         -- Predefined operators are declared in Standard. If no profile is required, we can
+         -- still build an image...
+         if Expression_Kind (The_Name) /= An_Operator_Symbol or With_Profile then
+            return "";
+         end if;
+
+         Parent := Enclosing_Element (The_Name);
+         while Expression_Kind (Parent) = A_Selected_Component loop
+            Parent := Enclosing_Element (Parent);
+         end loop;
+         if Is_Dispatching_Call (Parent) then
+            -- Too bad! A dispatching operator...
+            return "";
+         end if;
+
+         return "STANDARD." & Name_Image (The_Name);
       end if;
 
       -- Get rid of another annoying special case:
@@ -820,14 +910,13 @@ package body Thick_Queries is
                case Statement_Kind (Parent) is
                   when  A_Loop_Statement .. A_Block_Statement =>
                      -- Statements that can have a name
-                     if Is_Nil (Statement_Identifier (Parent)) then
-                        Anonymous_Count := Anonymous_Count + 1;
-                     else
+                     if not Is_Nil (Statement_Identifier (Parent)) then
                         return Full_Name_Image (Statement_Identifier (Parent), With_Profile)
                           & '.'
                           & Anonymous_Count * "_anonymous_."
                           & Simple_Name_Image (Decl_Name);
                      end if;
+                     Anonymous_Count := Anonymous_Count + 1;
                   when An_Accept_Statement =>
                      return Full_Name_Image (Names (Corresponding_Entry (Parent))(1), With_Profile)
                        & '.'
@@ -962,6 +1051,48 @@ package body Thick_Queries is
       end;
    end Corresponding_Pragma_Set;
 
+   --------------------------
+   -- Is_Access_Expression --
+   --------------------------
+
+   function Is_Access_Expression (The_Element : Asis.Expression) return Boolean is
+      use Asis.Expressions;
+
+      The_Type : constant Asis.Definition := Ultimate_Expression_Type (The_Element);
+      The_Name : Asis.Expression;
+      Decl     : Asis.Declaration;
+   begin
+      if Is_Nil (The_Type) then
+         -- This may mean that The_Element is of an anonymous access type
+         -- This can happen only if it is a (possibly selected) identifier.
+         if Expression_Kind (The_Element) = A_Selected_Component then
+            The_Name := Selector (The_Element);
+         else
+            The_Name := The_Element;
+         end if;
+         if Expression_Kind (The_Name) /= An_Identifier then
+            return False;
+         end if;
+
+         Decl := Corresponding_Name_Declaration (The_Name);
+         case Declaration_Kind (Decl) is
+            when A_Parameter_Specification
+               | A_Discriminant_Specification
+                 =>
+               return Trait_Kind (Decl) = An_Access_Definition_Trait;
+            when others =>
+               return False;
+         end case;
+
+      elsif Type_Kind (The_Type) = An_Access_Type_Definition then
+         return True;
+      elsif Formal_Type_Kind (The_Type) = A_Formal_Access_Type_Definition then
+         return True;
+      else
+         return False;
+      end if;
+   end Is_Access_Expression;
+
    ---------------------------
    -- Is_Callable_Construct --
    ---------------------------
@@ -1004,6 +1135,9 @@ package body Thick_Queries is
             case Expression_Kind (Element) is
                when An_Identifier =>
                   The_Declaration := Corresponding_Name_Declaration (Element);
+               when An_Enumeration_Literal =>
+                  -- Always considered a function
+                  return True;
                when A_Selected_Component =>
                   The_Declaration := Corresponding_Name_Declaration (Selector (Element));
                when An_Operator_Symbol =>
@@ -1064,24 +1198,38 @@ package body Thick_Queries is
          when An_Explicit_Dereference =>
             return False;
          when An_Indexed_Component =>
-            if Is_Static_Object (Prefix (Obj)) then
-               declare
-                  Indexes : constant Asis.Expression_List := Index_Expressions (Obj);
-               begin
-                  for I in Indexes'Range loop
-                     if Static_Expression_Value_Image (Indexes (I)) = "" then
-                        return False;
-                     end if;
-                  end loop;
-                  return True;
-               end;
-            else
+            if Is_Access_Expression (Prefix (Obj)) then
+               -- Implicit dereference
                return False;
             end if;
+
+            if not Is_Static_Object (Prefix (Obj)) then
+               return False;
+            end if;
+
+            declare
+               Indexes : constant Asis.Expression_List := Index_Expressions (Obj);
+            begin
+               for I in Indexes'Range loop
+                  if Static_Expression_Value_Image (Indexes (I)) = "" then
+                     return False;
+                  end if;
+               end loop;
+               return True;
+            end;
          when A_Slice =>
+            if Is_Access_Expression (Prefix (Obj)) then
+               -- Implicit dereference
+               return False;
+            end if;
+
             return Is_Static_Object (Prefix (Obj))
               and then Discrete_Constraining_Lengths (Slice_Range (Obj)) (1) /= Not_Static;
          when A_Selected_Component =>
+            if Is_Access_Expression (Prefix (Obj)) then
+               -- Implicit dereference
+               return False;
+            end if;
             return Is_Static_Object (Selector (Obj)) and then Is_Static_Object (Prefix (Obj));
          when A_Type_Conversion | A_Qualified_Expression =>
             return Is_Static_Object (Converted_Or_Qualified_Expression (Obj));
@@ -1120,7 +1268,7 @@ package body Thick_Queries is
 
    function Subtype_Simple_Name (Definition : Asis.Definition) return Asis.Expression is
       Result : constant Asis.Expression
-        := Asis.Definitions.Subtype_Mark (Definition); --##RULE LINE OFF Use_Subtype_Simple_Name
+        := Asis.Definitions.Subtype_Mark (Definition); --##RULE LINE OFF Avoid_Query
    begin
       if Expression_Kind (Result) = A_Selected_Component then
          return Asis.Expressions.Selector (Result);
@@ -1129,14 +1277,54 @@ package body Thick_Queries is
       end if;
    end Subtype_Simple_Name;
 
+   ---------------
+   -- Is_Access --
+   ---------------
+
+   function Is_Access (The_Subtype : Asis.Declaration) return Boolean is
+      Good_Def : constant Asis.Definition := Type_Declaration_View (Ultimate_Type_Declaration (The_Subtype));
+   begin
+      if Type_Kind (Good_Def) = An_Access_Type_Definition then
+         return True;
+      elsif Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition then
+         return True;
+      else
+         return False;
+      end if;
+   end Is_Access;
 
    ---------------------------
    -- Is_Class_Wide_Subtype --
    ---------------------------
 
-   function Is_Class_Wide_Subtype (The_Subtype : Asis.Declaration) return Boolean is
-      ST : Asis.Declaration := The_Subtype;
+   function Is_Class_Wide_Subtype (The_Subtype : Asis.Element) return Boolean is
+      use Asis.Expressions;
+
+      ST        : Asis.Declaration;
+      Good_Name : Asis.Expression;
    begin
+      case Element_Kind (The_Subtype) is
+         when A_Declaration =>
+            ST := The_Subtype;
+         when A_Defining_Name =>
+            ST := Enclosing_Element (The_Subtype);
+         when An_Expression =>
+            Good_Name := The_Subtype;
+            if Expression_Kind (Good_Name) = A_Selected_Component then
+               Good_Name := Selector (Good_Name);
+            end if;
+            if Expression_Kind (Good_Name) = An_Attribute_Reference then
+               return A4G_Bugs.Attribute_Kind (Good_Name) = A_Class_Attribute;
+            end if;
+            ST := Corresponding_Name_Declaration (Good_Name);
+         when others =>
+            return False;
+      end case;
+
+      -- If it is not a *sub*type, it cannot be class-wide
+      if Declaration_Kind (ST) /= A_Subtype_Declaration then
+         return False;
+      end if;
       -- We must unwind subtypes up to the last subtype (but not up to the type as
       -- Corresponding_First_Subtype would do), and check if the subtype mark is a
       -- 'Class attribute.
@@ -1160,7 +1348,11 @@ package body Thick_Queries is
    -- Is_Limited --
    ----------------
 
-   function Is_Limited (The_Subtype : Asis.Declaration) return Boolean is
+   Limited_Traits : constant array (Trait_Kinds) of Boolean
+     := (  A_Limited_Trait           | A_Limited_Private_Trait
+         | An_Abstract_Limited_Trait | An_Abstract_Limited_Private_Trait => True,
+         others => False);
+   function Is_Limited (The_Element : Asis.Element) return Boolean is
       use Asis.Definitions, Asis.Expressions;
 
       function Has_Limited_Components (Def : Asis.Definition) return Boolean is
@@ -1168,6 +1360,7 @@ package body Thick_Queries is
          --   A_Record_Definition
          --   A_Null_Record_Definition
          --   A_Variant
+         Comp_Name : Asis.Expression;
       begin
          if Definition_Kind (Def) = A_Null_Record_Definition then
             return False;
@@ -1180,11 +1373,16 @@ package body Thick_Queries is
                case Element_Kind (Components (I)) is
                   when A_Declaration =>
                      -- Can only be A_Component_Declaration
-                     if Is_Limited (Corresponding_Name_Declaration
-                                    (Subtype_Simple_Name
-                                     (Component_Subtype_Indication
-                                      (Object_Declaration_View (Components (I))))))
-                     then
+                     Comp_Name := Subtype_Simple_Name (Component_Subtype_Indication
+                                                       (Object_Declaration_View (Components (I))));
+                     if Expression_Kind (Comp_Name) = An_Attribute_Reference then
+                        -- Limitedness is the same for 'Base and 'Class as the prefix
+                        Comp_Name := Prefix (Comp_Name);
+                        if Expression_Kind (Comp_Name) = A_Selected_Component then
+                           Comp_Name := Prefix (Comp_Name);
+                        end if;
+                     end if;
+                     if Is_Limited (Corresponding_Name_Declaration (Comp_Name)) then
                         return True;
                      end if;
                   when A_Definition =>
@@ -1214,52 +1412,101 @@ package body Thick_Queries is
          return False;
       end Has_Limited_Components;
 
-      Decl : Asis.Declaration  := The_Subtype;
-      Name : Asis.Expression;
+      Decl : Asis.Element := The_Element;
    begin
       loop
-         case Declaration_Kind (Decl) is
-            when A_Private_Type_Declaration =>
-               return Trait_Kind (Decl) = A_Limited_Private_Trait;
-
-            when A_Private_Extension_Declaration =>
-               -- A private extension is limited iff the parent type is limited
-               Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                         (Ancestor_Subtype_Indication
-                                                            (Type_Declaration_View (Decl))));
-            when An_Ordinary_Type_Declaration =>
-               case Type_Kind (Type_Declaration_View (Decl)) is
-                  when A_Record_Type_Definition =>
-                     if Trait_Kind (Decl) = A_Limited_Trait then
-                        return True;
-                     end if;
-                     -- A record type is limited if any component is limited...
-                     return Has_Limited_Components (Asis.Definitions.Record_Definition (Type_Declaration_View (Decl)));
-                  when A_Tagged_Record_Type_Definition =>
-                     -- Tagged record types must be declared limited if they have limited components
-                     --   => no need to check subcomponents
-                     return Trait_Kind (Decl) = A_Limited_Trait;
-                  when A_Derived_Type_Definition =>
-                     Name := Subtype_Simple_Name (Parent_Subtype_Indication (Type_Declaration_View (Decl)));
-                     if Expression_Kind (Name) = An_Attribute_Reference then
-                        -- T'Base or T'Class
-                        Name := Prefix (Name);
-                        if Expression_Kind (Name) = A_Selected_Component then
-                           Name := Selector (Name);
-                        end if;
-                     end if;
-                     Decl := Corresponding_First_Subtype (Corresponding_Name_Declaration (Name));
-                  when A_Derived_Record_Extension_Definition =>
-                     -- A record extension is limited iff the (ultimate) parent type is limited
-                     Decl := A4G_Bugs.Corresponding_Root_Type (Type_Declaration_View (Decl));
-                  when others =>
+         case Element_Kind (Decl) is
+            when A_Declaration =>
+               case Declaration_Kind (Decl) is
+                  when A_Variable_Declaration
+                     | A_Constant_Declaration
+                     | A_Deferred_Constant_Declaration
+                     | A_Single_Protected_Declaration
+                     | A_Single_Task_Declaration
+                     | A_Component_Declaration
+                       =>
+                     Decl := Object_Declaration_View (Decl);
+                  when A_Discriminant_Specification
+                     | A_Parameter_Specification
+                     | A_Formal_Object_Declaration
+                     | An_Object_Renaming_Declaration
+                       =>
+                     Decl := Declaration_Subtype_Mark (Decl);
+                  when A_Private_Type_Declaration
+                     | A_Formal_Type_Declaration
+                       =>
+                     return Limited_Traits (Trait_Kind (Decl));
+                  when An_Ordinary_Type_Declaration
+                     | A_Private_Extension_Declaration
+                     | A_Subtype_Declaration
+                       =>
+                     Decl := Type_Declaration_View (Corresponding_First_Subtype (Decl));
+                  when A_Task_Type_Declaration
+                     | A_Protected_Type_Declaration
+                       =>
+                     return True;
+                  when others => -- Declaration_Kind
                      return False;
                end case;
 
-            when A_Task_Type_Declaration | A_Protected_Type_Declaration =>
-               return True;
+            when A_Definition =>
+               case Definition_Kind (Decl) is
+                  when A_Type_Definition =>
+                     case Type_Kind (Decl) is
+                        when A_Derived_Type_Definition =>
+                           Decl := Parent_Subtype_Indication (Decl);
+                        when A_Derived_Record_Extension_Definition =>
+                           -- A record extension is limited iff the (ultimate) parent type is limited
+                           Decl := A4G_Bugs.Corresponding_Root_Type (Decl);
+                        when An_Unconstrained_Array_Definition
+                           | A_Constrained_Array_Definition
+                             =>
+                           -- The array type is limited if its components are
+                           Decl := Component_Subtype_Indication (Array_Component_Definition (Decl));
+                        when A_Record_Type_Definition =>
+                           if Trait_Kind (Decl) = A_Limited_Trait then
+                              return True;
+                           end if;
+                           -- A record type is limited if any component is limited...
+                           return Has_Limited_Components (Asis.Definitions.Record_Definition (Decl));
+                        when A_Tagged_Record_Type_Definition =>
+                           -- Tagged record types must be declared limited if they have limited components
+                           --   => no need to check subcomponents
+                           return Trait_Kind (Decl) = A_Limited_Trait;
+                        when others => -- Type_Kind
+                           return False;
+                     end case;
 
-            when others =>
+                  when A_Private_Extension_Definition =>
+                     -- A private extension is limited iff the parent type is limited
+                     Decl := Ancestor_Subtype_Indication (Decl);
+
+                  when A_Subtype_Indication =>
+                     Decl := Subtype_Simple_Name (Decl);
+
+                  when others => -- Definition_Kind
+                     return False;
+               end case;
+
+            when An_Expression =>
+               case Expression_Kind (Decl) is
+                     when An_Identifier
+                     | An_Operator_Symbol
+                     | A_Character_Literal
+                     | An_Enumeration_Literal
+                       =>
+                     Decl := Corresponding_Name_Declaration (Decl);
+                  when A_Selected_Component =>
+                     Decl := Selector (Decl);
+                  when An_Attribute_Reference =>
+                     -- T'Base or T'Class
+                     Decl := Prefix (Decl);
+                  when others => -- Expression_Kind
+                     return False;
+               end case;
+
+            when others => -- Element_Kind
+               -- Including Not_An_Element
                return False;
          end case;
       end loop;
@@ -1277,12 +1524,11 @@ package body Thick_Queries is
          case Declaration_Kind (Decl) is
             when An_Ordinary_Type_Declaration =>
                if Type_Kind (Type_Declaration_View (Decl))
-                 in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition
+                 not in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition
                then
-                  Decl := A4G_Bugs.Corresponding_Root_Type (Type_Declaration_View (Decl));
-               else
                   return Decl;
                end if;
+               Decl := A4G_Bugs.Corresponding_Root_Type (Type_Declaration_View (Decl));
             when A_Task_Type_Declaration
               | A_Protected_Type_Declaration
               | A_Formal_Type_Declaration
@@ -1306,15 +1552,91 @@ package body Thick_Queries is
    -- Is_Type_Declaration_Kind --
    ------------------------------
 
-   function Is_Type_Declaration_Kind (The_Subtype : Asis.Declaration; Kind : Asis.Declaration_Kinds) return Boolean is
+   function Is_Type_Declaration_Kind (The_Subtype : Asis.Declaration;
+                                      The_Kind    : Asis.Declaration_Kinds)
+                                      return Boolean
+   is
       Decl : Asis.Declaration := The_Subtype;
    begin
       Decl := Corresponding_First_Subtype (Decl);
       if Type_Kind (Type_Declaration_View (Decl)) = A_Derived_Type_Definition then
          Decl := A4G_Bugs.Corresponding_Root_Type (Type_Declaration_View (Decl));
       end if;
-      return Declaration_Kind (Decl) = Kind;
+      return Declaration_Kind (Decl) = The_Kind;
    end Is_Type_Declaration_Kind;
+
+
+   --------------------------
+   -- Size_Clause_Expression --
+   --------------------------
+
+   function Size_Clause_Expression (Name : Asis.Element) return Asis.Expression is
+      use Asis.Clauses, Asis.Expressions;
+      Decl      : Asis.Declaration;
+      Good_Name : Asis.Expression;
+   begin
+      case Element_Kind (Name) is
+         when A_Defining_Name =>
+            Decl := Enclosing_Element (Name);
+         when An_Expression =>
+            Good_Name := Name;
+            loop
+               case Expression_Kind (Good_Name) is
+                  when A_Selected_Component =>
+                     Good_Name := Selector (Good_Name);
+                     if Declaration_Kind (Corresponding_Name_Declaration (Good_Name))
+                        in A_Discriminant_Specification .. A_Component_Declaration
+                     then
+                        -- 'Size of a record field => give up
+                        return Nil_Element;
+                     end if;
+                  when An_Indexed_Component =>
+                     -- A(I)'Size: give up
+                     return Nil_Element;
+                  when An_Attribute_Reference =>
+                     case A4G_Bugs.Attribute_Kind (Good_Name) is
+                        when A_Base_Attribute =>
+                           Good_Name := Prefix (Good_Name);
+                        when A_Class_Attribute =>
+                           -- There is no declaration for class wide type, hence no way
+                           -- to retrieve the size clause.
+                           -- Anyway, putting a size clause on a class-wide type seems
+                           -- a strange thing to do...
+                           return Nil_Element;
+                        when others =>
+                           Impossible ("unexpected attribute", Good_Name);
+                     end case;
+                  when others =>
+                     exit;
+               end case;
+            end loop;
+            Decl := Corresponding_Name_Declaration (Good_Name);
+         when others =>
+            Impossible ("Bad parameter to Type_Size_Expression", Name);
+      end case;
+
+      if Declaration_Kind (Decl) = An_Ordinary_Type_Declaration then
+         Decl := Corresponding_First_Subtype (Decl);
+      end if;
+      if Is_Nil (Decl) then
+         return Nil_Element;
+      end if;
+
+      declare
+         Reprs : constant Asis.Representation_Clause_List := Corresponding_Representation_Clauses (Decl);
+      begin
+         for R in Reprs'Range loop
+            if Representation_Clause_Kind (Reprs (R)) = An_Attribute_Definition_Clause
+              and then A4G_Bugs.Attribute_Kind (Representation_Clause_Name (Reprs (R))) = A_Size_Attribute
+            then
+               return Representation_Clause_Expression (Reprs (R));
+            end if;
+         end loop;
+
+         -- No size clause found
+         return Nil_Element;
+      end;
+   end Size_Clause_Expression;
 
 
    ------------------------------------
@@ -1322,7 +1644,7 @@ package body Thick_Queries is
    ------------------------------------
 
    function Contains_Type_Declaration_Kind (The_Subtype : Asis.Declaration;
-                                            Kind        : Asis.Declaration_Kinds) return Boolean is
+                                            The_Kind    : Asis.Declaration_Kinds) return Boolean is
       use Asis.Definitions, Asis.Expressions;
 
       function Components_Contain_Type_Declaration_Kind (Components : Asis.Record_Component_List) return Boolean is
@@ -1340,7 +1662,7 @@ package body Thick_Queries is
                         Name := Selector (Name);
                      end if;
                   end if;
-                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (Name), Kind) then
+                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (Name), The_Kind) then
                      return True;
                   end if;
                when A_Definition =>
@@ -1390,7 +1712,7 @@ package body Thick_Queries is
                      Impossible ("Wrong declaration_subtype_mark", SM);
                end case;
 
-               if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (SM), Kind) then
+               if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (SM), The_Kind) then
                   return True;
                end if;
             end loop;
@@ -1408,93 +1730,91 @@ package body Thick_Queries is
          Def  := Type_Declaration_View (Decl);
       end if;
 
-      if Declaration_Kind (Decl) = Kind then
+      if Declaration_Kind (Decl) = The_Kind then
          return True;
-      else
-         case Declaration_Kind (Decl) is
-            when An_Ordinary_Type_Declaration =>
-               case Type_Kind (Def) is
-                  when An_Unconstrained_Array_Definition | A_Constrained_Array_Definition =>
-                     return Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                                            (Subtype_Simple_Name
-                                                             (Component_Subtype_Indication
-                                                              (Array_Component_Definition (Def)))),
-                                                            Kind);
-
-                  when A_Record_Type_Definition |A_Tagged_Record_Type_Definition =>
-                     if Definition_Kind (Asis.Definitions.Record_Definition (Def)) /= A_Null_Record_Definition
-                       and then Components_Contain_Type_Declaration_Kind (Record_Components
-                                                                          (Asis.Definitions.Record_Definition (Def)))
-                     then
-                        return True;
-                     end if;
-                     return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-                  when A_Derived_Record_Extension_Definition =>
-                     if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                                        (Subtype_Simple_Name (Parent_Subtype_Indication (Def))),
-                                                       Kind)
-                     then
-                        return True;
-                     end if;
-                     if Definition_Kind (Asis.Definitions.Record_Definition (Def)) /= A_Null_Record_Definition
-                       and then Components_Contain_Type_Declaration_Kind (Record_Components
-                                                                          (Asis.Definitions.Record_Definition (Def)))
-                     then
-                        return True;
-                     end if;
-                     return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-                  when others =>
-                     return False;
-               end case;
-
-
-            when A_Task_Type_Declaration =>
-               -- Tasks contain no components
-               return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-            when A_Protected_Type_Declaration =>
-               -- Only the private part can contain components
-               declare
-                  Decls : constant Asis.Declarative_Item_List := Private_Part_Items (Def);
-               begin
-                  for I in Decls'Range loop
-                     if Declaration_Kind (Decls (I)) = A_Component_Declaration
-                       and then Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                                                (Subtype_Simple_Name
-                                                                 (Component_Subtype_Indication
-                                                                  (Object_Declaration_View (Decls (I))))),
-                                                                Kind)
-                     then
-                        return True;
-                     end if;
-                  end loop;
-               end;
-               return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-            when A_Private_Extension_Declaration =>
-               if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                                  (Subtype_Simple_Name (Ancestor_Subtype_Indication (Def))),
-                                                 Kind)
-               then
-                  return True;
-               end if;
-               return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-            when others =>
-               return False;
-         end case;
       end if;
+
+      case Declaration_Kind (Decl) is
+         when An_Ordinary_Type_Declaration =>
+            case Type_Kind (Def) is
+               when An_Unconstrained_Array_Definition | A_Constrained_Array_Definition =>
+                  return Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
+                                                         (Subtype_Simple_Name
+                                                          (Component_Subtype_Indication
+                                                           (Array_Component_Definition (Def)))),
+                                                         The_Kind);
+
+               when A_Record_Type_Definition | A_Tagged_Record_Type_Definition =>
+                  if Definition_Kind (Asis.Definitions.Record_Definition (Def)) /= A_Null_Record_Definition
+                    and then Components_Contain_Type_Declaration_Kind (Record_Components
+                                                                       (Asis.Definitions.Record_Definition (Def)))
+                  then
+                     return True;
+                  end if;
+                  return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
+
+               when A_Derived_Record_Extension_Definition =>
+                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
+                                                     (Subtype_Simple_Name (Parent_Subtype_Indication (Def))),
+                                                    The_Kind)
+                  then
+                     return True;
+                  end if;
+                  if Definition_Kind (Asis.Definitions.Record_Definition (Def)) /= A_Null_Record_Definition
+                    and then Components_Contain_Type_Declaration_Kind (Record_Components
+                                                                       (Asis.Definitions.Record_Definition (Def)))
+                  then
+                     return True;
+                  end if;
+                  return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
+
+               when others =>
+                  return False;
+            end case;
+
+
+         when A_Task_Type_Declaration =>
+            -- Tasks contain no components
+            return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
+
+         when A_Protected_Type_Declaration =>
+            -- Only the private part can contain components
+            declare
+               Decls : constant Asis.Declarative_Item_List := Private_Part_Items (Def);
+            begin
+               for I in Decls'Range loop
+                  if Declaration_Kind (Decls (I)) = A_Component_Declaration
+                    and then Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
+                                                             (Subtype_Simple_Name
+                                                              (Component_Subtype_Indication
+                                                               (Object_Declaration_View (Decls (I))))),
+                                                             The_Kind)
+                  then
+                     return True;
+                  end if;
+               end loop;
+            end;
+            return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
+
+         when A_Private_Extension_Declaration =>
+            if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
+                                               (Subtype_Simple_Name (Ancestor_Subtype_Indication (Def))),
+                                              The_Kind)
+            then
+               return True;
+            end if;
+            return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
+
+         when others =>
+            return False;
+      end case;
    end Contains_Type_Declaration_Kind;
 
    -------------------
    -- Profile_Image --
    -------------------
 
-   function Profile_Image (The_Name : Asis.Element; With_Profile : Boolean := True)
-                          return Wide_String
-   is
+   function Profile_Image (The_Name : Asis.Element; With_Profile : Boolean := True) return Wide_String is
       use Asis.Expressions;
 
       Decl_Name : Asis.Defining_Name;
@@ -1533,7 +1853,7 @@ package body Thick_Queries is
          end if;
       end Build_Names;
 
-   begin
+   begin   -- Profile_Image
       if Element_Kind (The_Name) = A_Defining_Name then
          Decl_Name := Enclosing_Element (The_Name);
       elsif Expression_Kind (The_Name) = A_Selected_Component then
@@ -1542,22 +1862,22 @@ package body Thick_Queries is
          Decl_Name := Corresponding_Name_Declaration (The_Name);
       end if;
 
-      if Is_Callable_Construct (The_Name) then
-         declare
-            Profile_Names : constant Profile_Descriptor := Types_Profile (Decl_Name);
-         begin
-            if Is_Nil (Profile_Names.Result_Type.Name) then
-               -- A procedure (or entry...)
-               return '{' & Build_Names (Profile_Names.Formals) & '}';
-            else
-               -- A function
-               return '{' & Build_Names (Profile_Names.Formals) & ':' &
-                 Entry_Name (Profile_Names.Result_Type) & '}';
-            end if;
-         end;
-      else
+      if  not Is_Callable_Construct (The_Name) then
          return "";
       end if;
+
+      declare
+         Profile_Names : constant Profile_Descriptor := Types_Profile (Decl_Name);
+      begin
+         if Is_Nil (Profile_Names.Result_Type.Name) then
+            -- A procedure (or entry...)
+            return '{' & Build_Names (Profile_Names.Formals) & '}';
+         else
+            -- A function
+            return '{' & Build_Names (Profile_Names.Formals) & ':' &
+            Entry_Name (Profile_Names.Result_Type) & '}';
+         end if;
+      end;
    end Profile_Image;
 
    -------------------
@@ -1565,10 +1885,11 @@ package body Thick_Queries is
    -------------------
 
    function Types_Profile (Declaration : in Asis.Declaration)  return Profile_Descriptor is
-      use Asis.Expressions;
 
       function Build_Entry (Mark : Asis.Element) return Profile_Entry is
          -- To be honnest, builds the entry except the Is_Access field
+         use Asis.Expressions;
+
          Good_Mark : Asis.Element;
          Attribute : Type_Attribute;
          Decl      : Asis.Declaration;
@@ -1628,14 +1949,13 @@ package body Thick_Queries is
             declare
                Names_Rest : constant Name_List := Names (Parameters (I));
             begin
-               if Names_Rest'Length = 1 then
-                  Result_Inx := Result_Inx + 1;
-                  Result (Result_Inx) := Build_Entry (Declaration_Subtype_Mark (Parameters (I)));
-                  Result (Result_Inx).Is_Access := Trait_Kind (Parameters (I)) = An_Access_Definition_Trait;
-               else
-                  return Result (1 .. Result_Inx) &
-                    Build_Profile (Parameters (I .. Parameters'Last));
+               if Names_Rest'Length /= 1 then
+                  return Result (1 .. Result_Inx) & Build_Profile (Parameters (I .. Parameters'Last));
                end if;
+
+               Result_Inx := Result_Inx + 1;
+               Result (Result_Inx) := Build_Entry (Declaration_Subtype_Mark (Parameters (I)));
+               Result (Result_Inx).Is_Access := Trait_Kind (Parameters (I)) = An_Access_Definition_Trait;
             end;
          end loop;
          return Result;
@@ -1698,20 +2018,16 @@ package body Thick_Queries is
       end;
    end Types_Profile;
 
+   ----------------------------------------------
+   -- Corresponding_Expression_Type_Definition --
+   ----------------------------------------------
 
-   ------------------------------
-   -- Ultimate_Expression_Type --
-   ------------------------------
-
-   function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition is
+   function Corresponding_Expression_Type_Definition (The_Element : Asis.Expression) return Asis.Definition is
       use Asis.Expressions;
-
       Local_Elem : Asis.Element := A4G_Bugs.Corresponding_Expression_Type (The_Element);
       Def        : Asis.Definition;
    begin
       if Is_Nil (Local_Elem) then
-         -- The_Element is a package, subprogram, task...
-         -- For task and protected, we can still go to the definition
          case Expression_Kind (The_Element) is
             when A_Selected_Component =>
                Local_Elem := Selector (The_Element);
@@ -1745,6 +2061,23 @@ package body Thick_Queries is
          end case;
       end if;
 
+      -- Normal case, we have a type declaration
+      return Type_Declaration_View (Corresponding_First_Subtype (Local_Elem));
+   end Corresponding_Expression_Type_Definition;
+
+   ------------------------------
+   -- Ultimate_Expression_Type --
+   ------------------------------
+
+   function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition is
+      Local_Elem : Asis.Element := A4G_Bugs.Corresponding_Expression_Type (The_Element);
+   begin
+      if Is_Nil (Local_Elem) then
+         -- The_Element is a package, subprogram, task...
+         -- For array, task and protected, we can still go to the definition
+         return Corresponding_Expression_Type_Definition (The_Element);
+      end if;
+
       -- Go to the full declaration if necessary (incomplete and private)
       if Declaration_Kind (Local_Elem) in
         An_Incomplete_Type_Declaration .. A_Private_Extension_Declaration
@@ -1770,6 +2103,22 @@ package body Thick_Queries is
 
       return Local_Elem;
    end Ultimate_Expression_Type;
+
+
+   -----------------
+   -- Simple_Name --
+   -----------------
+
+   function Simple_Name (The_Name : Asis.Expression) return Asis.Expression is
+      use Asis.Expressions;
+   begin
+      if Expression_Kind (The_Name) = A_Selected_Component then
+         return Selector (The_Name);
+      else
+         return The_Name;
+      end if;
+   end Simple_Name;
+
 
    -------------------
    -- Ultimate_Name --
@@ -1879,32 +2228,49 @@ package body Thick_Queries is
       if Is_Nil (Parent_Name) then
          -- Element was the declaration of a compilation unit
          return False;
-
-      else
-         Parent_Decl := Enclosing_Element (Parent_Name);
-         loop
-            case Declaration_Kind (Parent_Decl) is
-               when A_Generic_Declaration =>
-                  return True;
-               when A_Procedure_Body_Declaration
-                 | A_Function_Body_Declaration
-                 | A_Package_Body_Declaration
-                 =>
-                  if Is_Subunit (Parent_Decl) then
-                     Parent_Decl := Corresponding_Declaration (Corresponding_Body_Stub (Parent_Decl));
-                  else
-                     Parent_Decl := Corresponding_Declaration (Parent_Decl);
-                     -- If there is no explicit specification, it cannot be generic
-                     exit when Is_Nil (Parent_Decl);
-                  end if;
-               when others =>
-                  exit;
-            end case;
-         end loop;
       end if;
+
+      Parent_Decl := Enclosing_Element (Parent_Name);
+      loop
+         case Declaration_Kind (Parent_Decl) is
+            when A_Generic_Declaration =>
+               return True;
+            when A_Procedure_Body_Declaration
+               | A_Function_Body_Declaration
+               | A_Package_Body_Declaration
+                 =>
+               if Is_Subunit (Parent_Decl) then
+                  Parent_Decl := Corresponding_Declaration (Corresponding_Body_Stub (Parent_Decl));
+               else
+                  Parent_Decl := Corresponding_Declaration (Parent_Decl);
+                  -- If there is no explicit specification, it cannot be generic
+                  exit when Is_Nil (Parent_Decl);
+               end if;
+            when others =>
+               exit;
+         end case;
+      end loop;
 
       return Is_Part_Of_Generic (Enclosing_Element (Parent_Name));
    end Is_Part_Of_Generic;
+
+   ---------------------------------
+   -- Definition_Compilation_Unit --
+   ---------------------------------
+
+   function Definition_Compilation_Unit (Element : in Asis.Element) return Asis.Compilation_Unit is
+      use Asis.Expressions;
+      Def : Asis.Defining_Name := Element;
+   begin
+      if Element_Kind (Element) = An_Expression then
+         if Expression_Kind (Element) = A_Selected_Component then
+            Def := Selector (Def);
+         end if;
+         Def := Corresponding_Name_Definition (Def);
+      end if;
+
+      return Enclosing_Compilation_Unit (Def);
+   end Definition_Compilation_Unit;
 
    -----------------------
    -- Actual_Parameters --
@@ -1945,6 +2311,10 @@ package body Thick_Queries is
          Dim_Expr : constant Asis.Expression_List := Attribute_Designator_Expressions (Attr);
          Dim      : Positive;
       begin
+         if Bounds'Length = 0 then
+            return (1..2 => Nil_Element);
+         end if;
+
          if Is_Nil (Dim_Expr) then
             Dim := 1;
          else
@@ -1992,7 +2362,16 @@ package body Thick_Queries is
                   Result       : Asis.Expression_List (1 .. 2*Index_Ranges'Length);
                begin
                   for I in Index_Ranges'Range loop
-                     Result (2*I-1 .. 2*I) := Discrete_Range_Bounds (Index_Ranges (I));
+                     declare
+                        Bounds : constant Asis.Expression_List := Discrete_Range_Bounds (Index_Ranges (I));
+                     begin
+                        if Bounds = Nil_Element_List then
+                           -- Non static...
+                           Result (2 * I - 1 .. 2 * I) := (Nil_Element, Nil_Element);
+                        else
+                           Result (2 * I - 1 .. 2 * I) := Bounds;
+                        end if;
+                     end;
                   end loop;
                   return Result;
                end;
@@ -2003,287 +2382,274 @@ package body Thick_Queries is
         end case;
       end Constraint_Bounds;
 
-      Item       : Asis.Element := Elem; -- This item will navigate until we find the appropriate definition
-      Item_Def   : Asis.Definition;
-      Parent     : Subtype_Indication;
-      Constraint : Asis.Definition;
+      Item             : Asis.Element := Elem; -- This item will navigate until we find the appropriate definition
+      Constraint       : Asis.Definition;
+      No_Unconstrained : Boolean := False;
+      -- In the case of an unconstrained array type, we normally return the indices of the index type.
+      -- However, in the case of an object of an unconstrained type, the constraint is inherited from
+      -- the initial (or actual) value, and hence not available. No_Unconstrained is set to True
+      -- when moving from an object declaration to its type to prevent returning the indices of the
+      -- unconstrained type.
    begin  -- Discrete_Constraining_Bounds
-      -- Get rid of cases when we have directly a definition (managed by other functions)
-      case Definition_Kind (Elem) is
-         when A_Constraint =>
-            return Constraint_Bounds (Elem);
-         when A_Discrete_Range
-           | A_Discrete_Subtype_Definition
-           =>
-            return Discrete_Range_Bounds (Elem);
-         when A_Type_Definition =>
-            case Type_Kind (Elem) is
-               when An_Unconstrained_Array_Definition =>
-                  declare
-                     Index_Defs : constant Asis.Definition_List := Index_Subtype_Definitions (Elem);
-                     Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
-                  begin
-                     -- Index_Defs can only contain A_Discrete_Subtype_Indication here
-                     for I in Index_Defs'Range loop
-                        Result (2*I-1 .. 2*I) := Discrete_Constraining_Bounds (Index_Defs (I));
-                     end loop;
-
-                     return Result;
-                  end;
-               when A_Constrained_Array_Definition =>
-                  declare
-                     Index_Defs : constant Asis.Definition_List := Discrete_Subtype_Definitions (Elem);
-                     Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
-                  begin
-                     for I in Index_Defs'Range loop
-                        Result (2*I-1 .. 2*I) := Discrete_Range_Bounds (Index_Defs (I));
-                     end loop;
-
-                     return Result;
-                  end;
-               when others =>
-                  null;
-            end case;
-         when A_Formal_Type_Definition =>
-            case Formal_Type_Kind (Elem) is
-               when A_Formal_Unconstrained_Array_Definition =>
-                  declare
-                     Index_Defs : constant Asis.Definition_List := Index_Subtype_Definitions (Elem);
-                     Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
-                  begin
-                     -- Index_Defs can only contain A_Discrete_Subtype_Indication here
-                     for I in Index_Defs'Range loop
-                        Result (2*I-1 .. 2*I) := Discrete_Constraining_Bounds (Index_Defs (I));
-                     end loop;
-
-                     return Result;
-                  end;
-               when A_Formal_Constrained_Array_Definition =>
-                  declare
-                     Index_Defs : constant Asis.Definition_List := Discrete_Subtype_Definitions (Elem);
-                     Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
-                  begin
-                     for I in Index_Defs'Range loop
-                        Result (2*I-1 .. 2*I) := Discrete_Range_Bounds (Index_Defs (I));
-                     end loop;
-
-                     return Result;
-                  end;
-               when others =>
-                  null;
-            end case;
-         when others =>
-            -- Including Not_A_Definition
-            null;
-      end case;
-
-      -- Find a good declaration
       loop
-         if Element_Kind (Item) = An_Expression then
-            -- A (possibly selected) name
-            case Expression_Kind (Item) is
-               when A_Selected_Component =>
-                  Item := Corresponding_Name_Declaration (Selector (Item));
-               when An_Attribute_Reference =>
-                  -- We cannot get to the bounds of T'Base, and taking T instead would be misleading
-                  -- There is no applicable constraints for 'Class
-                  -- Other attributes are values or subprograms, not interesting for us.
-                  -- Therefore, in all cases:
-                  return Nil_Element_List;
-               when An_Explicit_Dereference =>
-                  -- We must go to the declaration of the type referenced by the prefix
-                  Item := Type_Declaration_View (A4G_Bugs.Corresponding_Expression_Type (Prefix (Item)));
-                  if Access_Type_Kind (Item) in An_Access_To_Procedure .. An_Access_To_Protected_Function then
-                     return Nil_Element_List;
-                  end if;
-                  Item       := Asis.Definitions.Access_To_Object_Definition (Item);
-                  Constraint := Subtype_Constraint (Item);
-                  if Is_Nil (Constraint) then
-                     Item :=  Corresponding_Name_Declaration (Subtype_Simple_Name (Item));
-                  else
-                     -- Constraint given in the subtype => no need to go further
-                     return Constraint_Bounds (Constraint);
-                  end if;
-               when A_Function_Call =>
-                  -- The constraint is the one of the return type
-                  Item := A4G_Bugs.Corresponding_Expression_Type (Item);
-               when others =>
-                   Item := Corresponding_Name_Declaration (Item);
-            end case;
-         end if;
-
-         -- Invariant:
-         -- Here, Item is a declaration
-         case Declaration_Kind (Item) is
-            when An_Ordinary_Type_Declaration =>
-               Item_Def := Type_Declaration_View (Item);
-               case Type_Kind (Item_Def) is
-                  when Not_A_Type_Definition =>
+         case Element_Kind (Item) is
+            when A_Definition =>                 ----------------- Definitions
+               case Definition_Kind (Item) is
+                  when Not_A_Definition =>
                      Impossible ("Discrete_Constraining_Bounds: not a definition", Item);
 
-                  when A_Derived_Type_Definition =>
-                     Parent     := Parent_Subtype_Indication (Item_Def);
-                     Constraint := Subtype_Constraint (Parent);
+                  when A_Constraint =>
+                     return Constraint_Bounds (Item);
+
+                  when A_Discrete_Range
+                     | A_Discrete_Subtype_Definition
+                       =>
+                     return Discrete_Range_Bounds (Item);
+
+                  when A_Subtype_Indication =>
+                     Constraint := Subtype_Constraint (Item);
                      if Is_Nil (Constraint) then
-                        Item := Subtype_Simple_Name (Parent);
+                        Item := Subtype_Simple_Name (Item);
                      else
-                        -- Constraint given in the derivation => no need to go further
-                        return Constraint_Bounds (Constraint);
+                        Item := Constraint;
                      end if;
 
-                  when A_Derived_Record_Extension_Definition
-                    | A_Record_Type_Definition
-                    | A_Tagged_Record_Type_Definition
-                    | An_Access_Type_Definition
-                    =>
-                     -- Not a discrete type
-                     return Nil_Element_List;
+                  when A_Type_Definition =>
+                     case Type_Kind (Item) is
+                        when Not_A_Type_Definition =>
+                           Impossible ("Discrete_Constraining_Bounds: not a type definition", Item);
+                        when A_Derived_Type_Definition =>
+                           Item := Parent_Subtype_Indication (Item);
+                        when A_Derived_Record_Extension_Definition
+                           | A_Record_Type_Definition
+                           | A_Tagged_Record_Type_Definition
+                           | An_Access_Type_Definition
+                             =>
+                           -- Not a discrete type
+                           return Nil_Element_List;
+                        when An_Enumeration_Type_Definition =>
+                           declare
+                              Literals : constant Asis.Declaration_List := Enumeration_Literal_Declarations (Item);
+                           begin
+                              return (Names (Literals (Literals'First)) (1), Names (Literals (Literals'Last)) (1));
+                           end;
+                        when A_Modular_Type_Definition =>
+                           return (Nil_Element, Mod_Static_Expression (Item));
+                        when A_Signed_Integer_Type_Definition =>
+                           Item := Integer_Constraint (Item);
+                        when A_Root_Type_Definition =>
+                           case Root_Type_Kind (Item) is
+                              when A_Root_Integer_Definition
+                                 | A_Universal_Integer_Definition
+                                   =>
+                                 -- Bounds of Root_Integer are System.Min_Int .. System.Max_Int, 3.5.4(14)
+                                 -- However, we have no (easy) way to retrieve them as Element
+                                 -- Bounds of Universal_Integer are infinite.
+                                 -- Just pretend they are both not computable
+                                 return (Nil_Element, Nil_Element);
+                              when A_Root_Real_Definition
+                                 | A_Universal_Real_Definition
+                                 | A_Universal_Fixed_Definition
+                                   =>
+                                 -- No way to get the bounds...
+                                 return (Nil_Element, Nil_Element);
+                              when Not_A_Root_Type_Definition =>
+                                 Impossible ("Wrong root type in Discrete_Constraining_Bounds", Item);
+                           end case;
+                        when A_Floating_Point_Definition
+                           | An_Ordinary_Fixed_Point_Definition
+                           | A_Decimal_Fixed_Point_Definition
+                             =>
+                           Item := Real_Range_Constraint (Item);
+                           if Is_Nil (Item) then
+                              return (Nil_Element, Nil_Element);
+                           end if;
+                        when An_Unconstrained_Array_Definition =>
+                           declare
+                              Index_Defs : constant Asis.Definition_List := Index_Subtype_Definitions (Item);
+                              Result     : Asis.Expression_List (1 .. 2 * Index_Defs'Length);
+                           begin
+                              if No_Unconstrained then
+                                 Result := (others => Nil_Element);
+                              else
+                                 -- Index_Defs can only contain A_Discrete_Subtype_Indication here
+                                 for I in Index_Defs'Range loop
+                                    Result (2 * I - 1 .. 2 * I) := Discrete_Constraining_Bounds (Index_Defs (I));
+                                 end loop;
+                              end if;
 
-                  when An_Enumeration_Type_Definition =>
-                     declare
-                        Literals : constant Asis.Declaration_List := Enumeration_Literal_Declarations (Item_Def);
-                     begin
-                        return (Names (Literals (Literals'First))(1), Names (Literals (Literals'Last))(1));
-                     end;
+                              return Result;
+                           end;
+                        when A_Constrained_Array_Definition =>
+                           declare
+                              Index_Defs : constant Asis.Definition_List := Discrete_Subtype_Definitions (Item);
+                              Result     : Asis.Expression_List (1 .. 2 * Index_Defs'Length);
+                           begin
+                              for I in Index_Defs'Range loop
+                                 Result (2 * I - 1 .. 2 * I) := Discrete_Range_Bounds (Index_Defs (I));
+                              end loop;
 
-                  when A_Modular_Type_Definition =>
-                     return (Nil_Element, Mod_Static_Expression (Item_Def));
-
-                  when A_Signed_Integer_Type_Definition =>
-                     declare
-                        Constr : constant Asis.Constraint := Integer_Constraint (Item_Def);
-                     begin
-                        return (Lower_Bound (Constr), Upper_Bound (Constr));
-                     end;
-
-                  when A_Root_Type_Definition =>
-                     case Root_Type_Kind (Item_Def) is
-                        when A_Root_Integer_Definition
-                          | A_Universal_Integer_Definition
-                          =>
-                           -- Bounds of Root_Integer are System.Min_Int .. System.Max_Int, 3.5.4(14)
-                           -- However, we have no (easy) way to retrieve them as Element
-                           -- Bounds of Universal_Integer are infinite.
-                           -- Just pretend they are both not computable
-                           return (Nil_Element, Nil_Element);
-                        when A_Root_Real_Definition
-                          | A_Universal_Real_Definition
-                          | A_Universal_Fixed_Definition
-                          =>
-                           -- Only discrete bounds for the moment
-                           return Nil_Element_List; -- TBSL
-                        when Not_A_Root_Type_Definition =>
-                           Impossible ("Wrong root type in Discrete_Constraining_Bounds", Item);
+                              return Result;
+                           end;
+                        when others =>  -- Compatibility Ada 2005
+                           return Nil_Element_List;
                      end case;
 
-                  when A_Floating_Point_Definition
-                    | An_Ordinary_Fixed_Point_Definition
-                    | A_Decimal_Fixed_Point_Definition
-                    =>
-                     -- Only discrete bounds for the moment
-                     return Nil_Element_List; -- TBSL
+                  when A_Component_Definition =>
+                     Item := Component_Subtype_Indication (Item);
 
-                  when An_Unconstrained_Array_Definition
-                     | A_Constrained_Array_Definition
-                       =>
-                     return Discrete_Constraining_Bounds (Item_Def);
+                  when A_Formal_Type_Definition =>
+                     case Formal_Type_Kind (Item) is
+                        when Not_A_Formal_Type_Definition =>
+                           Impossible ("Discrete_Constraining_Bounds: not a formal definition", Item);
+                        when A_Formal_Private_Type_Definition
+                           | A_Formal_Tagged_Private_Type_Definition
+                             =>
+                           return Nil_Element_List;
+                        when A_Formal_Derived_Type_Definition =>
+                           Item := Subtype_Simple_Name (Item);
+                        when A_Formal_Discrete_Type_Definition
+                           | A_Formal_Signed_Integer_Type_Definition
+                           | A_Formal_Modular_Type_Definition
+                             =>
+                           return (Nil_Element, Nil_Element);
+                        when A_Formal_Floating_Point_Definition
+                           | A_Formal_Ordinary_Fixed_Point_Definition
+                           | A_Formal_Decimal_Fixed_Point_Definition
+                           | A_Formal_Access_Type_Definition
+                             =>
+                           return Nil_Element_List;
+                        when A_Formal_Unconstrained_Array_Definition =>
+                           declare
+                              Index_Defs : constant Asis.Definition_List := Index_Subtype_Definitions (Item);
+                              Result     : Asis.Expression_List (1 .. 2 * Index_Defs'Length);
+                           begin
+                              if No_Unconstrained then
+                                 Result := (others => Nil_Element);
+                              else
+                                 -- Index_Defs can only contain A_Discrete_Subtype_Indication here
+                                 for I in Index_Defs'Range loop
+                                    Result (2 * I - 1 .. 2 * I) := Discrete_Constraining_Bounds (Index_Defs (I));
+                                 end loop;
+                              end if;
 
-                  when others =>  -- Compatibility Ada 2005
-                     return Nil_Element_List;
-               end case;
+                              return Result;
+                           end;
+                        when A_Formal_Constrained_Array_Definition =>
+                           declare
+                              Index_Defs : constant Asis.Definition_List := Discrete_Subtype_Definitions (Item);
+                              Result     : Asis.Expression_List (1 .. 2 * Index_Defs'Length);
+                           begin
+                              for I in Index_Defs'Range loop
+                                 Result (2 * I - 1 .. 2 * I) := Discrete_Range_Bounds (Index_Defs (I));
+                              end loop;
 
-            when A_Subtype_Declaration =>
-               Item_Def   := Type_Declaration_View (Item);
-               Constraint := Subtype_Constraint (Item_Def);
-               if Is_Nil (Constraint) then
-                  Item := Subtype_Simple_Name (Item_Def);
-               else
-                  -- Constraint given in the subtype => no need to go further
-                  return Constraint_Bounds (Constraint);
-               end if;
+                              return Result;
+                           end;
+                        when others =>  -- Compatibility Ada 2005
+                           return Nil_Element_List;
+                     end case;
 
-            when A_Task_Type_Declaration
-              | A_Protected_Type_Declaration
-              | A_Private_Extension_Declaration
-              =>
-               return Nil_Element_List;
-
-            when An_Incomplete_Type_Declaration
-              | A_Private_Type_Declaration
-              =>
-               Item := Corresponding_Type_Declaration (Item);
-
-            when A_Variable_Declaration
-              | A_Constant_Declaration
-              | A_Component_Declaration
-              =>
-               Item_Def := Object_Declaration_View (Item);
-               if Definition_Kind (Item_Def) = A_Component_Definition then
-                 Item_Def := Component_Subtype_Indication (Item_Def);
-               end if;
-
-               case Definition_Kind (Item_Def) is
-                  when A_Type_Definition =>
-                     -- A_Constrained_Array_Definition
-                     return Discrete_Constraining_Bounds (Item_Def);
                   when A_Task_Definition
-                    | A_Protected_Definition
-                    =>
+                     | A_Protected_Definition
+                     | An_Unknown_Discriminant_Part
+                     | A_Known_Discriminant_Part
+                     | A_Record_Definition
+                     | A_Null_Record_Definition
+                     | A_Null_Component
+                     | A_Variant_Part
+                     | A_Variant
+                     | An_Others_Choice
+                     | A_Private_Type_Definition
+                     | A_Tagged_Private_Type_Definition
+                     | A_Private_Extension_Definition
+                       =>
                      -- Not a discrete type
                      return Nil_Element_List;
-                  when A_Component_Definition =>
-                     Impossible ("Discrete_Constraining_Bounds: Component definition", Item_Def);
-                  when A_Subtype_Indication =>
-                     Constraint := Subtype_Constraint (Item_Def);
-                     if Is_Nil (Constraint) then
-                        Item := Subtype_Simple_Name (Item_Def);
-                     else
-                        return Constraint_Bounds (Constraint);
-                     end if;
-                  when others =>
-                     Impossible ("Discrete_Constraining_Bounds: Bad definition from object", Item_Def);
-               end case;
 
-            when A_Parameter_Specification
-              | A_Formal_Object_Declaration
-              =>
-               -- No constraint allowed here, get bounds from the type
-               Item := Declaration_Subtype_Mark (Item);
-
-            when A_Formal_Type_Declaration =>
-               Item_Def := Type_Declaration_View (Item);
-               case Formal_Type_Kind (Item_Def) is
-                  when Not_A_Formal_Type_Definition =>
-                     Impossible ("Discrete_Constraining_Bounds: not a formal definition", Item);
-                  when A_Formal_Private_Type_Definition
-                     | A_Formal_Tagged_Private_Type_Definition
-                       =>
-                     return Nil_Element_List;
-                  when A_Formal_Derived_Type_Definition =>
-                     Item := Subtype_Simple_Name (Item_Def);
-                  when A_Formal_Discrete_Type_Definition
-                     | A_Formal_Signed_Integer_Type_Definition
-                       | A_Formal_Modular_Type_Definition
-                       =>
-                     return (Nil_Element, Nil_Element);
-                  when A_Formal_Floating_Point_Definition
-                     | A_Formal_Ordinary_Fixed_Point_Definition
-                     | A_Formal_Decimal_Fixed_Point_Definition
-                     | A_Formal_Access_Type_Definition
-                       =>
-                     return Nil_Element_List;
-
-                     when A_Formal_Unconstrained_Array_Definition
-                     | A_Formal_Constrained_Array_Definition
-                       =>
-                     return Discrete_Constraining_Bounds (Item_Def);
                   when others =>  -- Compatibility Ada 2005
                      return Nil_Element_List;
+               end case;                         ----------------- Definitions
+
+            when An_Expression =>                ----------------- Expressions
+               case Expression_Kind (Item) is
+                  when A_Selected_Component =>
+                     Item := Selector (Item);
+                  when An_Indexed_Component =>
+                     -- We must go to the declaration of the component type of the array
+                     Item := A4G_Bugs.Corresponding_Expression_Type (Item);
+                  when A_Slice =>
+                     Item := Slice_Range (Item);
+                  when An_Explicit_Dereference =>
+                     -- We must go to the declaration of the type referenced by the prefix
+                     Item := Type_Declaration_View (A4G_Bugs.Corresponding_Expression_Type (Prefix (Item)));
+                     if Access_Type_Kind (Item) in An_Access_To_Procedure .. An_Access_To_Protected_Function then
+                        return Nil_Element_List;
+                     end if;
+                     Item := Asis.Definitions.Access_To_Object_Definition (Item);
+                  when An_Attribute_Reference =>
+                     -- We cannot get to the bounds of T'Base, and taking T instead would be misleading
+                     -- There is no applicable constraints for 'Class
+                     -- Other attributes are values or subprograms, not interesting for us.
+                     -- Therefore, in all cases:
+                     return Nil_Element_List;
+                  when A_Function_Call =>
+                     -- The constraint is the one of the return type
+                     Item := A4G_Bugs.Corresponding_Expression_Type (Item);
+                  when others =>
+                     -- Assume it's a name, but it can be a type name, therefore
+                     -- we cannot take directly Corresponding_Expression_Type
+                     Item := Corresponding_Name_Declaration (Item);
+               end case;                         ----------------- Expressions
+
+            when A_Defining_Name =>              ----------------- Defining name
+               Item := Object_Declaration_View (Enclosing_Element (Item));
+
+            when A_Declaration =>                ----------------- Declarations
+               case Declaration_Kind (Item) is
+                  when An_Ordinary_Type_Declaration
+                     | A_Subtype_Declaration
+                     | A_Formal_Type_Declaration
+                       =>
+                     Item := Type_Declaration_View (Item);
+
+                  when A_Task_Type_Declaration
+                     | A_Protected_Type_Declaration
+                     | A_Private_Extension_Declaration
+                       =>
+                     return Nil_Element_List;
+
+                  when An_Incomplete_Type_Declaration
+                     | A_Private_Type_Declaration
+                       =>
+                     Item := Corresponding_Type_Declaration (Item);
+
+                  when A_Variable_Declaration
+                     | A_Constant_Declaration
+                     | A_Component_Declaration
+                       =>
+                     No_Unconstrained := True;
+                     Item             := Object_Declaration_View (Item);
+
+                  when A_Parameter_Specification
+                     | A_Formal_Object_Declaration
+                       =>
+                     -- No constraint allowed here, get bounds from the type
+                     No_Unconstrained := True;
+                     Item             := Declaration_Subtype_Mark (Item);
+
+                  when An_Object_Renaming_Declaration =>
+                     Item := A4G_Bugs.Renamed_Entity (Item);
+
+                  when others =>
+                     Impossible ("Discrete_Constraining_Bounds: Bad declaration "
+                                   & Asis.Declaration_Kinds'Wide_Image (Declaration_Kind (Item)),
+                                 Item);
                end case;
 
             when others =>
-               Impossible ("Discrete_Constraining_Bounds: Bad declaration", Elem);
-         end case;
+               Impossible ("Discrete_Constraining_Bounds: Inappropriate element", Elem);
+         end case;                               ----------------- Declarations
       end loop;
    end Discrete_Constraining_Bounds;
 
@@ -2296,9 +2662,8 @@ package body Thick_Queries is
       Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Elem);
       Result : Extended_Biggest_Natural_List (1 .. Bounds'Length / 2);
    begin
-      -- TBSL return empty list for arrays?
       if Result'Length = 0 then
-         return (Not_Static, Not_Static);
+         return Nil_Extended_Biggest_Natural_List;
       end if;
 
       for I in Result'Range loop
@@ -2344,7 +2709,7 @@ package body Thick_Queries is
    -- Statements --
    ----------------
 
-   function Statements (Element : in Asis.Element) return Asis.Statement_List is
+   function Statements (Element : in Asis.Element) return Asis.Statement_List is --## rule line off LOCAL_HIDING
    begin
       case Element_Kind (Element) is
          when A_Declaration =>
@@ -2382,6 +2747,74 @@ package body Thick_Queries is
       end case;
    end Statements;
 
+   ------------------------------
+   -- Last_Effective_Statement --
+   ------------------------------
+
+   function Last_Effective_Statement (Stats : Asis.Statement_List) return Asis.Statement is
+      Result : Asis.Statement := Stats (Stats'Last);
+   begin
+      while Statement_Kind (Result) = A_Block_Statement loop
+         declare
+            Block_Stmts : constant Asis.Statement_List := Block_Statements (Result);
+         begin
+            Result := Block_Stmts (Block_Stmts'Last);
+         end;
+      end loop;
+      return Result;
+   end Last_Effective_Statement;
+
+   -------------------------
+   -- Are_Null_Statements --
+   -------------------------
+
+   function Are_Null_Statements (Stats : Asis.Statement_List; Except_Labelled : Boolean := False) return Boolean is
+   begin
+      for I in Stats'Range loop
+         if Statement_Kind (Stats (I)) /= A_Null_Statement then
+            return False;
+         end if;
+
+         if Except_Labelled and then not Is_Nil (Label_Names (Stats (I)))then
+            return False;
+         end if;
+      end loop;
+      return True;
+   end Are_Null_Statements;
+
+   ------------------------
+   -- Exception_Handlers --
+   ------------------------
+
+   function Exception_Handlers (Element : Asis.Element) return Asis.Exception_Handler_List is
+   begin
+      case Element_Kind (Element) is
+         when A_Declaration =>
+            case Declaration_Kind (Element) is
+               when A_Function_Body_Declaration
+                 | A_Procedure_Body_Declaration
+                 | An_Entry_Body_Declaration
+                 | A_Package_Body_Declaration
+                 | A_Task_Body_Declaration
+                 =>
+                  return Body_Exception_Handlers (Element);
+               when others =>
+                  Impossible ("Statements: invalid declaration kind", Element);
+            end case;
+         when A_Statement =>
+            case Statement_Kind (Element) is
+               when An_Accept_Statement =>
+                  return Accept_Body_Exception_Handlers (Element);
+               when A_Block_Statement =>
+                  return Block_Exception_Handlers (Element);
+               when others =>
+                  Impossible ("Statements: invalid statement kind", Element);
+            end case;
+         when others =>
+            Impossible ("Statements: invalid element kind", Element);
+      end case;
+   end Exception_Handlers;
+
    -----------------------------------
    -- Static_Expression_Value_Image --
    -----------------------------------
@@ -2404,8 +2837,8 @@ package body Thick_Queries is
       generic
          with function Op_Int (Left, Right : Biggest_Int) return Biggest_Int;
          with function Op_Float (Left, Right : Biggest_Float) return Biggest_Float;
-      function String_Op (Left, Right : Wide_String) return Wide_String;
-      function String_Op (Left, Right : Wide_String) return Wide_String is
+      function String_Arithmetic_Op (Left, Right : Wide_String) return Wide_String;
+      function String_Arithmetic_Op (Left, Right : Wide_String) return Wide_String is
       begin
          if Left = "" or Right = "" then
             return "";
@@ -2414,15 +2847,15 @@ package body Thick_Queries is
             return Biggest_Float'Wide_Image (Op_Float (Biggest_Float'Wide_Value (Left),
                                                        Biggest_Float'Wide_Value (Right)));
          else
-            return Biggest_Int'Wide_Image (Op_Int (Biggest_Int'Wide_Value (Left),
-                                                   Biggest_Int'Wide_Value (Right)));
+            return Biggest_Int_Img (Op_Int (Biggest_Int'Wide_Value (Left),
+                                            Biggest_Int'Wide_Value (Right)));
          end if;
-      end String_Op;
+      end String_Arithmetic_Op;
 
-      function "+" is new String_Op ("+","+");
-      function "-" is new String_Op ("-","-");
-      function "*" is new String_Op ("*","*");
-      function "/" is new String_Op ("/","/");
+      function "+" is new String_Arithmetic_Op ("+","+");
+      function "-" is new String_Arithmetic_Op ("-","-");
+      function "*" is new String_Arithmetic_Op ("*","*");
+      function "/" is new String_Arithmetic_Op ("/","/");
       -- Cannot do the same for "**", since Right is always Natural
       function "**" (Left, Right : Wide_String) return Wide_String is
       begin
@@ -2433,10 +2866,36 @@ package body Thick_Queries is
             return Biggest_Float'Wide_Image ("**" (Biggest_Float'Wide_Value (Left),
                                                    Natural'Wide_Value (Right)));
          else
-            return Biggest_Int'Wide_Image ("**" (Biggest_Int'Wide_Value (Left),
-                                                 Natural'Wide_Value (Right)));
+            return Biggest_Int_Img ("**" (Biggest_Int'Wide_Value (Left),
+                                          Natural'Wide_Value (Right)));
          end if;
       end "**";
+
+      Bool_Pos : constant array (Boolean) of Wide_String (1..1) := ("0", "1");
+      generic
+         with function Op_Int (Left, Right : Biggest_Int) return Boolean;
+         with function Op_Float (Left, Right : Biggest_Float) return Boolean;
+      function String_Logical_Op (Left, Right : Wide_String) return Wide_String;
+      function String_Logical_Op (Left, Right : Wide_String) return Wide_String is
+      begin
+         if Left = "" or Right = "" then
+            return "";
+         end if;
+         if Is_Float_String(Left) or Is_Float_String(Right) then
+            return Bool_Pos (Op_Float (Biggest_Float'Wide_Value (Left),
+                                       Biggest_Float'Wide_Value (Right)));
+         else
+            return Bool_Pos (Op_Int (Biggest_Int'Wide_Value (Left),
+                                     Biggest_Int'Wide_Value (Right)));
+         end if;
+      end String_Logical_Op;
+      function "="  is new String_Logical_Op ("=",  "=");
+      function "/=" is new String_Logical_Op ("/=", "/=");
+      function "<"  is new String_Logical_Op ("<",  "<");
+      function "<=" is new String_Logical_Op ("<=", "<=");
+      function ">"  is new String_Logical_Op (">",  ">");
+      function ">=" is new String_Logical_Op (">=", ">=");
+
 
       function Strip_Underscores (Item : Wide_String) return Wide_String is
          Result : Wide_String (Item'Range);
@@ -2477,7 +2936,7 @@ package body Thick_Queries is
          when An_Integer_Literal =>
             -- We make a round-trip through Value/Image below to normalize the form of the result
             -- (get rid of based numbers and '_')
-            return Biggest_Int'Wide_Image (Biggest_Int'Wide_Value (Value_Image (Expression)));
+            return Biggest_Int_Img (Biggest_Int'Wide_Value (Value_Image (Expression)));
 
          when A_Real_Literal =>
             -- We can't make the same trick as with Integer literals, since it could cause
@@ -2571,6 +3030,30 @@ package body Thick_Queries is
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
                              ** Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
+                        when An_Equal_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
+                             = Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+
+                        when A_Not_Equal_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
+                             /= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+
+                        when A_Less_Than_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
+                             < Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+
+                        when A_Less_Than_Or_Equal_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
+                             <= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+
+                        when A_Greater_Than_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
+                             > Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+
+                        when A_Greater_Than_Or_Equal_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
+                             >= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+
                         when others =>
                            -- Not implemented, or Not_An_Operator
                            return "";
@@ -2660,25 +3143,12 @@ package body Thick_Queries is
                   end;
                when A_Size_Attribute =>
                   -- If a size clause has been given, we may try it, otherwise give up
-                  Expr := Prefix (Expression);
-                  if Expression_Kind (Expr) = A_Selected_Component then
-                     Expr := Selector (Expr);
+                  Expr := Size_Clause_Expression (Prefix (Expression));
+                  if Is_Nil (Expr) then
+                     return "";
+                  else
+                     return Static_Expression_Value_Image (Expr);
                   end if;
-                  declare
-                     use Asis.Clauses;
-                     Reprs: constant Asis.Representation_Clause_List
-                       := Corresponding_Representation_Clauses (Corresponding_Name_Declaration (Expr));
-                  begin
-                     for R in Reprs'Range loop
-                        if Representation_Clause_Kind (Reprs (R)) = An_Attribute_Definition_Clause
-                          and then A4G_Bugs.Attribute_Kind (Representation_Clause_Name (Reprs (R))) = A_Size_Attribute
-                        then
-                           return Static_Expression_Value_Image (Representation_Clause_Expression (Reprs (R)));
-                        end if;
-                     end loop;
-                  end;
-                  -- not found
-                  return "";
                when others =>
                   return "";
             end case;
@@ -2703,9 +3173,9 @@ package body Thick_Queries is
       use Asis.Expressions;
 
       type Part_Kind is (Identifier, Field, Indexing, Dereference, Call, Not_Variable);
-      type Name_Part (Kind : Part_Kind := Identifier) is
+      type Name_Part (The_Kind : Part_Kind := Identifier) is
          record
-            case Kind is
+            case The_Kind is
                when Identifier =>
                   Id_Name : Asis.Expression;
                when Field =>
@@ -2732,8 +3202,8 @@ package body Thick_Queries is
             -- Add a "Dereference" part if the *type* is an access type
             -- This allows explicit and implicit dereferences to match
          begin
-            if With_Deref and Expression_Type_Kind (Name) = An_Access_Type_Definition then
-               return D & Name_Part'(Kind => Dereference);
+            if With_Deref and then Is_Access_Expression (Name) then
+               return D & Name_Part'(The_Kind => Dereference);
             else
                return D;
             end if;
@@ -2752,11 +3222,10 @@ package body Thick_Queries is
                   -- A : T renames Rec.X.Y(3);
                   Variable := Corresponding_Name_Definition (E);
                   Variable_Enclosing := Enclosing_Element (Variable);
-                  if Declaration_Kind (Variable_Enclosing) in A_Renaming_Declaration then
-                     E := A4G_Bugs.Renamed_Entity (Variable_Enclosing);
-                  else
+                  if Declaration_Kind (Variable_Enclosing) not in A_Renaming_Declaration then
                      return Complete_For_Access ((1 => (Identifier, Variable)));
                   end if;
+                  E := A4G_Bugs.Renamed_Entity (Variable_Enclosing);
 
                when A_Selected_Component =>
                   case Declaration_Kind (Corresponding_Name_Declaration (Selector (E))) is
@@ -2771,7 +3240,7 @@ package body Thick_Queries is
                         -- Its a Pack.Var or Pack.F() selector
                         E := Selector (E);
                      when others =>
-                        return (1 => (Kind => Not_Variable));
+                        return (1 => (The_Kind => Not_Variable));
                   end case;
 
                when An_Indexed_Component =>
@@ -2789,7 +3258,7 @@ package body Thick_Queries is
                   --  element, and if it returns an access value,
                   --  or a composite object used for one of its
                   --  access subcomponents.
-                  return Complete_For_Access ((1 => (Kind => Call)));
+                  return Complete_For_Access ((1 => (The_Kind => Call)));
 
                when An_Explicit_Dereference =>
                    return Complete_For_Access (Descriptor (Prefix (E), With_Deref => True));
@@ -2798,7 +3267,7 @@ package body Thick_Queries is
                   E := Converted_Or_Qualified_Expression (E);
 
                when others =>
-                  return (1 => (Kind => Not_Variable));
+                  return (1 => (The_Kind => Not_Variable));
             end case;
          end loop;
       end Descriptor;
@@ -2814,23 +3283,23 @@ package body Thick_Queries is
 
          -- First, compare the "base" variable and eliminate expressions that are not variables
          for I in reverse L_Descr'Range loop
-            case L_Descr (I).Kind is
+            case L_Descr (I).The_Kind is
                when Dereference =>
                   L_Rightmost_Deref := I;
                   exit;
                when Not_Variable =>
-                  return (Certain, None);
+                  return Different_Variables;
                when others =>
                   null;
             end case;
          end loop;
          for I in reverse R_Descr'Range loop
-            case R_Descr (I).Kind is
+            case R_Descr (I).The_Kind is
                when Dereference =>
                   R_Rightmost_Deref := I;
                   exit;
                when Not_Variable =>
-                  return (Certain, None);
+                  return Different_Variables;
                when others =>
                   null;
             end case;
@@ -2838,12 +3307,13 @@ package body Thick_Queries is
 
          if L_Rightmost_Deref = 1 and R_Rightmost_Deref = 1 then
             -- No dereference on either side
-            if (L_Descr (1).Kind = Identifier and R_Descr (1).Kind = Identifier)
+            if (L_Descr (1).The_Kind = Identifier and R_Descr (1).The_Kind = Identifier)
               and then not Is_Equal (L_Descr (1).Id_Name, R_Descr (1).Id_Name)
             then
-               return (Confidence => Certain, Overlap => None);
-            elsif L_Descr (1).Kind = Call or R_Descr (1).Kind = Call then
-               Best_Conf := Possible;
+               return Different_Variables;
+            elsif L_Descr (1).The_Kind = Call or R_Descr (1).The_Kind = Call then
+               -- Function call without dereference => it is a value, not a name
+               return Different_Variables;
             else
                Best_Conf := Certain;
             end if;
@@ -2851,8 +3321,8 @@ package body Thick_Queries is
             -- Dereferences on both sides
             Base_Proximity := Descriptors_Proximity (L_Descr (1 .. L_Rightmost_Deref - 1),
                                                      R_Descr (1 .. R_Rightmost_Deref - 1));
-            if Base_Proximity.Overlap = Complete then
-               Best_Conf := Base_Proximity.Confidence;
+            if Base_Proximity = Same_Variable then
+               Best_Conf := Certain;
             else
                Best_Conf := Unlikely;
             end if;
@@ -2864,20 +3334,20 @@ package body Thick_Queries is
          L_Inx := L_Rightmost_Deref + 1;
          R_Inx := R_Rightmost_Deref + 1;
          while L_Inx <= L_Descr'Last and R_Inx <= R_Descr'Last loop
-            if L_Descr (L_Inx).Kind /= R_Descr (R_Inx).Kind then
-               return (Confidence => Certain, Overlap => None);
+            if L_Descr (L_Inx).The_Kind /= R_Descr (R_Inx).The_Kind then
+               return Different_Variables;
             end if;
-            case L_Descr (L_Inx).Kind is
+            case L_Descr (L_Inx).The_Kind is
                when Identifier
                  | Not_Variable
                  =>
-                  Impossible ("Variables proximity: " & Part_Kind'Wide_Image (L_Descr (L_Inx).Kind),
+                  Impossible ("Variables proximity: " & Part_Kind'Wide_Image (L_Descr (L_Inx).The_Kind),
                               L_Descr (L_Inx).Id_Name);
                when Field =>
                   if not Is_Equal (Corresponding_Name_Definition (L_Descr (L_Inx).Sel_Name),
                                    Corresponding_Name_Definition (R_Descr (R_Inx).Sel_Name))
                   then
-                     return (Confidence => Certain, Overlap => None);
+                     return Different_Variables;
                   end if;
                when Indexing =>
                   declare
@@ -2885,7 +3355,7 @@ package body Thick_Queries is
                      R_Indexes : constant Asis.Expression_List := Index_Expressions (R_Descr (R_Inx).Indexers);
                   begin
                      if L_Indexes'Length /= R_Indexes'Length then
-                        Impossible ("Variables proximity: different lengthes", Nil_Element);
+                        Impossible ("Variables proximity: different lengths", Nil_Element);
                      end if;
                      for I in L_Indexes'Range loop
                         declare
@@ -2895,7 +3365,7 @@ package body Thick_Queries is
                            if L_Value = "" or R_Value = "" then
                               Best_Conf := Result_Confidence'Min (Best_Conf, Possible);
                            elsif L_Value /= R_Value then
-                              return (Confidence => Certain, Overlap => None);
+                              return Different_Variables;
                            end if;
                         end;
                      end loop;
