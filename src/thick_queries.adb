@@ -1,3 +1,4 @@
+with Utilities; use Utilities;
 --------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002 Adalog                                       --
@@ -1906,6 +1907,7 @@ package body Thick_Queries is
          if The_Entry.Is_Access then
             return '*' & Add_Attribute (Full_Name_Image (The_Entry.Name, With_Profile));
          else
+            Trace (Defining_Name_Image (The_Entry.Name), The_Entry.Name, True);
             return Add_Attribute (Full_Name_Image (The_Entry.Name, With_Profile));
          end if;
       end Entry_Name;

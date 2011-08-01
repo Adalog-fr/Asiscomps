@@ -186,6 +186,9 @@ package body A4G_Bugs is
       -- (although Called_Profile does not return anything)
       if Is_Nil (Result) then
          return Nil_Element;
+      elsif Declaration_Kind (Result) = A_Function_Instantiation then
+         -- certainly not a predefined operator
+         return Result;
       elsif Operator_Kind (Names (Result)(1)) = A_Not_Equal_Operator
         and then not Is_Nil (Corresponding_Equality_Operator (Result))
       then
