@@ -201,7 +201,8 @@ package body Utilities is
            & Character_Position_Positive'Wide_Image (S.Last_Column)
            & ')';
       end Span_Image;
-   begin
+
+   begin  -- Failure
       Trace ("Failing element " & Span_Image (Element_Span (Element)), Element); --## rule line off no_trace
       Failure (Message);
    end Failure;
@@ -452,10 +453,12 @@ package body Utilities is
       end if;
 
       if File_Name = "" or else To_Upper (File_Name) = "CONSOLE" then
-         Current_Trace := Current_Error;
+         Current_Trace  := Current_Error;
+         Trace_Is_Error := True;
       else
-         Current_Trace := Trace_File'Access;
-         Trace_Name    := To_Unbounded_Wide_String (File_Name);
+         Current_Trace  := Trace_File'Access;
+         Trace_Name     := To_Unbounded_Wide_String (File_Name);
+         Trace_Is_Error := False;
       end if;
    end Set_Trace;
 

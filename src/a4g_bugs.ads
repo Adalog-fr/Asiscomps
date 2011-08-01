@@ -112,14 +112,6 @@ package A4G_Bugs is
    -- From Asis.Expressions
    --
 
-   -- Reason      : Bug when Argument is A_Selected_Component or An_Indexed_Component
-   --             : Bug when Argument is the selector of A_Selected_Component (sometimes)
-   --             : Bug when Argument is An_Explicit_Dereference
-   -- Bug report  : [E217-012] [E317-009]
-   -- Gnat version: GAP 1.1.0
-   -- Fixed in    : current wavefront, not released
-   function Corresponding_Expression_Type (Expression : in Asis.Expression) return Asis.Declaration;
-
    -- Reason: Wrong result when Expression is part of implicit
    -- Bug report  : [E225-002]
    -- Gnat version: GAP 1.1.0
@@ -131,6 +123,14 @@ package A4G_Bugs is
    -- Gnat version: GAP 1.1.0
    -- Fixed in    : current wavefront, not released
    function Corresponding_Called_Function (Expression : in Asis.Expression) return Asis.Declaration;
+
+   -- Reason      : Bug when Argument is A_Selected_Component or An_Indexed_Component
+   --             : Bug when Argument is the selector of A_Selected_Component (sometimes)
+   --             : Bug when Argument is An_Explicit_Dereference
+   -- Bug report  : [E217-012] [E317-009]
+   -- Gnat version: GAP 1.1.0
+   -- Fixed in    : current wavefront, not released
+   function Corresponding_Expression_Type (Expression : in Asis.Expression) return Asis.Declaration;
 
    -- Reason      : ASIS failure in some cases (notably with generic formals)
    -- Bug report  : [G223-008]
@@ -147,6 +147,12 @@ package A4G_Bugs is
    -- Gnat version: GAP 1.1.0
    -- Fixed in    : GnatPro 5.02
    function Corresponding_Called_Entity (Statement : in Asis.Statement) return Asis.Declaration;
+
+   -- Reason      : Bug when task body is separate
+   -- Bug report  : [H415-017]
+   -- Gnat version: GnatPro 6.1.1
+   -- Fixed in    :
+   function Corresponding_Entry (Statement : in Asis.Statement) return Asis.Declaration;
 
    ------------------------------------------------------------------------------------------------
    -- Trace identified bugs (in debug mode):

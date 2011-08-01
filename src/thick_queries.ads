@@ -101,6 +101,27 @@ package Thick_Queries is
    --    An_Identifier
    --    A_Selected_Component (checks the selector)
 
+   function Corresponding_Static_Exception_Handler (Exc            : Asis.Element;
+                                                    Where          : Asis.Element;
+                                                    Include_Others : Boolean)
+                                                    return Asis.Exception_Handler;
+   -- Returns the innermost exception handler that handles the given exception, and whose corresponding
+   -- sequence of statements statically encloses Where.
+   -- Returns a Nil_Element if no such handler is found
+   --
+   -- If the handler is a "when others" one, return it if Include_Others is true,
+   -- return Nil_Element otherwise.
+   --
+   -- Look up stops as soon as a callable entity (or task body) is encountered (since from that point on,
+   -- exception propagation is no more statically determinable).
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Defining_Name
+   --    An_Expression
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component (checks the selector)
+
 
    function Declarative_Items (Element : in Asis.Element; Include_Pragmas : in Boolean := False)
                               return Asis.Declaration_List;
@@ -163,12 +184,18 @@ package Thick_Queries is
    --    A_Block_Statement
 
    function Last_Effective_Statement (Stats : Asis.Statement_List) return Asis.Statement;
-   -- Returns the last statement from Stats, unless it is a block statement, in which case
-   -- the last statement of the block is returned (recursively, of course).
+   -- Returns the last statement from Stats, unless it is a block statement without exception handlers,
+   -- in which case the last statement of the block is returned (recursively, of course).
 
    function Are_Null_Statements (Stats : Asis.Statement_List; Except_Labelled : Boolean := False) return Boolean;
    -- Checks whether Stats contain only null statement(s)
    -- If Except_Labelled is True, returns False also if there is a labelled statement
+
+   function Is_Part_Of (Elem : Asis.Element; Inside : Asis.Element_List) return Boolean;
+   -- returns true if Elem is textually within Inside
+   -- Note: will return False for any element that Is_Part_Of_Instance, since these have no
+   --       *textual* representation. The caller should take care of calling Corresponding_Generic_Element
+   --       as needed to recognize elements that are Is_Part_Of_Instance
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
@@ -251,11 +278,15 @@ package Thick_Queries is
    --
    -- Appropriate Element_Kinds:
    --    A_Declaration
+   --    A_Definition
    --    A_Defining_Name
    --    An_Expression
    --
    -- Appropriate Declaration_Kinds:
    --    A_Subtype_Declaration
+   --
+   -- Appropriate Definition_Kinds:
+   --    A_Subtype_Indication
    --
    -- Appropriate Expression_Kinds:
    --    An_Identifier
@@ -400,6 +431,31 @@ package Thick_Queries is
    --    A_Selected_Component (operates on selector)
    --    An_Attribute_Reference
 
+   function First_Defining_Name (Name : Asis.Element) return Asis.Defining_Name;
+   -- Returns the first textually encountered defining name of Name (assuming normal
+   -- processing order), i.e.:
+   -- For a program unit with a spec: the defining name from the spec, given the name
+   --     of a spec, the name of a body, the name of a stub, or the name of a proper body
+   -- For a subprogram without a spec: the defining name from the body (given same input)
+   -- For a private or incomplete or deferred declaration, or the a full declaration of one
+   --     of these: the defining name of the private or incomplete or deferred declaration.
+   -- For a formal parameter of a body: the corresponding formal parameter of the spec if
+   --     there is one, the one from the body otherwise.
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Defining_Name
+   --    An_Expression
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component (operates on selector)
+
+   function Matching_Name (Name : Asis.Defining_Name; Decl : Asis.Declaration) return Asis.Defining_Name;
+   -- Return the Defining_Name from Decl which is identical to Name
+   -- return Nil_Element if not found
+
+   function Ultimate_Expression (Expr : Asis.Expression) return Asis.Expression;
+   -- Returns Simple_name (Expr), unless Expr is the name of constant, in which case it returns
+   -- the Ultimate_Expression of the initialization expression of the constant.
 
    function Is_Static_Object (Obj : Asis.Expression) return Boolean;
    -- Return True if Obj is a name that designates a statically determinable object
@@ -411,7 +467,7 @@ package Thick_Queries is
    -- return the type definition of the type of The_Element
    -- Unlike Corresponding_Expression_Type, works if the the type of The_Element is
    -- an anonymous type
-   -- This query is a candidate for ASIS05, and already profided by ASIS-for-GNAT,
+   -- This query is a candidate for ASIS05, and already provided by ASIS-for-GNAT,
    -- but we don't use it as long as it is not standard
 
    function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition;
@@ -572,6 +628,16 @@ package Thick_Queries is
 
    function Formal_Name (Assoc : Asis.Association) return Asis.Defining_Name;
    -- Same as above, but retrieves the call (or instantiation) and the position given an association
+
+
+   function Other_Formal_Name (Name : Asis.Defining_Name; From_Spec : Boolean := False) return Asis.Defining_Name;
+   -- Given the defining name of a formal parameter of a callable entity, returns the defining name
+   -- of the same parameter:
+   -- from the other part of the callable entity (body if Name is from a spec,
+   -- spec if Name is from a body) if From_Spec is False
+   -- from the specification in any case, if From_Spec is True
+   -- If there is no such defining name (subprogram body without spec,
+   -- task entry, generic formal SP), a Nil_Element is returned.
 
 
    function Actual_Expression (Call           : Asis.Element;

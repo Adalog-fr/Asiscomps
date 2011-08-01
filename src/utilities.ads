@@ -54,6 +54,9 @@ package Utilities is
    -- User_Message. It is initialized to false so that by default, if not properly
    -- initialized, the output will be less pretty, but not wrong.
 
+   Trace_Is_Error   : Boolean := True;
+   -- Tells whether trace is to current_error, or has been redirected to a file
+
    --
    --  Output
    --

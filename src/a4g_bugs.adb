@@ -206,6 +206,16 @@ package body A4G_Bugs is
       end if;
    end Corresponding_Called_Function;
 
+   -------------------------
+   -- Corresponding_Entry --
+   -------------------------
+
+   function Corresponding_Entry (Statement : in Asis.Statement) return Asis.Declaration is
+      use Asis.Expressions, Asis.Statements;
+   begin
+      return Corresponding_Name_Declaration (Accept_Entry_Direct_Name (Statement));
+   end Corresponding_Entry;
+
    -----------------------------------
    -- Corresponding_Expression_Type --
    -----------------------------------

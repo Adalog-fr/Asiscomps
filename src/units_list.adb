@@ -322,7 +322,8 @@ package body Units_List is
                   return Buffer (1 .. Last);
                end if;
             end Read_Line;
-         begin
+
+         begin  -- Process_Indirect_File
             Open (Units_File, In_File, Name);
 
             -- Exit on End_Error
