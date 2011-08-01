@@ -95,6 +95,20 @@ package body Implementation_Options is
    -------------------------------------------------------------
 
    -----------------------
+   -- Initialize_String --
+   -----------------------
+
+   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
+      Default : constant Wide_String := "-ws -k";
+   begin
+      if Debug_Mode then
+         return Default;
+      else
+         return Default & " -nbb";
+      end if;
+   end Initialize_String;
+
+  -----------------------
    -- Parameters_String --
    -----------------------
 
@@ -102,6 +116,7 @@ package body Implementation_Options is
                                Other_Options : Wide_String := "") return Wide_String is
       use Ada.Characters.Handling, Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
       Default_Options : Unbounded_Wide_String;
+
    begin
       if Index (Other_Options, "-C") = 0 then
          Default_Options := To_Unbounded_Wide_String ("-CA");
@@ -110,11 +125,10 @@ package body Implementation_Options is
          Default_Options := Default_Options & To_Unbounded_Wide_String (" -FM");
       end if;
       return
-        To_Wide_String (Default_Options) &
-        ' ' &
-        To_Wide_String (I_Options_From_Project (Project_File)) &
-        ' ' &
-        Other_Options;
+        To_Wide_String (Default_Options)
+        & ' ' & To_Wide_String (I_Options_From_Project (Project_File))
+        & ' ' & Other_Options
+        ;
    end Parameters_String;
 
 end Implementation_Options;

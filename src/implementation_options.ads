@@ -37,7 +37,7 @@ package Implementation_Options is
    -- There is no other (known) dependency on the ASIS implentation
 
    -- Parameters for ASIS
-   Initialize_String : constant Wide_String := "-ws -k";
+   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String;
    function Parameters_String (Project_File  : String := "";
                                Other_Options : Wide_String := "") return Wide_String;
 
