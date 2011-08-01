@@ -33,6 +33,7 @@
 ----------------------------------------------------------------------
 
 with  -- Standard Ada units
+  Ada.Exceptions,
   Ada.Wide_Text_IO;
 
 with  -- Asis
@@ -72,8 +73,17 @@ package Utilities is
    function To_Upper (Item : in Wide_String) return Wide_String;
    --  The language provides this only for String, this is the same for Wide_String
 
-   function To_Title (Item : Wide_String) return Wide_String;
+   function To_Title (Item : in Wide_String) return Wide_String;
    --  Similar to To_Upper, but makes the string Title_Case
+
+   function Trim_All (Item : in Wide_String) return Wide_String;
+   -- Remove spaces and control characters from both ends of the string
+   -- Remove multiple spaces, line delimiters and comments within the string
+   -- Lower bound of returned string is 1.
+
+   function Integer_Img (Item : in Integer) return Wide_String;
+   -- Like Integer'Wide_Image, without the !*#!! initial space.
+   -- (avoids depending on the Gnat specific attribute 'Img)
 
    function Choose (Preferred : in Wide_String;
                     Otherwise : in Wide_String) return Wide_String;
@@ -106,6 +116,7 @@ package Utilities is
    procedure Trace (Message : Wide_String);
    procedure Trace (Message : Wide_String; Value : Boolean);
    procedure Trace (Message : Wide_String; Value : Integer);
+   procedure Trace (Message : Wide_String; Value : Ada.Exceptions.Exception_Occurrence);
 
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;

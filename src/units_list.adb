@@ -48,6 +48,7 @@ with   -- ASIS components
 
 with   -- Reusable components
   A4G_Bugs,
+  Linear_Queue,
   Thick_Queries,
   Utilities;
 package body Units_List is
@@ -57,11 +58,11 @@ package body Units_List is
    --                 Internal elements                          --
    ----------------------------------------------------------------
 
+   package String_List is new Linear_Queue (Wide_String);
+
    ------------------
    -- Global types --
    ------------------
-
-   type WS_Access is access Wide_String;
 
    type Node;
    type Link is access Node;
@@ -176,13 +177,12 @@ package body Units_List is
                        Add_Stubs  : in     Boolean;
                        My_Context : in out Asis.Context)
    is
-      use Asis, Asis.Compilation_Units, Asis.Elements, Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps;
+      use Asis, Asis.Compilation_Units, Asis.Elements;
+      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps;
+      use String_List;
 
-      Ignored_Units : array (1 .. Count (Unit_Spec, "-")    ) of WS_Access;
-      Ignored_Inx   : Natural := 0;
+      Ignored_Units : String_List.Queue;
       Separators    : constant Wide_Character_Set := To_Set ("+-");
-
-      procedure Free is new Ada.Unchecked_Deallocation (Wide_String, WS_Access);
 
       procedure Raise_Specification_Error (Mess : String) is
          use Ada.Exceptions;
@@ -193,15 +193,21 @@ package body Units_List is
 
       function Must_Ignore (Name : Wide_String) return Boolean is
          -- Check if unit name is either ignored, or a child (or a subunit) of an ignored unit
+        C : String_List.Cursor := First (Ignored_Units);
       begin
-         for I in Ignored_Units'Range loop
-            if Name = Ignored_Units (I).all or else
-              (Name'Length > Ignored_Units (I).all'Length + 1 and then
-               Ignored_Units (I).all = Name (Name'First .. Name'First+Ignored_Units (I).all'Length-1) and then
-               Name (Name'First + Ignored_Units (I).all'Length) = '.')
-            then
-               return True;
-            end if;
+         while Has_Element (C) loop
+            declare
+               Unit : constant Wide_String := Fetch (C);
+            begin
+               if Name = Unit
+                 or else (Name'Length > Unit'Length + 1
+                   and then Unit = Name (Name'First .. Name'First+Unit'Length-1)
+                          and then Name (Name'First + Unit'Length) = '.')
+               then
+                  return True;
+               end if;
+            end;
+            C := Next (C);
          end loop;
          return False;
       end Must_Ignore;
@@ -232,7 +238,7 @@ package body Units_List is
                end if;
             end;
          end Add_Withed_Unit;
-      begin
+      begin   -- Do_Process_With
          if Is_Nil (My_Unit) then
             return;
          end if;
@@ -287,7 +293,7 @@ package body Units_List is
          use Ada.Characters.Handling;
 
          procedure Process_Indirect_File (Name : String) is
-            use Ada.Wide_Text_IO, Ada.Strings;
+            use Ada.Wide_Text_IO;
 
             Units_File : Ada.Wide_Text_IO.File_Type;
 
@@ -309,9 +315,9 @@ package body Units_List is
             -- This is the simplest way to deal with improperly formed files
             loop
                declare
-                  Line : constant Wide_String := Trim (Read_Line, Both);
+                  Line : constant Wide_String := Trim_All (Read_Line);
                begin
-                  if Line /= "" and then Line (1) /= '#' then
+                  if Line /= "" and then Line (1) /= '#' and then (Line'Length = 1 or else Line (1..2) /= "--") then
                      Process_Unit_Spec (Line);
                   end if;
                end;
@@ -323,7 +329,7 @@ package body Units_List is
                Raise_Specification_Error ("Missing units file: " & Name);
             when others =>  -- Including End_Error
                if Is_Open (Units_File) then
-               Close (Units_File);
+                  Close (Units_File);
                end if;
          end Process_Indirect_File;
 
@@ -347,12 +353,6 @@ package body Units_List is
          -- Extract unit names and ignored units from unit spec.
          --
 
-         -- If Spec starts with '-', our count is wrong...
-         -- let's forbid this case
-         if Spec (Spec'First) = '-' then
-            Raise_Specification_Error ("Wrong unit specification: " & To_String (Spec));
-         end if;
-
          if Spec (Spec'First) = '+' then
             Start := Spec'First + 1;
          else
@@ -370,8 +370,7 @@ package body Units_List is
             if Start = Spec'First or else Spec (Start-1) = '+' then
                Add (To_Upper(Spec (Start .. Stop)));
             else
-               Ignored_Inx                 := Ignored_Inx + 1;
-               Ignored_Units (Ignored_Inx) := new Wide_String'(To_Upper(Spec (Start .. Stop)));
+               Append (Ignored_Units, To_Upper(Spec (Start .. Stop)));
             end if;
             exit when Stop = Spec'Last;
             Start := Stop + 2;
@@ -413,10 +412,6 @@ package body Units_List is
                Skip;
             end if;
          end;
-      end loop;
-
-      for I in Ignored_Units'Range loop
-         Free (Ignored_Units (I));
       end loop;
    end Register;
 

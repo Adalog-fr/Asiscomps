@@ -34,7 +34,6 @@
 
 with   -- Standard Ada units
   Ada.Characters.Handling,
-  Ada.Exceptions,
   Ada.Strings.Wide_Unbounded,
   Ada.Strings.Wide_Maps.Wide_Constants;
 
@@ -297,7 +296,7 @@ package body Utilities is
    -- To_Title --
    --------------
 
-   function To_Title (Item : Wide_String) return Wide_String is
+   function To_Title (Item : in Wide_String) return Wide_String is
       use Ada.Strings.Wide_Maps, Ada.Strings.Wide_Maps.Wide_Constants;
 
       Result     : Wide_String (1 .. Item'Length);
@@ -317,6 +316,105 @@ package body Utilities is
 
       return Result;
    end To_Title;
+
+   --------------
+   -- Trim_All --
+   --------------
+
+   Delim_Image : constant Wide_String := Asis.Text.Delimiter_Image;
+   function Trim_All (Item : in Wide_String) return Wide_String is
+      Result    : Wide_String (1 .. Item'Length);
+      Last      : Natural  := 0;
+      Start     : Positive := Item'First;
+      Stop      : Natural  := Item'Last;
+      In_Quotes : Boolean := False;
+      In_Comment: Boolean := False;
+      Delim_Inx : Natural := 0;
+   begin
+      for I in Item'Range loop
+         if Item (I) > ' ' then
+            Start := I;
+            Last  := 1;
+            Result (1) := Item (I);
+            exit;
+         end if;
+      end loop;
+      if Last = 0 then
+         -- Nothing found
+         return "";
+      end if;
+
+      for I in reverse Item'Range loop
+         if Item (I) > ' ' then
+            Stop := I;
+            if Stop = Start then
+               -- Only one character
+               return Result (1 .. 1);
+            end if;
+            exit;
+         end if;
+      end loop;
+
+      -- Since we loop until Stop-1, it is safe to access Item (I+1)
+      for I in Positive range Start+1 .. Stop-1 loop
+         if In_Quotes then
+            Last          := Last + 1;
+            Result (Last) := Item (I);
+         elsif In_Comment then
+            if Delim_Inx = 0 then
+               if Item (I) = Delim_Image (Delim_Image'First) then
+                  Delim_Inx := Delim_Image'First;
+               end if;
+            elsif Item (I) /= Delim_Image (Delim_Inx) then
+               Delim_Inx := 0;
+            elsif Delim_Inx = Delim_Image'Last then
+               In_Comment := False;
+            end if;
+         else
+            case Item (I) is
+               when Wide_Character'First .. Wide_Character'Pred (' ') =>
+                  null;
+               when '"' =>
+                  In_Quotes     := not In_Quotes;
+                  Last          := Last + 1;
+                  Result (Last) := '"';
+               when '-' =>
+                  if Item (I+1) = '-' then
+                     In_Comment := True;
+                  else
+                     Last          := Last + 1;
+                     Result (Last) := Item (I);
+                  end if;
+               when ' ' =>
+                  if Item (I+1) /= ' ' then
+                     Last          := Last + 1;
+                     Result (Last) := ' ';
+                  end if;
+               when others =>
+                  Last          := Last + 1;
+                  Result (Last) := Item (I);
+            end case;
+         end if;
+      end loop;
+      Last          := Last + 1;
+      Result (Last) := Item (Stop);
+
+      return Result (1 .. Last);
+   end Trim_All;
+
+   -----------------
+   -- Integer_Img --
+   -----------------
+
+   function Integer_Img (Item : in Integer) return Wide_String is
+      Result : constant Wide_String := Integer'Wide_Image (Item);
+   begin
+      if Item < 0 then
+         return Result;
+      else
+         return Result (2 .. Result'Last);
+      end if;
+   end Integer_Img;
 
    ---------------
    -- Set_Trace --
@@ -372,6 +470,16 @@ package body Utilities is
    procedure Trace (Message : Wide_String; Value : Integer) is
    begin
       Trace (Message & ", value= " & Integer'Wide_Image (Value));
+   end Trace;
+
+   ------------
+   -- Trace  --
+   ------------
+
+   procedure Trace (Message : Wide_String; Value : Ada.Exceptions.Exception_Occurrence) is
+      use Ada.Characters.Handling, Ada.Exceptions;
+   begin
+      Trace (Message & ", exception info= " & To_Wide_String (Exception_Information (Value)));
    end Trace;
 
    ------------

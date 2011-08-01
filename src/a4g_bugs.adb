@@ -83,7 +83,7 @@ package body A4G_Bugs is
          Name : constant Wide_String := Defining_Name_Image (Names (E)(1));
       begin
          E := Enclosing_Element (E);  -- Go to subprogram declaration
-         while Is_Part_Of_Implicit (E) loop
+         while Is_Part_Of_Inherited (E) loop
             E := Corresponding_Subprogram_Derivation (E);
          end loop;
 
@@ -146,7 +146,7 @@ package body A4G_Bugs is
          end if;
 
          -- (Object) Renaming of a complicated expression:
-         exit when Expression_Kind (Result) /= An_Identifier;
+         exit when Expression_Kind (Result) not in An_Identifier .. An_Operator_Symbol;
 
          Decl := Corresponding_Name_Declaration (Result);
          exit when Declaration_Kind (Decl) not in A_Renaming_Declaration;
@@ -215,6 +215,8 @@ package body A4G_Bugs is
       Result : Asis.Element;
       Temp   : Asis.Element;
    begin
+      --return Asis.Expressions.Corresponding_Expression_Type (Expression);
+
       if Expression_Kind (Expression) = An_Explicit_Dereference then
          -- For An_Explicit_Dereference, ASIS returns the type of the pointer
          -- instead of the type of the dereference.
@@ -223,6 +225,7 @@ package body A4G_Bugs is
          -- Agreed, this is awfully complicated, but after all it is only a fix for an
          -- ASIS bug. If someone feels like spending more time improving it...
          Temp := Prefix (Expression);
+
          if Expression_Kind (Temp) = A_Selected_Component then
             Temp := Selector (Temp);
          end if;
@@ -269,7 +272,7 @@ package body A4G_Bugs is
                      -- ???
                      Raise_Exception (Program_Error'Identity,
                                       "Unexpected declaration in Corresponding_Expression_Type: "
-                                      & Declaration_Kinds'Image (Declaration_Kind (Temp)));
+                                        & Declaration_Kinds'Image (Declaration_Kind (Temp)));
                end case;
          end case;
          if Expression_Kind (Result) = A_Selected_Component then
@@ -331,7 +334,7 @@ package body A4G_Bugs is
                   -- What's that?
                   Raise_Exception (Program_Error'Identity,
                                    "Bug in Corresponding_Expression_Type, attribute "
-                                   & Attribute_Kinds'Image (Attribute_Kind (Result)));
+                                     & Attribute_Kinds'Image (Attribute_Kind (Result)));
             end case;
          end if;
          if Expression_Kind (Result) = A_Selected_Component then
@@ -355,7 +358,7 @@ package body A4G_Bugs is
             Result := Asis.Expressions.Corresponding_Expression_Type (Enclosing_Element (Expression));
          end if;
          if Is_Nil (Result) then
-           -- Must be true this time...
+            -- Must be true this time...
             return Result;
          end if;
       end if;
@@ -364,7 +367,7 @@ package body A4G_Bugs is
          when A_Component_Declaration =>
             -- Bug
             Result := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication
-                                                                           (Object_Declaration_View (Result))));
+                                                                             (Object_Declaration_View (Result))));
 
          when A_Type_Declaration | A_Subtype_Declaration | A_Formal_Type_Declaration =>
             -- OK
@@ -460,6 +463,41 @@ package body A4G_Bugs is
          end if;
       end loop;
    end Corresponding_Root_Type;
+
+   ---------------------
+   -- Renamed_Entity --
+   ---------------------
+
+   function Renamed_Entity (Declaration : in Asis.Declaration) return Asis.Expression is
+      use Asis.Elements, Asis.Expressions, Asis.Statements;
+      Ren : constant Asis.Expression := Asis.Declarations.Renamed_Entity (Declaration);
+   begin
+      case A_Renaming_Declaration (Declaration_Kind (Declaration)) is
+         when An_Object_Renaming_Declaration
+            | An_Exception_Renaming_Declaration
+            | A_Package_Renaming_Declaration
+            | A_Generic_Package_Renaming_Declaration
+            | A_Generic_Procedure_Renaming_Declaration
+            | A_Generic_Function_Renaming_Declaration
+              =>
+            -- No problem here
+            return Ren;
+         when A_Procedure_Renaming_Declaration =>
+            if Statement_Kind (Ren) = A_Procedure_Call_Statement then
+               Trace_Bug ("Renamed_Entity");
+               return Called_Name (Ren);
+            else
+               return Ren;
+            end if;
+         when A_Function_Renaming_Declaration =>
+            if Expression_Kind (Ren) = A_Function_Call then
+               Trace_Bug ("Renamed_Entity");
+               return Prefix (Ren);
+            else
+               return Ren;
+            end if;
+      end case;
+   end Renamed_Entity;
 
    --------------
    -- Subunits --

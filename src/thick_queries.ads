@@ -362,6 +362,15 @@ package Thick_Queries is
    --    A_Selected_Component (applies to the selector)
 
 
+   function Is_Task_Entry (Declaration : Asis.Declaration) return Boolean;
+   -- Returns True if the Declaration is An_Entry_Declaration of a task.
+   -- Returns False if it is An_Entry_Declaration of a protected type
+   -- Expected elements:
+   --    A_Declaration
+   -- Appropriate Declaration_Kinds:
+   --    An_Entry_Declaration
+
+
    function Called_Simple_Name (Call : Asis.Element) return Asis.Expression;
    -- Given a procedure, entry or function call, returns the simple name of the called
    -- entity (from the call).
@@ -413,7 +422,9 @@ package Thick_Queries is
    -- Same as above, but retrieves the call (or instantiation) and the position given an association
 
 
-   function Actual_Expression (Call : Asis.Element; Formal : Asis.Defining_Name) return Asis.Expression;
+   function Actual_Expression (Call           : Asis.Element;
+                               Formal         : Asis.Defining_Name;
+                               Return_Default : Boolean := True) return Asis.Expression;
    -- Given a procedure, entry or function call, or a generic instantiation, returns the value
    -- of the actual corresponding to the formal whose defining_identifier is passed.
    -- If there is no such actual (the call used the default value), the default expression is returned.
@@ -473,10 +484,10 @@ package Thick_Queries is
    -------------------------------------------------------------------------------------------------
 
    type Biggest_Int is range System.Min_Int .. System.Max_Int; -- The best we can do
-   Non_Static : constant Biggest_Int := -1;
+   Not_Static : constant Biggest_Int := -1;
 
    subtype Biggest_Natural          is Biggest_Int range 0          .. Biggest_Int'Last;
-   subtype Extended_Biggest_Natural is Biggest_Int range Non_Static .. Biggest_Int'Last;
+   subtype Extended_Biggest_Natural is Biggest_Int range Not_Static .. Biggest_Int'Last;
 
    type Extended_Biggest_Natural_List is array (Positive range <>) of Extended_Biggest_Natural;
 
@@ -527,12 +538,13 @@ package Thick_Queries is
    -- Subtype of modular  : returns (First_Expression, Last_Expression)
    -- Modular type        : returns (Nil_Element, Mod_Expression)
    -- Enumerated type     : returns (First_Defining_Name, Last_Defining_Name)
+   -- The expressions are replaced by Nil_Element if they cannot be determined (formal type, root type)
    --
    -- Returns the bounds that constrain the indexes of an array type.
    -- Returned list has an even number of elements (First(1), Last (1), First (2), Last (2), ...)
    -- Each pair of elements is the same as above
    --
-   -- Returns Nil_Element_List if the type that applies to Elem is not discrete or array, or is formal
+   -- Returns Nil_Element_List if the type that applies to Elem is not discrete or array
    --
    -- Appropriate Element_Kinds:
    --   An_Expression
@@ -561,7 +573,12 @@ package Thick_Queries is
    -- Appropriate Definition_Kinds
    --   A_Discrete_Range
    --   A_Constraint
-   --
+   --   A_Type_Definition, appropriate Type_Kinds:
+   --      An_Unconstrained_Array_Definition
+   --      A_Constrained_Array_Definition
+   --   A_Formal_Type_Definition, appropriate Formal_Type_Kinds:
+   --      A_Formal_Unconstrained_Array_Definition
+   --      A_Formal_Constrained_Array_Definition   --
    -- Returns Element_Kind:
    --   Not_An_Element
    --   An_Expression

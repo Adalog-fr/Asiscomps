@@ -294,7 +294,10 @@ package body Thick_Queries is
    -- Actual_Expression --
    -----------------------
 
-   function Actual_Expression (Call : Asis.Element; Formal : Asis.Defining_Name) return Asis.Expression is
+   function Actual_Expression (Call           : Asis.Element;
+                               Formal         : Asis.Defining_Name;
+                               Return_Default : Boolean := True) return Asis.Expression
+   is
       use Asis.Expressions;
       Actuals : constant Asis.Association_List := Actual_Parameters (Call);
    begin
@@ -308,7 +311,11 @@ package body Thick_Queries is
          end if;
       end loop;
 
-      -- Not found, is it a default value?
+      -- Not found, can still be a default value
+      if not Return_Default then
+         return Nil_Element;
+      end if;
+
       declare
          Formals : constant Asis.Association_List := Called_Profile (Call);
       begin
@@ -722,6 +729,12 @@ package body Thick_Queries is
       end if;
 
       -- Get rid of (annoying) special case:
+      -- A predefined operator that has no declaration.
+     if Is_Nil (Decl_Name) and then Expression_Kind (The_Name) = An_Operator_Symbol then
+         return "STANDARD." & Name_Image (The_Name) & Profile_Image (The_Name, With_Profile);
+      end if;
+
+      -- Get rid of another annoying special case:
       -- A defining name that is actually part of a Defining_Expanded_Name
       -- (i.e. the composite name of a child unit).
       -- The full name is actually the Defining_Name of the enclosing construct
@@ -977,6 +990,9 @@ package body Thick_Queries is
                   The_Declaration := Corresponding_Name_Declaration (Element);
                when A_Selected_Component =>
                   The_Declaration := Corresponding_Name_Declaration (Selector (Element));
+               when An_Operator_Symbol =>
+                  -- These are always functions
+                  return True;
                when others =>
                   Impossible ("Is_Callable_Construct called on "
                               & Element_Kinds'Wide_Image (Element_Kind (Element)),
@@ -1016,6 +1032,28 @@ package body Thick_Queries is
       end case;
    end Is_Callable_Construct;
 
+
+   -------------------
+   -- Is_Task_Entry --
+   -------------------
+
+   function Is_Task_Entry (Declaration : Asis.Declaration) return Boolean is
+      use Asis.Definitions, Asis.Expressions;
+      Enclosing : Asis.Declaration := Enclosing_Element (Declaration);
+   begin
+      case Definition_Kind (Enclosing) is
+         when  A_Task_Definition =>
+            return True;
+         when A_Type_Definition =>
+            -- Must be A_Derived_Type_Defintion
+            Enclosing := Ultimate_Type_Declaration (Corresponding_Name_Declaration
+                                                      (Subtype_Simple_Name
+                                                         (Parent_Subtype_Indication (Enclosing))));
+            return Declaration_Kind (Enclosing) = A_Task_Type_Declaration;
+         when others =>
+            return False;
+      end case;
+   end Is_Task_Entry;
 
    -------------------------
    -- Subtype_Simple_Name --
@@ -1430,16 +1468,16 @@ package body Thick_Queries is
 
    begin
       if Element_Kind (The_Name) = A_Defining_Name then
-         Decl_Name := The_Name;
+         Decl_Name := Enclosing_Element (The_Name);
       elsif Expression_Kind (The_Name) = A_Selected_Component then
-         Decl_Name := Corresponding_Name_Definition (Selector (The_Name));
+         Decl_Name := Corresponding_Name_Declaration (Selector (The_Name));
       else
-         Decl_Name := Corresponding_Name_Definition (The_Name);
+         Decl_Name := Corresponding_Name_Declaration (The_Name);
       end if;
 
-      if Is_Callable_Construct (Decl_Name) then
+      if Is_Callable_Construct (The_Name) then
          declare
-            Profile_Names : constant Profile_Descriptor := Types_Profile (Enclosing_Element (Decl_Name));
+            Profile_Names : constant Profile_Descriptor := Types_Profile (Decl_Name);
          begin
             if Is_Nil (Profile_Names.Result_Type.Name) then
                -- A procedure (or entry...)
@@ -1703,10 +1741,10 @@ package body Thick_Queries is
       -- we want to unwind renamings, but Corrresponding_Base_Entity doesn't.
       -- Hence the loop.
    Going_Up_Renamings:
-      while Declaration_Kind (Decl) in A_Renaming_Declaration loop
-         Result := A4G_Bugs.Corresponding_Base_Entity (Decl);
-         loop
-            case Expression_Kind (Result) is
+       while Declaration_Kind (Decl) in A_Renaming_Declaration loop
+          Result := A4G_Bugs.Corresponding_Base_Entity (Decl);
+          loop
+             case Expression_Kind (Result) is
                when A_Selected_Component =>
                   Result := Selector (Result);
                when A_Slice
@@ -1840,10 +1878,7 @@ package body Thick_Queries is
          Dim_Expr : constant Asis.Expression_List := Attribute_Designator_Expressions (Attr);
          Dim      : Positive;
       begin
-         if Is_Nil (Bounds) then
-            -- 'Range of a generic formal type
-            return Nil_Element_List;
-         elsif Is_Nil (Dim_Expr) then
+         if Is_Nil (Dim_Expr) then
             Dim := 1;
          else
             -- In the extremely unlikely case where the static expression Dim_Expr is
@@ -1906,7 +1941,7 @@ package body Thick_Queries is
       Parent     : Subtype_Indication;
       Constraint : Asis.Definition;
    begin  -- Discrete_Constraining_Bounds
-      -- Get rid of cases managed by other functions
+      -- Get rid of cases when we have directly a definition (managed by other functions)
       case Definition_Kind (Elem) is
          when A_Constraint =>
             return Constraint_Bounds (Elem);
@@ -1914,7 +1949,64 @@ package body Thick_Queries is
            | A_Discrete_Subtype_Definition
            =>
             return Discrete_Range_Bounds (Elem);
+         when A_Type_Definition =>
+            case Type_Kind (Elem) is
+               when An_Unconstrained_Array_Definition =>
+                  declare
+                     Index_Defs : constant Asis.Definition_List := Index_Subtype_Definitions (Elem);
+                     Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
+                  begin
+                     -- Index_Defs can only contain A_Discrete_Subtype_Indication here
+                     for I in Index_Defs'Range loop
+                        Result (2*I-1 .. 2*I) := Discrete_Constraining_Bounds (Index_Defs (I));
+                     end loop;
+
+                     return Result;
+                  end;
+               when A_Constrained_Array_Definition =>
+                  declare
+                     Index_Defs : constant Asis.Definition_List := Discrete_Subtype_Definitions (Elem);
+                     Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
+                  begin
+                     for I in Index_Defs'Range loop
+                        Result (2*I-1 .. 2*I) := Discrete_Range_Bounds (Index_Defs (I));
+                     end loop;
+
+                     return Result;
+                  end;
+               when others =>
+                  null;
+            end case;
+         when A_Formal_Type_Definition =>
+            case Formal_Type_Kind (Elem) is
+               when A_Formal_Unconstrained_Array_Definition =>
+                  declare
+                     Index_Defs : constant Asis.Definition_List := Index_Subtype_Definitions (Elem);
+                     Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
+                  begin
+                     -- Index_Defs can only contain A_Discrete_Subtype_Indication here
+                     for I in Index_Defs'Range loop
+                        Result (2*I-1 .. 2*I) := Discrete_Constraining_Bounds (Index_Defs (I));
+                     end loop;
+
+                     return Result;
+                  end;
+               when A_Formal_Constrained_Array_Definition =>
+                  declare
+                     Index_Defs : constant Asis.Definition_List := Discrete_Subtype_Definitions (Elem);
+                     Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
+                  begin
+                     for I in Index_Defs'Range loop
+                        Result (2*I-1 .. 2*I) := Discrete_Range_Bounds (Index_Defs (I));
+                     end loop;
+
+                     return Result;
+                  end;
+               when others =>
+                  null;
+            end case;
          when others =>
+            -- Including Not_A_Definition
             null;
       end case;
 
@@ -2006,7 +2098,7 @@ package body Thick_Queries is
                            -- However, we have no (easy) way to retrieve them as Element
                            -- Bounds of Universal_Integer are infinite.
                            -- Just pretend they are both not computable
-                           return Nil_Element_List;
+                           return (Nil_Element, Nil_Element);
                         when A_Root_Real_Definition
                           | A_Universal_Real_Definition
                           | A_Universal_Fixed_Definition
@@ -2024,33 +2116,12 @@ package body Thick_Queries is
                      -- Only discrete bounds for the moment
                      return Nil_Element_List; -- TBSL
 
-                  when An_Unconstrained_Array_Definition =>
-                     declare
-                        Index_Defs : constant Asis.Definition_List := Index_Subtype_Definitions (Item_Def);
-                        Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
-                     begin
-                        -- Index_Defs can only contain A_Discrete_Subtype_Indication here
-                        for I in Index_Defs'Range loop
-                          Result (2*I-1 .. 2*I) := Discrete_Constraining_Bounds (Index_Defs (I));
-                        end loop;
-
-                        return Result;
-                     end;
-
-                  when A_Constrained_Array_Definition =>
-                     declare
-                        Index_Defs : constant Asis.Definition_List := Discrete_Subtype_Definitions (Item_Def);
-                        Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
-                     begin
-                        for I in Index_Defs'Range loop
-                           Result (2*I-1 .. 2*I) := Discrete_Range_Bounds (Index_Defs (I));
-                        end loop;
-
-                        return Result;
-                     end;
+                  when An_Unconstrained_Array_Definition
+                     | A_Constrained_Array_Definition
+                       =>
+                     return Discrete_Constraining_Bounds (Item_Def);
 
                   when others =>  -- Compatibility Ada 2005
-                     -- TBSL what is it?
                      return Nil_Element_List;
                end case;
 
@@ -2087,16 +2158,7 @@ package body Thick_Queries is
                case Definition_Kind (Item_Def) is
                   when A_Type_Definition =>
                      -- A_Constrained_Array_Definition
-                     declare
-                        Index_Defs : constant Asis.Definition_List := Discrete_Subtype_Definitions (Item_Def);
-                        Result     : Asis.Expression_List (1 .. 2*Index_Defs'Length);
-                     begin
-                        for I in Index_Defs'Range loop
-                           Result (2*I-1 .. 2*I) := Discrete_Range_Bounds (Index_Defs (I));
-                        end loop;
-
-                        return Result;
-                     end;
+                     return Discrete_Constraining_Bounds (Item_Def);
                   when A_Task_Definition
                     | A_Protected_Definition
                     =>
@@ -2122,10 +2184,35 @@ package body Thick_Queries is
                Item := Declaration_Subtype_Mark (Item);
 
             when A_Formal_Type_Declaration =>
-               -- TBSL
-               -- Consider it non static for the moment
-               -- If it is a formal array type, its bounds could be evaluable
-               return Nil_Element_List;
+               Item_Def := Type_Declaration_View (Item);
+               case Formal_Type_Kind (Item_Def) is
+                  when Not_A_Formal_Type_Definition =>
+                     Impossible ("Discrete_Constraining_Bounds: not a formal definition", Item);
+                  when A_Formal_Private_Type_Definition
+                     | A_Formal_Tagged_Private_Type_Definition
+                       =>
+                     return Nil_Element_List;
+                  when A_Formal_Derived_Type_Definition =>
+                     Item := Subtype_Simple_Name (Item_Def);
+                  when A_Formal_Discrete_Type_Definition
+                     | A_Formal_Signed_Integer_Type_Definition
+                       | A_Formal_Modular_Type_Definition
+                       =>
+                     return (Nil_Element, Nil_Element);
+                  when A_Formal_Floating_Point_Definition
+                     | A_Formal_Ordinary_Fixed_Point_Definition
+                     | A_Formal_Decimal_Fixed_Point_Definition
+                     | A_Formal_Access_Type_Definition
+                       =>
+                     return Nil_Element_List;
+
+                     when A_Formal_Unconstrained_Array_Definition
+                     | A_Formal_Constrained_Array_Definition
+                       =>
+                     return Discrete_Constraining_Bounds (Item_Def);
+                  when others =>  -- Compatibility Ada 2005
+                     return Nil_Element_List;
+               end case;
 
             when others =>
                Impossible ("Discrete_Constraining_Bounds: Bad declaration", Elem);
@@ -2144,7 +2231,7 @@ package body Thick_Queries is
    begin
       -- TBSL return empty list for arrays?
       if Result'Length = 0 then
-         return (Non_Static, Non_Static);
+         return (Not_Static, Not_Static);
       end if;
 
       for I in Result'Range loop
@@ -2157,7 +2244,7 @@ package body Thick_Queries is
                   begin
                      if Low = "" or High = "" then
                         -- Some bound is dynamic
-                        Result (I) := Non_Static;
+                        Result (I) := Not_Static;
                      elsif Biggest_Int'Wide_Value (Low) > Biggest_Int'Wide_Value (High) then
                         Result (I) := 0;
                      else
@@ -2178,7 +2265,7 @@ package body Thick_Queries is
          exception
             when Constraint_Error =>
                -- Not in range of Biggest_Int...
-               Result (I) := Non_Static;
+               Result (I) := Not_Static;
          end;
       end loop;
 
@@ -2283,6 +2370,7 @@ package body Thick_Queries is
       end Strip_Quotes;
 
       Decl : Asis.Declaration;
+      Expr : Asis.Expression;
    begin
       case Expression_Kind (Expression) is
          when An_Integer_Literal =>
@@ -2469,6 +2557,27 @@ package body Thick_Queries is
                            Impossible ("Bad return from Discrete_Constraining_Bounds", Bounds (2*Dim-1));
                      end case;
                   end;
+               when A_Size_Attribute =>
+                  -- If a size clause has been given, we may try it, otherwise give up
+                  Expr := Prefix (Expression);
+                  if Expression_Kind (Expr) = A_Selected_Component then
+                     Expr := Selector (Expr);
+                  end if;
+                  declare
+                     use Asis.Clauses;
+                     Reprs: constant Asis.Representation_Clause_List
+                       := Corresponding_Representation_Clauses (Corresponding_Name_Declaration (Expr));
+                  begin
+                     for R in Reprs'Range loop
+                        if Representation_Clause_Kind (Reprs (R)) = An_Attribute_Definition_Clause
+                          and then A4G_Bugs.Attribute_Kind (Representation_Clause_Name (Reprs (R))) = A_Size_Attribute
+                        then
+                           return Static_Expression_Value_Image (Representation_Clause_Expression (Reprs (R)));
+                        end if;
+                     end loop;
+                  end;
+                  -- not found
+                  return "";
                when others =>
                   return "";
             end case;
@@ -2543,7 +2652,7 @@ package body Thick_Queries is
                   Variable := Corresponding_Name_Definition (E);
                   Variable_Enclosing := Enclosing_Element (Variable);
                   if Declaration_Kind (Variable_Enclosing) in A_Renaming_Declaration then
-                     E := Renamed_Entity (Variable_Enclosing);
+                     E := A4G_Bugs.Renamed_Entity (Variable_Enclosing);
                   else
                      return Complete_For_Access ((1 => (Identifier, Variable)));
                   end if;
@@ -2735,7 +2844,11 @@ package body Thick_Queries is
       if Expression_Kind (Good_Left) = An_Identifier and Expression_Kind (Good_Right) = An_Identifier then
          Good_Left  := Ultimate_Name (Good_Left);
          Good_Right := Ultimate_Name (Good_Right);
-         Decl       := Corresponding_Name_Declaration (Good_Left);
+         if Is_Nil (Good_Left) or Is_Nil (Good_Right) then
+            -- Dynamic renaming...
+            return False;
+         end if;
+         Decl := Corresponding_Name_Declaration (Good_Left);
          case Declaration_Kind (Decl) is
             when A_Constant_Declaration =>
                if Is_Equal (Corresponding_Name_Definition (Good_Left),

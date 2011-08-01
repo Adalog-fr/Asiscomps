@@ -79,6 +79,13 @@ package A4G_Bugs is
    -- Fixed in    :
    function Corresponding_Last_Subtype (Declaration : in Asis.Declaration) return Asis.Declaration;
 
+   -- Reason      : Renaming of attribute returns A_Function_Call (or A_Procedure_Call_Statement)
+   --               instead of An_Attribute_Reference
+   -- Bug report  : [FA26-004], 26/10/2006
+   -- Gnat version: GNATPro 5.05w (20060603-34)
+   -- Fixed in    :
+   function Renamed_Entity (Declaration : in Asis.Declaration) return Asis.Expression;
+
 
    --
    -- From Asis.Definitions
