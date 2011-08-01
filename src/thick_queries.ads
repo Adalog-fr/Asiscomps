@@ -73,6 +73,12 @@ package Thick_Queries is
    --     Nil_Element if Element is Nil, or is a Compilation_Unit
    --
 
+   function Is_Compilation_Unit (Element : Asis.Element) return Boolean;
+   --  Return True if the element is the declaration of the enclosing compilation unit
+   --
+   --  Appropriate Element_Kinds:
+   --     Any element
+
    function Ultimate_Enclosing_Instantiation (The_Element : Asis.Element) return Asis.Declaration;
    -- For an entity which Is_Part_Of_Instance:
    -- Return the "true" instantiation, i.e. the one written by the user, going up instantiations
@@ -109,9 +115,11 @@ package Thick_Queries is
 
    function Statements (Element : in Asis.Element) return Asis.Statement_List;
    -- Returns the statements of any construct with statements.
-    -- Appropriate Element_Kinds:
+   -- Appropriate Element_Kinds:
    --    A_Declaration
    --    A_Statement
+   --    A_Path
+   --    An_Exception_Handler
    --
    -- Appropriate Declaration_Kinds:
    --    A_Function_Body_Declaration
@@ -123,6 +131,10 @@ package Thick_Queries is
    -- Appropriate Statement_Kinds:
    --    An_Accept_Statement
    --    A_Block_Statement
+   --    A_Loop_Statement
+   --    A_While_Loop_Statement
+   --    A_For_Loop_Statement
+
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
@@ -158,6 +170,7 @@ package Thick_Queries is
    -- Appropriate Expression_Kinds:
    --    An_Identifier
    --    A_Selected_Component (returns the image of the selector)
+   --    An_Attribute_Reference
 
 
    function Profile_Image (The_Name     : Asis.Element;
@@ -273,6 +286,7 @@ package Thick_Queries is
    function Ultimate_Name (The_Name : Asis.Element) return Asis.Element;
    -- For a name defined by a renaming declaration: returns the name of the entity, which is not
    --   itself defined by a renaming.
+   --   - In the case of a renaming whose target is part of a composite type, returns the name
    --     of the field for A_Selected_Component and the name of the array for An_Indexed_Component
    --        (i.e. X : T renames V.Field (2) => Field).
    --   - In the case of a renaming whose target is An_Explicit_Dereference, returns Nil_Element
@@ -292,6 +306,12 @@ package Thick_Queries is
    --    An_Identifier
    --    A_Selected_Component (operates on selector)
    --    An_Attribute_Reference
+
+
+   function Is_Static_Object (Obj : Asis.Expression) return Boolean;
+   -- Return True if Obj is a name that designates a statically determinable object
+   -- (including, f.e., statically indexed array components).
+   -- Return False in all other cases, including when Obj does not designate an Object
 
 
    function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition;
@@ -359,6 +379,7 @@ package Thick_Queries is
    --    An_Expression
    -- Appropriate Expression_Kinds:
    --    An_Identifier
+   --    An_Attribute_Reference
    --    A_Selected_Component (applies to the selector)
 
 
@@ -491,6 +512,7 @@ package Thick_Queries is
 
    type Extended_Biggest_Natural_List is array (Positive range <>) of Extended_Biggest_Natural;
 
+   type Biggest_Float is digits System.Max_Digits; -- The same for floatting point numbers
 
    function Static_Expression_Value_Image (Expression : Asis.Expression) return Wide_String;
    --  Computes the value of Expression if it is a static expression
@@ -514,6 +536,7 @@ package Thick_Queries is
    --  Real:
    --     Literal
    --     Named number
+   --     + - * / **
    --  Enumerated:
    --     Literal
    --  String: (no way to distinguish true "" from non-static expression)
@@ -588,7 +611,7 @@ package Thick_Queries is
    function Discrete_Constraining_Lengths (Elem : Asis.Element) return Extended_Biggest_Natural_List;
    -- Like Discrete_Constraining_Bounds, but returns the number of values in the range instead of
    -- the bounds if statically determinable
-   -- Returns Non_Static (-1) if not statically determinable
+   -- Returns Not_Static (-1) if not statically determinable
 
 
    type Result_Confidence is (Unlikely, Possible, Certain);

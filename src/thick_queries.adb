@@ -271,9 +271,6 @@ package body Thick_Queries is
                   end if;
                end loop;
             end;
-
-
-
          when others =>
             declare
                Assoc_List : constant Asis.Association_List :=  Called_Profile (Call_Or_Instantiation);
@@ -720,6 +717,10 @@ package body Thick_Queries is
 
       Decl_Name_Enclosing : Asis.Element;
    begin   -- Full_Name_Image
+      if Expression_Kind (The_Name) = An_Attribute_Reference then
+         return Full_Name_Image (Prefix (The_Name)) & ''' & Attribute_Name_Image (The_Name);
+      end if;
+
       if Element_Kind (The_Name) = A_Defining_Name then
          Decl_Name := The_Name;
       elsif Expression_Kind (The_Name) = A_Selected_Component then
@@ -965,6 +966,21 @@ package body Thick_Queries is
    -- Is_Callable_Construct --
    ---------------------------
 
+   Callable_Attributes : constant array (Asis.Attribute_Kinds) of Boolean
+     := (An_Adjacent_Attribute          | A_Ceiling_Attribute    | A_Compose_Attribute    |
+         A_Copy_Sign_Attribute          | An_Exponent_Attribute  | A_Floor_Attribute      |
+         A_Fraction_Attribute           | An_Image_Attribute     | An_Input_Attribute     |
+         A_Leading_Part_Attribute       | A_Machine_Attribute    | A_Max_Attribute        |
+         A_Min_Attribute                | A_Model_Attribute      | An_Output_Attribute    |
+         A_Pos_Attribute                | A_Pred_Attribute       | A_Read_Attribute       |
+         A_Remainder_Attribute          | A_Round_Attribute      | A_Rounding_Attribute   |
+         A_Scaling_Attribute            | A_Succ_Attribute       | A_Truncation_Attribute |
+         An_Unbiased_Rounding_Attribute | A_Val_Attribute        | A_Value_Attribute      |
+         A_Wide_Image_Attribute         | A_Wide_Value_Attribute | A_Write_Attribute
+           => True,
+         others
+           => False);
+
    function Is_Callable_Construct (Element : Asis.Element) return Boolean is
       use Asis.Expressions;
       The_Declaration : Asis.Element;
@@ -993,9 +1009,11 @@ package body Thick_Queries is
                when An_Operator_Symbol =>
                   -- These are always functions
                   return True;
+               when An_Attribute_Reference =>
+                  return Callable_Attributes (A4G_Bugs.Attribute_Kind (Element));
                when others =>
                   Impossible ("Is_Callable_Construct called on "
-                              & Element_Kinds'Wide_Image (Element_Kind (Element)),
+                              & Expression_Kinds'Wide_Image (Expression_Kind (Element)),
                               Element);
             end  case;
          when others =>
@@ -1031,6 +1049,47 @@ package body Thick_Queries is
             return False;
       end case;
    end Is_Callable_Construct;
+
+
+   ----------------------
+   -- Is_Static_Object --
+   ----------------------
+
+   function Is_Static_Object (Obj : Asis.Expression) return Boolean is
+      use Asis.Expressions;
+   begin
+      case Expression_Kind (Obj) is
+         when An_Identifier =>
+            return not Is_Nil (Ultimate_Name (Obj));
+         when An_Explicit_Dereference =>
+            return False;
+         when An_Indexed_Component =>
+            if Is_Static_Object (Prefix (Obj)) then
+               declare
+                  Indexes : constant Asis.Expression_List := Index_Expressions (Obj);
+               begin
+                  for I in Indexes'Range loop
+                     if Static_Expression_Value_Image (Indexes (I)) = "" then
+                        return False;
+                     end if;
+                  end loop;
+                  return True;
+               end;
+            else
+               return False;
+            end if;
+         when A_Slice =>
+            return Is_Static_Object (Prefix (Obj))
+              and then Discrete_Constraining_Lengths (Slice_Range (Obj)) (1) /= Not_Static;
+         when A_Selected_Component =>
+            return Is_Static_Object (Selector (Obj)) and then Is_Static_Object (Prefix (Obj));
+         when A_Type_Conversion | A_Qualified_Expression =>
+            return Is_Static_Object (Converted_Or_Qualified_Expression (Obj));
+         when others =>
+            -- Not an object
+            return False;
+      end case;
+   end Is_Static_Object;
 
 
    -------------------
@@ -1088,6 +1147,14 @@ package body Thick_Queries is
       return A4G_Bugs.Attribute_Kind (Subtype_Simple_Name (Type_Declaration_View (ST))) = A_Class_Attribute;
    end Is_Class_Wide_Subtype;
 
+   -------------------------
+   -- Is_Compilation_Unit --
+   -------------------------
+
+   function Is_Compilation_Unit (Element : Asis.Element) return Boolean is
+   begin
+      return Is_Equal (Element, Unit_Declaration (Enclosing_Compilation_Unit (Element)));
+   end Is_Compilation_Unit;
 
    ----------------
    -- Is_Limited --
@@ -2298,9 +2365,18 @@ package body Thick_Queries is
                   return Accept_Body_Statements (Element);
                when A_Block_Statement =>
                   return Block_Statements (Element);
+               when A_Loop_Statement
+                  | A_While_Loop_Statement
+                  | A_For_Loop_Statement
+                    =>
+                  return Loop_Statements (Element);
                when others =>
                   Impossible ("Statements: invalid statement kind", Element);
             end case;
+         when A_Path =>
+            return Sequence_Of_Statements (Element);
+         when An_Exception_Handler =>
+            return Handler_Statements (Element);
          when others =>
             Impossible ("Statements: invalid element kind", Element);
       end case;
@@ -2313,28 +2389,53 @@ package body Thick_Queries is
    function Static_Expression_Value_Image (Expression : Asis.Expression) return Wide_String is
       use Asis.Expressions;
 
+      -- The function Is_Float_String returns true if, and only if, the argument
+      -- text corresponds to a float.
+      function Is_Float_String(Str: Wide_String) return Boolean is
+      begin
+         for I in Str'Range loop
+            if Str(I) = '.' then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end Is_Float_String;
+
       generic
-         with function Op (Left, Right : Biggest_Int) return Biggest_Int;
+         with function Op_Int (Left, Right : Biggest_Int) return Biggest_Int;
+         with function Op_Float (Left, Right : Biggest_Float) return Biggest_Float;
       function String_Op (Left, Right : Wide_String) return Wide_String;
       function String_Op (Left, Right : Wide_String) return Wide_String is
       begin
          if Left = "" or Right = "" then
             return "";
          end if;
-         return Biggest_Int'Wide_Image (Op (Biggest_Int'Wide_Value (Left), Biggest_Int'Wide_Value (Right)));
+         if Is_Float_String(Left) or Is_Float_String(Right) then
+            return Biggest_Float'Wide_Image (Op_Float (Biggest_Float'Wide_Value (Left),
+                                                       Biggest_Float'Wide_Value (Right)));
+         else
+            return Biggest_Int'Wide_Image (Op_Int (Biggest_Int'Wide_Value (Left),
+                                                   Biggest_Int'Wide_Value (Right)));
+         end if;
       end String_Op;
 
-      function "+" is new String_Op ("+");
-      function "-" is new String_Op ("-");
-      function "*" is new String_Op ("*");
-      function "/" is new String_Op ("/");
+      function "+" is new String_Op ("+","+");
+      function "-" is new String_Op ("-","-");
+      function "*" is new String_Op ("*","*");
+      function "/" is new String_Op ("/","/");
       -- Cannot do the same for "**", since Right is always Natural
       function "**" (Left, Right : Wide_String) return Wide_String is
       begin
          if Left = "" or Right = "" then
             return "";
          end if;
-         return Biggest_Int'Wide_Image ("**" (Biggest_Int'Wide_Value (Left), Natural'Wide_Value (Right)));
+         if Is_Float_String(Left) then
+            return Biggest_Float'Wide_Image ("**" (Biggest_Float'Wide_Value (Left),
+                                                   Natural'Wide_Value (Right)));
+         else
+            return Biggest_Int'Wide_Image ("**" (Biggest_Int'Wide_Value (Left),
+                                                 Natural'Wide_Value (Right)));
+         end if;
       end "**";
 
       function Strip_Underscores (Item : Wide_String) return Wide_String is
