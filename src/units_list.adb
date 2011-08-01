@@ -41,11 +41,10 @@ with   -- Standard Ada units
   Ada.Wide_Text_IO;
 
 with   -- ASIS components
+  Asis.Clauses,
   Asis.Compilation_Units,
   Asis.Elements,
-  Asis.Expressions,
-  Asis.Iterator;
-pragma Elaborate_All (Asis.Iterator);
+  Asis.Expressions;
 
 with   -- Reusable components
   A4G_Bugs,
@@ -64,8 +63,6 @@ package body Units_List is
 
    type WS_Access is access Wide_String;
 
-   type Info is null record;
-
    type Node;
    type Link is access Node;
    type Node (Length : Positive) is
@@ -78,9 +75,10 @@ package body Units_List is
    -- Global variables --
    ----------------------
 
-   Head     : Link;
-   Cursor   : Link;
-   Previous : Link;
+   Head        : Link;
+   Cursor      : Link;
+   Previous    : Link;
+   List_Length : Natural := 0;
 
    ---------
    -- Add --
@@ -94,9 +92,10 @@ package body Units_List is
       Current    : Link := Head;
    begin
       if Current = null then
-         Head     := new Node'(Upper_Unit'Length, Upper_Unit, null);
-         Cursor   := Head;
-         Previous := null;
+         Head        := new Node'(Upper_Unit'Length, Upper_Unit, null);
+         Cursor      := Head;
+         Previous    := null;
+         List_Length := 1;
          return;
       end if;
 
@@ -111,100 +110,13 @@ package body Units_List is
       -- Not found
       -- Current still points to the last node
       Current.Next := new Node'(Upper_Unit'Length, Upper_Unit, null);
+      List_Length := List_Length + 1;
       if Cursor = null then
          Cursor   := Current.Next;
          Previous := Current;
       end if;
    end Add;
 
-   -----------
-   -- Error --
-   -----------
-
-   procedure Raise_Specification_Error (Mess : String) is
-      use Ada.Exceptions;
-   begin
-      Raise_Exception (Specification_Error'Identity, Mess);
-   end Raise_Specification_Error;
-   pragma No_Return (Raise_Specification_Error);
-
-   ----------
-   -- Free --
-   ----------
-   procedure Free is new Ada.Unchecked_Deallocation (Node, Link);
-
-   --------------------
-   -- Post_Procedure --
-   --------------------
-
-   procedure Post_Procedure (Element : in     Asis.Element;
-                             Control : in out Asis.Traverse_Control;
-                             State   : in out Info)
-   is
-      pragma Unreferenced (Element);
-      pragma Unreferenced (Control);
-      pragma Unreferenced (State);
-  begin
-      null;
-   end Post_Procedure;
-
-   ------------------------
-   -- Pre_Procedure_With --
-   ------------------------
-
-   procedure Pre_Procedure_With (Element : in     Asis.Element;
-                                 Control : in out Asis.Traverse_Control;
-                                 State   : in out Info)
-   is
-      pragma Unreferenced (State);
-      use Asis, Asis.Elements, Asis.Expressions, Asis.Compilation_Units;
-      use Thick_Queries;
-
-   begin
-      Control := Continue;
-
-      case Element_Kind (Element) is
-         when A_Clause =>                 ------------ Clause ------------
-            case Clause_Kind (Element) is
-               when A_With_Clause =>
-                  -- Let recurse into children
-                  null;
-               when others =>
-                  -- Not interested
-                  Control := Abandon_Children;
-            end case;
-         when An_Expression =>                 ------------ Expression ------------
-            case Expression_Kind (Element) is
-               when An_Identifier =>
-                  -- Only identifiers from with clauses come here
-                  -- However, we do not add predefined units
-                  if Unit_Origin (Enclosing_Compilation_Unit
-                                    (Corresponding_Name_Definition (Element))) =
-                    An_Application_Unit
-                  then
-                     Add (Full_Name_Image (Corresponding_Name_Definition (Element)));
-                  end if;
-               when others =>
-                  null;
-            end case;
-
-         when others =>
-            -- Not interested
-            Control := Abandon_Children;
-      end case;
-
-   exception
-      when others =>
-         Trace ("Exception in Pre-proc of Units_List ", Element); --## rule line off no_trace
-         raise;
-   end Pre_Procedure_With;
-
-   -------------------
-   -- Traverse_With --
-   -------------------
-
-   procedure Traverse_With is new Asis.Iterator.Traverse_Element
-     (Info, Pre_Procedure_With, Post_Procedure);
 
    ----------------------------------------------------------------
    --                 Exported subprograms                       --
@@ -224,6 +136,7 @@ package body Units_List is
    --------------------
 
    procedure Delete_Current is
+      procedure Free is new Ada.Unchecked_Deallocation (Node, Link);
       To_Free : Link := Cursor;
    begin
       if Previous = null then
@@ -231,7 +144,8 @@ package body Units_List is
       else
          Previous.Next := Cursor.Next;
       end if;
-      Cursor := Cursor.Next;
+      Cursor      := Cursor.Next;
+      List_Length := List_Length - 1;
       Free (To_Free);
    end Delete_Current;
 
@@ -244,6 +158,15 @@ package body Units_List is
       return Cursor = null;
    end Is_Exhausted;
 
+   ------------
+   -- Length --
+   ------------
+
+   function Length return Integer is
+   begin
+      return List_Length;
+   end Length;
+
    --------------
    -- Register --
    --------------
@@ -255,11 +178,18 @@ package body Units_List is
    is
       use Asis, Asis.Compilation_Units, Asis.Elements, Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps;
 
-      procedure Free is new Ada.Unchecked_Deallocation (Wide_String, WS_Access);
-
       Ignored_Units : array (1 .. Count (Unit_Spec, "-")    ) of WS_Access;
       Ignored_Inx   : Natural := 0;
       Separators    : constant Wide_Character_Set := To_Set ("+-");
+
+      procedure Free is new Ada.Unchecked_Deallocation (Wide_String, WS_Access);
+
+      procedure Raise_Specification_Error (Mess : String) is
+         use Ada.Exceptions;
+      begin
+         Raise_Exception (Specification_Error'Identity, Mess);
+      end Raise_Specification_Error;
+      pragma No_Return (Raise_Specification_Error);
 
       function Must_Ignore (Name : Wide_String) return Boolean is
          -- Check if unit name is either ignored, or a child (or a subunit) of an ignored unit
@@ -277,21 +207,49 @@ package body Units_List is
       end Must_Ignore;
 
       procedure Do_Process_With (My_Unit : Compilation_Unit) is
-         The_Control : Traverse_Control := Continue;
-         The_Info    : Info;
+         use Asis.Clauses;
 
+         procedure Add_Withed_Unit (Withed_Name : Asis.Expression) is
+            use Asis.Expressions;
+            use Thick_Queries;
+            Unit_Name : Asis.Expression;
+         begin
+            if Expression_Kind (Withed_Name) = A_Selected_Component then
+               -- Must add all units in the prefix
+               Add_Withed_Unit (Prefix (Withed_Name));
+
+               -- Treat this one
+               Unit_Name := Selector (Withed_Name);
+            else
+               Unit_Name := Withed_Name;
+            end if;
+
+            declare
+               Name_Def : constant Asis.Definition := Corresponding_Name_Definition (Unit_Name);
+            begin
+               if Unit_Origin (Enclosing_Compilation_Unit (Name_Def)) = An_Application_Unit then
+                  Add (Full_Name_Image (Name_Def));
+               end if;
+            end;
+         end Add_Withed_Unit;
       begin
          if Is_Nil (My_Unit) then
             return;
          end if;
 
          declare
-            My_CC_List : constant Context_Clause_List
-              := Context_Clause_Elements (Compilation_Unit => My_Unit,
-                                          Include_Pragmas  => True) ;
+            My_CC_List : constant Context_Clause_List := Context_Clause_Elements (My_Unit) ;
          begin
             for I in My_CC_List'Range loop
-               Traverse_With (My_CC_List (I), The_Control, The_Info);
+               if Clause_Kind (My_CC_List (I)) = A_With_Clause then
+                   declare
+                      Withed_Units : constant Asis.Name_List := Clause_Names (My_CC_List (I));
+                   begin
+                      for J in Withed_Units'Range loop
+                         Add_Withed_Unit (Withed_Units (J));
+                      end loop;
+                   end;
+               end if;
             end loop;
          end;
       end Do_Process_With;
@@ -312,75 +270,75 @@ package body Units_List is
             My_CU_List : constant Compilation_Unit_List := A4G_Bugs.Subunits (My_Unit);
          begin
             for I in My_CU_List'Range loop
-               -- We do not add stubs is Add_Stubs is false, but we still need to
-               -- add units that are withed by the stub
+               -- We do not add stubs if Add_Stubs is false, but if recursive, we still need
+               -- to add units that are withed by the stub
                if Add_Stubs then
                   Add (Unit_Full_Name (My_CU_List (I)));
                end if;
-               Do_Process_With (My_CU_List (I));
+
+               if Recursive then
+                  Do_Process_With (My_CU_List (I));
+               end if;
             end loop;
          end;
       end Do_Process_Stub;
 
-      -- Forward declaration:
-      procedure Process_Unit_Spec (Unit_Spec : Wide_String);
-
-      procedure Process_Indirect_File (Name : String) is
-         use Ada.Wide_Text_IO, Ada.Strings,Ada.Strings.Wide_Fixed;
-
-         Units_File : Ada.Wide_Text_IO.File_Type;
-
-         function Read_Line return Wide_String is
-            Buffer : Wide_String (1..250);
-            Last   : Natural;
-         begin
-            Get_Line (Units_File, Buffer, Last);
-            if Last = Buffer'Last then
-               return Buffer & Read_Line;
-            else
-               return Buffer (1 .. Last);
-            end if;
-         end Read_Line;
-      begin
-         Open (Units_File, In_File, Name);
-
-         -- Exit on End_Error
-         -- This is the simplest way to deal with improperly formed files
-         loop
-            declare
-               Line : constant Wide_String := Trim (Read_Line, Both);
-            begin
-               if Line /= "" and then Line (1) /= '#' then
-                  Process_Unit_Spec (Line);
-               end if;
-            end;
-         end loop;
-
-         Close (Units_File);
-      exception
-         when Name_Error =>
-            Raise_Specification_Error ("Missing units file: " & Name);
-         when others =>  -- Including End_Error
-            if Is_Open (Units_File) then
-               Close (Units_File);
-            end if;
-      end Process_Indirect_File;
-
-      procedure Process_Unit_Spec (Unit_Spec : Wide_String) is
+      procedure Process_Unit_Spec (Spec : Wide_String) is
          use Ada.Characters.Handling;
+
+         procedure Process_Indirect_File (Name : String) is
+            use Ada.Wide_Text_IO, Ada.Strings;
+
+            Units_File : Ada.Wide_Text_IO.File_Type;
+
+            function Read_Line return Wide_String is
+               Buffer : Wide_String (1..250);
+               Last   : Natural;
+            begin
+               Get_Line (Units_File, Buffer, Last);
+               if Last = Buffer'Last then
+                  return Buffer & Read_Line;
+               else
+                  return Buffer (1 .. Last);
+               end if;
+            end Read_Line;
+         begin
+            Open (Units_File, In_File, Name);
+
+            -- Exit on End_Error
+            -- This is the simplest way to deal with improperly formed files
+            loop
+               declare
+                  Line : constant Wide_String := Trim (Read_Line, Both);
+               begin
+                  if Line /= "" and then Line (1) /= '#' then
+                     Process_Unit_Spec (Line);
+                  end if;
+               end;
+            end loop;
+
+            Close (Units_File);
+         exception
+            when Name_Error =>
+               Raise_Specification_Error ("Missing units file: " & Name);
+            when others =>  -- Including End_Error
+               if Is_Open (Units_File) then
+               Close (Units_File);
+               end if;
+         end Process_Indirect_File;
 
          Start : Positive;
          Stop  : Natural;
-      begin
+      begin  -- Process_Unit_Spec
          --
          -- Get rid of case of indirect file:
          --
-         if Unit_Spec (Unit_Spec'First) = '@' then
-            if Unit_Spec'Length = 1 then
+         if Spec (Spec'First) = '@' then
+            if Spec'Length = 1 then
                -- '@' alone
                Raise_Specification_Error ("Missing file name after @");
             else
-               Process_Indirect_File (To_String (Unit_Spec (Unit_Spec'First+1 .. Unit_Spec'Last)));
+               Process_Indirect_File (To_String (Spec (Spec'First+1 .. Spec'Last)));
                return;
             end if;
          end if;
@@ -389,33 +347,33 @@ package body Units_List is
          -- Extract unit names and ignored units from unit spec.
          --
 
-         -- If Unit_spec starts with '-', our count is wrong...
+         -- If Spec starts with '-', our count is wrong...
          -- let's forbid this case
-         if Unit_Spec (Unit_Spec'First) = '-' then
-            Raise_Specification_Error ("Wrong unit specification: " & To_String (Unit_Spec));
+         if Spec (Spec'First) = '-' then
+            Raise_Specification_Error ("Wrong unit specification: " & To_String (Spec));
          end if;
 
-         if Unit_Spec (Unit_Spec'First) = '+' then
-            Start := Unit_Spec'First + 1;
+         if Spec (Spec'First) = '+' then
+            Start := Spec'First + 1;
          else
-            Start := Unit_Spec'First;
+            Start := Spec'First;
          end if;
          loop
-            Stop := Index (Unit_Spec (Start .. Unit_Spec'Last), Separators);
+            Stop := Index (Spec (Start .. Spec'Last), Separators);
             if Stop = 0 then
-               Stop := Unit_Spec'Last;
+               Stop := Spec'Last;
             elsif Stop = Start then   -- "--" or "+-" or "-+" or "++" ...
                Raise_Specification_Error ("No unit name after '-' or '+'");
             else
                Stop := Stop - 1;
             end if;
-            if Start = Unit_Spec'First or else Unit_Spec (Start-1) = '+' then
-               Add (To_Upper(Unit_Spec (Start .. Stop)));
+            if Start = Spec'First or else Spec (Start-1) = '+' then
+               Add (To_Upper(Spec (Start .. Stop)));
             else
                Ignored_Inx                 := Ignored_Inx + 1;
-               Ignored_Units (Ignored_Inx) := new Wide_String'(To_Upper(Unit_Spec (Start .. Stop)));
+               Ignored_Units (Ignored_Inx) := new Wide_String'(To_Upper(Spec (Start .. Stop)));
             end if;
-            exit when Stop = Unit_Spec'Last;
+            exit when Stop = Spec'Last;
             Start := Stop + 2;
          end loop;
       end Process_Unit_Spec;
@@ -450,7 +408,7 @@ package body Units_List is
 
                   -- Analyze with clauses
                   Do_Process_With (Library_Unit_Declaration (One_Unit, My_Context));
-                  Do_Process_With (Compilation_Unit_Body (One_Unit, My_Context));
+                  Do_Process_With (Compilation_Unit_Body    (One_Unit, My_Context));
                end if;
                Skip;
             end if;

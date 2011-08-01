@@ -37,7 +37,7 @@
 -- These operations have the same specification as their "official" counterparts,
 -- so that user's code does not need to change when the problems are fixed.
 --
--- A comment tells in which version we observed the problem, and in which version
+-- A comment tells in which version we first observed the problem, and in which version
 -- we found it fixed. You may have to experiment if you have an intermediate version.
 --
 -- The replacements are written in such a way that they still work correctly if the
@@ -57,18 +57,11 @@ package A4G_Bugs is
    -- Fixed in    : ?
    function Subunits (Parent_Body : in Asis.Compilation_Unit) return Asis.Compilation_Unit_List;
 
-
-
-   --
-   -- From Asis.Elements
-   --
-
-   -- Reason      : Incorrect attribute returned
-   -- Gnat version: 3.15p
-   -- Fixed in    : ?
-   function Attribute_Kind (Expression : in Asis.Expression) return Asis.Attribute_Kinds;
-
-
+   -- Reason      : Returns A_Public_Body instead of A_Public_Declaration_And_Body for spec-less SP.
+   -- Bug report  : [EA24-001]
+   -- Gnat version: GAP 2005, GnatPro 5.02
+   -- Fixed in    : GnatPro 5.04a1, GnatGPL 2006
+   function Unit_Class (Compilation_Unit : in Asis.Compilation_Unit) return Asis.Unit_Classes;
 
    --
    -- From Asis.Declarations
@@ -77,9 +70,35 @@ package A4G_Bugs is
    -- Reason      : Does not (not always?) follow a chain of renamings
    -- Bug report  : [E901-003]
    -- Gnat version: GAP 2005
-   -- Fixed in    : current wavefront, not released
+   -- Fixed in    : GnatPro 5.02, GnatGPL 2006
    function Corresponding_Base_Entity (Declaration : in Asis.Declaration) return Asis.Expression;
 
+   -- Reason      : Endless loop when subtype of T'Base
+   -- Bug report  : [EA18-001]
+   -- Gnat version: GAP 2005, GnatPro 5.02
+   -- Fixed in    :
+   function Corresponding_Last_Subtype (Declaration : in Asis.Declaration) return Asis.Declaration;
+
+
+   --
+   -- From Asis.Definitions
+   --
+
+   -- Reason      : Infinite loop when T'Base is part of the derivation chain
+   -- Bug report  : [F919-016]
+   -- Gnat version: GnatPro 5.05w (20060910-34)
+   -- Fixed in    : GnatPro 5.05w (200609-)
+   function Corresponding_Root_Type (Type_Definition : in Asis.Type_Definition) return Asis.Declaration;
+
+
+   --
+   -- From Asis.Elements
+   --
+
+   -- Reason      : Incorrect attribute returned
+   -- Gnat version: 3.15p
+   -- Fixed in    : GnatPro 5.02, GnatGPL 2006
+   function Attribute_Kind (Expression : in Asis.Expression) return Asis.Attribute_Kinds;
 
 
    --
@@ -97,6 +116,7 @@ package A4G_Bugs is
    -- Reason: Wrong result when Expression is part of implicit
    -- Bug report  : [E225-002]
    -- Gnat version: GAP 1.1.0
+   -- Fixed in    : GnatPro 5.02
    function Attribute_Designator_Identifier (Expression : in Asis.Expression) return Asis.Expression;
 
    -- Reason      : Bug when Argument is a call to a child function
@@ -105,14 +125,18 @@ package A4G_Bugs is
    -- Fixed in    : current wavefront, not released
    function Corresponding_Called_Function (Expression : in Asis.Expression) return Asis.Declaration;
 
-
    --
    -- From Asis.Statements
    --
 
-   -- Reason      : Bug when Argument is a call to a child procedure
+   -- Reason      : Bug when Argument is a call to a child function
    -- Bug report  : [E317-007]
    -- Gnat version: GAP 1.1.0
-   -- Fixed in    : current wavefront, not released
+   -- Fixed in    : GnatPro 5.02
    function Corresponding_Called_Entity (Statement : in Asis.Statement) return Asis.Declaration;
+
+   ------------------------------------------------------------------------------------------------
+   -- Trace identified bugs (in debug mode):
+
+   procedure Trace_Bug (Message : Wide_String);
 end A4G_Bugs;

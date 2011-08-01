@@ -57,8 +57,10 @@ package Utilities is
    --  Output
    --
 
-   procedure User_Message (Message : Wide_String);
-   procedure User_Log     (Message : Wide_String);  -- Output only if Verbose_Option
+   procedure User_Message (Message : Wide_String; Stay_On_Line : Boolean := False);
+   procedure User_Log     (Message : Wide_String; Stay_On_Line : Boolean := False);
+   -- Output only if Verbose_Option
+
 
    --
    --  String facilities
@@ -93,12 +95,18 @@ package Utilities is
    procedure Failure (Message : Wide_String);
    procedure Failure (Message : in Wide_String; Element : Asis.Element);
    pragma No_Return (Failure);
+   -- Failure raises Program_Error
 
    --
    -- Debugging facilities
    --
 
+   procedure Set_Trace (File_Name : Wide_String);
+
    procedure Trace (Message : Wide_String);
+   procedure Trace (Message : Wide_String; Value : Boolean);
+   procedure Trace (Message : Wide_String; Value : Integer);
+
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;
                     With_Source : Boolean      := False);
@@ -116,8 +124,9 @@ package Utilities is
    Overwrite_Error : exception;
 
    type Open_Mode is (Create, Append);
-   -- Create: the file must not exist, unless -w option
-   -- Append: if the file exists, it is appended to, unless -w option
+   -- Create: the file must not exist, unless Overwrite_Option
+   -- Append: if the file exists, it is appended to, unless Overwrite_Option
+   -- Failure of the existence condition raises Overwrite_Error
    procedure Safe_Open (File : in out Ada.Wide_Text_IO.File_Type;
                         Name : String;
                         Mode : Open_Mode;

@@ -47,7 +47,8 @@ with   -- ASIS
   Asis.Statements;
 
 with   -- Adalog
-  Thick_Queries;
+  Thick_Queries,
+  Utilities;   -- Only for Trace_Bug
 
 package body A4G_Bugs is
    use Asis;
@@ -135,7 +136,7 @@ package body A4G_Bugs is
    -------------------------------
 
    function Corresponding_Base_Entity (Declaration : in Asis.Declaration) return Asis.Expression is
-      use Asis, Asis.Elements, Asis.Expressions;
+      use Asis.Elements, Asis.Expressions;
       Result : Asis.Expression := Asis.Declarations.Corresponding_Base_Entity (Declaration);
       Decl   : Asis.Declaration;
    begin
@@ -165,6 +166,7 @@ package body A4G_Bugs is
    begin
       if Defining_Name_Kind (Result) = A_Defining_Expanded_Name then
          -- Bug: missing one level of Enclosing_Element
+         Trace_Bug ("A4G_Bugs.Corresponding_Called_Entity");
          return Enclosing_Element (Result);
       else
          return Result;
@@ -176,11 +178,24 @@ package body A4G_Bugs is
    -----------------------------------
 
    function Corresponding_Called_Function (Expression : in Asis.Expression) return Asis.Declaration is
-      use Asis.Elements;
+      use Asis.Declarations, Asis.Elements;
       Result : constant Asis.Declaration := Asis.Expressions.Corresponding_Called_Function (Expression);
    begin
+      -- Special kludge for "/=" which does not return Nil_Element in some version of GNAT
+      -- (although Called_Profile does not return anything)
+      if Is_Nil (Result) then
+         return Nil_Element;
+      elsif Operator_Kind (Names (Result)(1)) = A_Not_Equal_Operator
+        and then not Is_Nil (Corresponding_Equality_Operator (Result))
+      then
+         -- It is a predefined "/=" whose result is Boolean
+         -- Note that it can only be a predefined one, per 6.6(5)
+         return Nil_Element;
+      end if;
+
       if Defining_Name_Kind (Result) = A_Defining_Expanded_Name then
          -- Bug: missing one level of Enclosing_Element
+         Trace_Bug ("A4G_Bugs.Corresponding_Called_Function");
          return Enclosing_Element (Result);
       else
          return Result;
@@ -193,11 +208,12 @@ package body A4G_Bugs is
 
    function Corresponding_Expression_Type (Expression : in Asis.Expression) return Asis.Declaration
    is
+      -- Since this is a (partial) rewriting of the function, there is no call to Trace_Bug
       use Ada.Exceptions, Asis.Declarations, Asis.Definitions, Asis.Elements, Asis.Expressions;
+      use Thick_Queries;
 
       Result : Asis.Element;
       Temp   : Asis.Element;
-      Name   : Asis.Expression;
    begin
       if Expression_Kind (Expression) = An_Explicit_Dereference then
          -- For An_Explicit_Dereference, ASIS returns the type of the pointer
@@ -224,8 +240,11 @@ package body A4G_Bugs is
 
                Result := Result_Profile (Result);
                Temp   := Nil_Element;
-            when An_Indexed_Component =>
+            when An_Indexed_Component
+              | An_Explicit_Dereference
+              =>
                -- The type of the name of an indexed component cannot (yet!) be anonymous
+               -- Similarly, for X.all.all
                Result := Corresponding_Expression_Type (Temp);
                Temp   := Nil_Element;
             when others =>
@@ -243,10 +262,9 @@ package body A4G_Bugs is
                     | A_Single_Protected_Declaration
                     | A_Single_Task_Declaration
                     =>
-                     Result := Asis.Definitions.Subtype_Mark (Object_Declaration_View (Temp));
+                     Result := Subtype_Simple_Name (Object_Declaration_View (Temp));
                   when  A_Component_Declaration=>
-                     Result := Asis.Definitions.Subtype_Mark (Component_Subtype_Indication
-                                                              (Object_Declaration_View (Temp)));
+                     Result := Subtype_Simple_Name (Component_Subtype_Indication (Object_Declaration_View (Temp)));
                   when others =>
                      -- ???
                      Raise_Exception (Program_Error'Identity,
@@ -283,6 +301,13 @@ package body A4G_Bugs is
             -- (but beware of intermediate subtyping)
             Result := Type_Declaration_View (Corresponding_First_Subtype (Result));
 
+            -- Get rid of derivations
+            if Type_Kind (Result) in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition then
+               Result := Type_Declaration_View (Corresponding_Root_Type (Result));
+            elsif Formal_Type_Kind (Result) = A_Formal_Derived_Type_Definition then
+               Result := Type_Declaration_View (Corresponding_Name_Declaration (Subtype_Simple_Name (Result)));
+            end if;
+
             -- Here, Result is either the definition of an access-to-object or an access-to-subprogram
             -- In the latter case, we should probably return a Nil_Element (not clear from the standard,
             -- but there is nothing else to return).
@@ -290,8 +315,7 @@ package body A4G_Bugs is
                return Nil_Element;
             end if;
 
-            Result := Asis.Definitions.Subtype_Mark (Asis.Definitions.Access_To_Object_Definition
-                                                     (Result));
+            Result := Subtype_Simple_Name (Asis.Definitions.Access_To_Object_Definition (Result));
          end if;
 
          -- Here, Result is the name that follows "access" in the access type definition
@@ -339,13 +363,8 @@ package body A4G_Bugs is
       case Declaration_Kind (Result) is
          when A_Component_Declaration =>
             -- Bug
-            Name := Asis.Definitions.Subtype_Mark (Component_Subtype_Indication
-                                                   (Object_Declaration_View
-                                                    (Result)));
-            if Expression_Kind (Name) = A_Selected_Component then
-               Name := Selector (Name);
-            end if;
-            Result := Corresponding_Name_Declaration (Name);
+            Result := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication
+                                                                           (Object_Declaration_View (Result))));
 
          when A_Type_Declaration | A_Subtype_Declaration | A_Formal_Type_Declaration =>
             -- OK
@@ -360,11 +379,7 @@ package body A4G_Bugs is
                return Nil_Element;
             end if;
 
-            Result := Asis.Definitions.Subtype_Mark (Result);
-            if Expression_Kind (Result) = A_Selected_Component then
-               Result := Selector (Result);
-            end if;
-            Result := Corresponding_Name_Declaration (Result);
+            Result := Corresponding_Name_Declaration (Subtype_Simple_Name (Result));
 
          when Not_A_Declaration =>
             Raise_Exception (Program_Error'Identity,
@@ -377,6 +392,74 @@ package body A4G_Bugs is
       end case;
       return Result;
    end Corresponding_Expression_Type;
+
+   --------------------------------
+   -- Corresponding_Last_Subtype --
+   --------------------------------
+
+   function Corresponding_Last_Subtype (Declaration : in Asis.Declaration) return Asis.Declaration is
+      -- Since this is a complete rewriting of the function, there is no call to Trace_Bug
+      use Asis.Declarations, Asis.Elements, Asis.Expressions, Ada.Exceptions;
+      use Thick_Queries;
+      Mark : Asis.Expression;
+   begin
+      if Declaration_Kind (Declaration) /= A_Subtype_Declaration then
+         return Declaration;
+      end if;
+
+      Mark := Subtype_Simple_Name (Type_Declaration_View (Declaration));
+      case Expression_Kind (Mark) is
+         when An_Identifier =>
+            return Corresponding_Name_Declaration (Mark);
+         when An_Attribute_Reference =>
+            Mark := Prefix (Mark);
+            if Expression_Kind (Mark) = A_Selected_Component then
+               Mark := Selector (Mark);
+            end if;
+            return Corresponding_Name_Declaration (Mark);
+         when others =>
+            Raise_Exception (Program_Error'Identity,
+                             "Bug in Corresponding_Last_Subtype, returned "
+                               & Expression_Kinds'Image (Expression_Kind (Mark)));
+      end case;
+   end Corresponding_Last_Subtype;
+
+
+   -----------------------------
+   -- Corresponding_Root_Type --
+   -----------------------------
+
+   function Corresponding_Root_Type (Type_Definition : in Asis.Type_Definition) return Asis.Declaration is
+      -- Since this is a complete rewriting of the function, there is no call to Trace_Bug
+      use Asis.Definitions, Asis.Declarations, Asis.Elements, Asis.Expressions;
+      use Thick_Queries;
+
+      Def  : Asis.Definition := Type_Definition;
+      Decl : Asis.Declaration;
+      Name : Asis.Expression;
+   begin
+      loop
+         -- Invariant: Def is A_Derived_Type_Definition or A_Derived_Record_Extension_Definition
+
+         Name := Subtype_Simple_Name (Parent_Subtype_Indication (Def));
+         if Expression_Kind (Name) = An_Attribute_Reference then
+            Name := Prefix (Name);
+            if Expression_Kind (Name) = A_Selected_Component then
+               Name := Selector (Name);
+            end if;
+         end if;
+
+         Decl := Corresponding_First_Subtype (Corresponding_Name_Declaration (Name));
+         if Declaration_Kind (Decl) /= An_Ordinary_Type_Declaration then
+            return Decl;
+         end if;
+
+         Def := Type_Declaration_View (Decl);
+         if Type_Kind (Def) not in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition then
+            return Decl;
+         end if;
+      end loop;
+   end Corresponding_Root_Type;
 
    --------------
    -- Subunits --
@@ -417,5 +500,31 @@ package body A4G_Bugs is
          return Stubs_List (Stubs_List'First .. Stub_Index);
       end if;
    end Subunits;
+
+   ----------------
+   -- Unit_Class --
+   ----------------
+
+   function Unit_Class (Compilation_Unit : in Asis.Compilation_Unit) return Asis.Unit_Classes is
+      use Asis.Compilation_Units;
+      Result : constant Asis.Unit_Classes := Asis.Compilation_Units.Unit_Class (Compilation_Unit);
+   begin
+      if Result = A_Public_Body and then Is_Nil (Corresponding_Declaration (Compilation_Unit)) then
+         Trace_Bug ("A4G_Bugs.Unit_Class");
+         return A_Public_Declaration_And_Body;
+      else
+         return Result;
+      end if;
+   end Unit_Class;
+
+   ---------------
+   -- Trace_Bug --
+   ---------------
+
+   procedure Trace_Bug (Message : Wide_String) is
+      use Utilities;
+   begin
+      Trace ("ASIS bug workaround triggered in " & Message);  --## RULE LINE OFF No_Trace
+   end Trace_Bug;
 
 end A4G_Bugs;

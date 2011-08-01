@@ -36,7 +36,7 @@ with Asis;
 package Units_List is
 
    -- Register unit specification
-   -- Syntax : <unit>{+|-<unit>}
+   -- Syntax : <unit>{+|-<unit>} | @<file>
    procedure Register (Unit_Spec  : in     Wide_String;
                        Recursive  : in     Boolean;
                        Add_Stubs  : in     Boolean;
@@ -48,6 +48,7 @@ package Units_List is
    procedure Skip;
    function Is_Exhausted return Boolean;
 
+   function Length       return Integer;
    function Current_Unit return Wide_String;
    procedure Delete_Current;
 

@@ -34,18 +34,22 @@
 
 with   -- Standard Ada units
   Ada.Characters.Handling,
-  Ada.Wide_Text_IO,
+  Ada.Exceptions,
+  Ada.Strings.Wide_Unbounded,
   Ada.Strings.Wide_Maps.Wide_Constants;
 
-with  -- Standard Ada units
-  Ada.Exceptions,
-  Ada.Characters.Handling;
 with  -- ASIS units
   Asis.Elements,
   Asis.Errors,
   Asis.Implementation,
   Asis.Text;
 package body Utilities is
+
+   -- Note that we delay opening the actual trace file until traces are
+   -- actually used, to avoid creating the trace file if not used.
+   Trace_Name    : Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
+   Trace_File    : aliased Ada.Wide_Text_IO.File_Type;
+   Current_Trace : Ada.Wide_Text_IO.File_Access := Ada.Wide_Text_IO.Current_Error;
 
    ----------------
    -- Trace_Elem --
@@ -54,33 +58,33 @@ package body Utilities is
    procedure Trace_Elem (Element : Asis.Element) is
       use Ada.Wide_Text_IO, Asis, Asis.Elements;
    begin
-      Put (Current_Error, Element_Kinds'Wide_Image (Element_Kind (Element)));
-      Put (Current_Error, " => ");
+      Put (Current_Trace.all, Element_Kinds'Wide_Image (Element_Kind (Element)));
+      Put (Current_Trace.all, " => ");
       case Element_Kind (Element) is
          when Not_An_Element =>
             null;
          when A_Pragma =>
-            Put (Current_Error, Pragma_Kinds'Wide_Image (Pragma_Kind (Element)));
+            Put (Current_Trace.all, Pragma_Kinds'Wide_Image (Pragma_Kind (Element)));
          when A_Defining_Name =>
-            Put (Current_Error, Defining_Name_Kinds'Wide_Image (Defining_Name_Kind (Element)));
+            Put (Current_Trace.all, Defining_Name_Kinds'Wide_Image (Defining_Name_Kind (Element)));
          when A_Declaration =>
-            Put (Current_Error, Declaration_Kinds'Wide_Image (Declaration_Kind (Element)));
+            Put (Current_Trace.all, Declaration_Kinds'Wide_Image (Declaration_Kind (Element)));
          when A_Definition =>
-            Put (Current_Error, Definition_Kinds'Wide_Image (Definition_Kind (Element)));
+            Put (Current_Trace.all, Definition_Kinds'Wide_Image (Definition_Kind (Element)));
          when An_Expression =>
-            Put (Current_Error, Expression_Kinds'Wide_Image (Expression_Kind (Element)));
+            Put (Current_Trace.all, Expression_Kinds'Wide_Image (Expression_Kind (Element)));
          when An_Association =>
-            Put (Current_Error, Association_Kinds'Wide_Image (Association_Kind (Element)));
+            Put (Current_Trace.all, Association_Kinds'Wide_Image (Association_Kind (Element)));
          when A_Statement =>
-            Put (Current_Error, Statement_Kinds'Wide_Image (Statement_Kind (Element)));
+            Put (Current_Trace.all, Statement_Kinds'Wide_Image (Statement_Kind (Element)));
          when A_Path =>
-            Put (Current_Error, Path_Kinds'Wide_Image (Path_Kind (Element)));
+            Put (Current_Trace.all, Path_Kinds'Wide_Image (Path_Kind (Element)));
          when A_Clause =>
-            Put (Current_Error, Clause_Kinds'Wide_Image (Clause_Kind (Element)));
+            Put (Current_Trace.all, Clause_Kinds'Wide_Image (Clause_Kind (Element)));
          when An_Exception_Handler =>
             null;
       end case;
-      New_Line (Current_Error);
+      New_Line (Current_Trace.all);
    end Trace_Elem;
 
    -----------------------------
@@ -182,10 +186,10 @@ package body Utilities is
    -- User_Log --
    --------------
 
-   procedure User_Log (Message : Wide_String) is
+   procedure User_Log (Message : Wide_String; Stay_On_Line : Boolean := False) is
    begin
       if Verbose_Option then
-        User_Message (Message);
+        User_Message (Message, Stay_On_Line);
       end if;
    end User_Log;
 
@@ -193,7 +197,7 @@ package body Utilities is
    -- User_Message --
    ------------------
 
-   procedure User_Message (Message : Wide_String) is
+   procedure User_Message (Message : Wide_String; Stay_On_Line : Boolean := False) is
       use Ada.Wide_Text_IO;
       Old_Col : Count;
    begin
@@ -203,7 +207,10 @@ package body Utilities is
          Set_Col (Current_Output, 1);
       end if;
 
-      Put_Line (Current_Error, Message);
+      Put (Current_Error, Message);
+      if not Stay_On_Line then
+         New_Line (Current_Error);
+      end if;
 
       if Error_Is_Out then
          Set_Col (Current_Output, Old_Col);
@@ -311,18 +318,60 @@ package body Utilities is
       return Result;
    end To_Title;
 
+   ---------------
+   -- Set_Trace --
+   ---------------
+
+   procedure Set_Trace (File_Name : Wide_String) is
+      use Ada.Strings.Wide_Unbounded, Ada.Wide_Text_IO;
+   begin
+      if Is_Open (Trace_File) then
+         Close (Trace_File);
+      end if;
+
+      if File_Name = "" or else To_Upper (File_Name) = "CONSOLE" then
+         Current_Trace := Current_Error;
+      else
+         Current_Trace := Trace_File'Access;
+         Trace_Name    := To_Unbounded_Wide_String (File_Name);
+      end if;
+   end Set_Trace;
+
+   --## Rule off no_trace ## Trace SP can use each other
+
    ------------
    -- Trace  --
    ------------
 
    procedure Trace (Message : Wide_String) is
-      use Ada.Wide_Text_IO;
+      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded, Ada.Wide_Text_IO;
    begin
       if Debug_Option then
-         Put (Current_Error, "<<");
-         Put (Current_Error, Message);
-         Put_Line (Current_Error, ">>");
+         if not Is_Open (Current_Trace.all) then
+            Safe_Open (Trace_File, To_String (To_Wide_String (Trace_Name)), Append, Overwrite_Option => False);
+         end if;
+         Put (Current_Trace.all, "<<");
+         Put (Current_Trace.all, Message);
+         Put_Line (Current_Trace.all, ">>");
       end if;
+   end Trace;
+
+   ------------
+   -- Trace  --
+   ------------
+
+   procedure Trace (Message : Wide_String; Value : Boolean) is
+   begin
+      Trace (Message & ", value= " & Boolean'Wide_Image (Value));
+   end Trace;
+
+   ------------
+   -- Trace  --
+   ------------
+
+   procedure Trace (Message : Wide_String; Value : Integer) is
+   begin
+      Trace (Message & ", value= " & Integer'Wide_Image (Value));
    end Trace;
 
    ------------
@@ -332,20 +381,23 @@ package body Utilities is
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;
                     With_Source : Boolean      := False) is
-      use Ada.Wide_Text_IO, Asis.Text;
+      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded, Ada.Wide_Text_IO, Asis.Text;
    begin
       if Debug_Option then
-         Put (Current_Error, "<<");
-         Put (Current_Error, Message);
-         New_Line (Current_Error);
+         if not Is_Open (Current_Trace.all) then
+            Safe_Open (Trace_File, To_String (To_Wide_String (Trace_Name)), Append, Overwrite_Option => False);
+         end if;
+         Put (Current_Trace.all, "<<");
+         Put (Current_Trace.all, Message);
+         New_Line (Current_Trace.all);
 
          Trace_Elem (Element);
 
          if With_Source then
-            Put_Line (Current_Error, Element_Image (Element));
+            Put_Line (Current_Trace.all, Element_Image (Element));
          end if;
 
-         Put_Line (Current_Error, ">>");
+         Put_Line (Current_Trace.all, ">>");
       end if;
    end Trace;
 
@@ -356,24 +408,29 @@ package body Utilities is
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element_List;
                     With_Source : Boolean           := False) is
-      use Ada.Wide_Text_IO, Asis.Text;
+      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded, Ada.Wide_Text_IO, Asis.Text;
    begin
       if Debug_Option then
-         Put (Current_Error, "<<");
-         Put (Current_Error, Message);
-         New_Line (Current_Error);
+         if not Is_Open (Current_Trace.all) then
+            Safe_Open (Trace_File, To_String (To_Wide_String (Trace_Name)), Append, Overwrite_Option => False);
+         end if;
+         Put (Current_Trace.all, "<<");
+         Put (Current_Trace.all, Message);
+         New_Line (Current_Trace.all);
 
          for E in Element'Range loop
             Trace_Elem (Element (E));
 
             if With_Source then
-               Put_Line (Current_Error, Element_Image (Element (E)));
+               Put_Line (Current_Trace.all, Element_Image (Element (E)));
             end if;
          end loop;
 
-         Put_Line (Current_Error, ">>");
+         Put_Line (Current_Trace.all, ">>");
       end if;
    end Trace;
+
+   --## rule on no_trace
 
 end Utilities;
 
