@@ -2,7 +2,7 @@ with "asis";
 with "adalog";
 project Tests is
 
-   for Main use ("ta4g_bugs.adb");
+   for Main use ("ta4g_bugs.adb", "tse.adb");
 
    package Ide is
       for Default_Switches ("adacontrol") use ("-F", "gnat_short");
