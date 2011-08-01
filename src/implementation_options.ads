@@ -33,7 +33,7 @@
 ----------------------------------------------------------------------
 
 package Implementation_Options is
-   -- This package defines parameter strings that are implementation dependend.
+   -- This package defines parameter strings that are implementation dependent.
    -- There is no other (known) dependency on the ASIS implentation
 
    -- Parameters for ASIS

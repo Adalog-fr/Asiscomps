@@ -72,9 +72,13 @@ package body Units_List is
          Next  : Link;
       end record;
 
+   type Context_Access is access all Asis.Context;
+
    ----------------------
    -- Global variables --
    ----------------------
+
+   My_Context : Context_Access;
 
    Head        : Link;
    Cursor      : Link;
@@ -150,6 +154,15 @@ package body Units_List is
       Free (To_Free);
    end Delete_Current;
 
+   ----------------
+   -- Initialize --
+   ----------------
+
+   procedure Initialize (Context : access Asis.Context) is
+   begin
+      My_Context := Context.all'Access;
+   end Initialize;
+
    ------------------
    -- Is_Exhausted --
    ------------------
@@ -174,11 +187,10 @@ package body Units_List is
 
    procedure Register (Unit_Spec  : in     Wide_String;
                        Recursive  : in     Boolean;
-                       Add_Stubs  : in     Boolean;
-                       My_Context : in out Asis.Context)
+                       Add_Stubs  : in     Boolean)
    is
       use Asis, Asis.Compilation_Units;
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps;
+      use Ada.Strings, Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps;
       use String_List;
 
       Ignored_Units : String_List.Queue;
@@ -319,7 +331,10 @@ package body Units_List is
                declare
                   Line : constant Wide_String := Trim_All (Read_Line);
                begin
-                  if Line /= "" and then Line (1) /= '#' and then (Line'Length = 1 or else Line (1..2) /= "--") then
+                  if Line /= ""
+                    and then Line (1) /= '#'
+                    and then (Line'Length = 1 or else Line (1 .. 2) /= "--")
+                  then
                      Process_Unit_Spec (Line);
                   end if;
                end;
@@ -379,6 +394,7 @@ package body Units_List is
          end loop;
       end Process_Unit_Spec;
 
+      Unit_Found : Boolean := False;
    begin  -- Register
       Process_Unit_Spec (Unit_Spec);
 
@@ -389,26 +405,43 @@ package body Units_List is
       Reset;
       while not Is_Exhausted loop
          declare
-            One_Unit : constant Wide_String := Current_Unit;
-            Inx      : Natural;
+            This_Unit : constant Wide_String := Current_Unit;
+            Spec_Decl : Asis.Compilation_Unit;
+            Body_Decl : Asis.Compilation_Unit;
+            Inx       : Natural;
          begin
-            if Must_Ignore (One_Unit) then
+            if Must_Ignore (This_Unit) then
                Delete_Current;
             else
+               -- TBSL: Temporary fix for problem with System
+               -- Make sure at least one unit is open before accessing anything else
+               if not Unit_Found or Add_Stubs or Recursive then
+                  Body_Decl  := Compilation_Unit_Body (This_Unit, My_Context.all);
+                  Unit_Found := not Is_Nil (Body_Decl);
+               end if;
+               if not Unit_Found or Recursive then
+                  Spec_Decl  := Library_Unit_Declaration (This_Unit, My_Context.all);
+                  Unit_Found := not Is_Nil (Spec_Decl);
+               end if;
+
                -- Search for subunits stubs
                -- Stubs can only appear in bodies
-               Do_Process_Stub (Compilation_Unit_Body (One_Unit, My_Context));
+               -- If recursive, stubs must be parsed since they can have their own
+               -- "with" clauses
+               if Add_Stubs or Recursive then
+                  Do_Process_Stub (Body_Decl);
+               end if;
 
                if Recursive then
                   -- Add parent if any
-                  Inx := Index (One_Unit, ".");
+                  Inx := Index (This_Unit, ".", Going => Backward);
                   if Inx /= 0 then
-                     Add (One_Unit (One_Unit'First .. Inx-1));
+                     Add (This_Unit (This_Unit'First .. Inx-1));
                   end if;
 
                   -- Analyze with clauses
-                  Do_Process_With (Library_Unit_Declaration (One_Unit, My_Context));
-                  Do_Process_With (Compilation_Unit_Body    (One_Unit, My_Context));
+                  Do_Process_With (Spec_Decl);
+                  Do_Process_With (Body_Decl);
                end if;
                Skip;
             end if;

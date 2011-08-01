@@ -34,6 +34,7 @@
 
 with   -- Standard Ada units
   Ada.Characters.Handling,
+  Ada.Strings.Wide_Fixed,
   Ada.Strings.Wide_Unbounded,
   Ada.Strings.Wide_Maps.Wide_Constants;
 
@@ -139,10 +140,10 @@ package body Utilities is
    function Choose (Preferred : in Wide_String;
                     Otherwise : in Wide_String) return Wide_String is
    begin
-      if Preferred /= "" then
-         return Preferred;
-      else
+      if Preferred = "" then
          return Otherwise;
+      else
+         return Preferred;
       end if;
    end Choose;
 
@@ -299,15 +300,9 @@ package body Utilities is
    --------------
 
    function To_Lower (Item : in Wide_String) return Wide_String is
-      use Ada.Strings.Wide_Maps, Ada.Strings.Wide_Maps.Wide_Constants;
-
-      Result : Wide_String (1 .. Item'Length);
+      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps.Wide_Constants;
    begin
-      for I in Item'Range loop
-         Result (I - (Item'First - 1)) := Value (Lower_Case_Map, Item (I));
-      end loop;
-
-      return Result;
+      return Translate (Item, Lower_Case_Map);
    end To_Lower;
 
    --------------
@@ -315,15 +310,9 @@ package body Utilities is
    --------------
 
    function To_Upper (Item : in Wide_String) return Wide_String is
-      use Ada.Strings.Wide_Maps, Ada.Strings.Wide_Maps.Wide_Constants;
-
-      Result : Wide_String (1 .. Item'Length);
+      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps.Wide_Constants;
    begin
-      for I in Item'Range loop
-         Result (I - (Item'First - 1)) := Value (Upper_Case_Map, Item (I));
-      end loop;
-
-      return Result;
+      return Translate (Item, Upper_Case_Map);
    end To_Upper;
 
    --------------
@@ -470,6 +459,19 @@ package body Utilities is
       end if;
    end Set_Trace;
 
+   ---------------
+   -- Raw_Trace --
+   ---------------
+
+   procedure Raw_Trace (Message : Wide_String) is
+      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded, Ada.Wide_Text_IO;
+   begin
+      if not Is_Open (Current_Trace.all) then
+         Safe_Open (Trace_File, To_String (To_Wide_String (Trace_Name)), Append, Overwrite_Option => False);
+      end if;
+      Put_Line (Current_Trace.all, Message);
+   end Raw_Trace;
+
    --## Rule off no_trace ## Trace SP can use each other
 
    ------------
@@ -477,15 +479,9 @@ package body Utilities is
    ------------
 
    procedure Trace (Message : Wide_String) is
-      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded, Ada.Wide_Text_IO;
    begin
       if Debug_Option then
-         if not Is_Open (Current_Trace.all) then
-            Safe_Open (Trace_File, To_String (To_Wide_String (Trace_Name)), Append, Overwrite_Option => False);
-         end if;
-         Put (Current_Trace.all, "<<");
-         Put (Current_Trace.all, Message);
-         Put_Line (Current_Trace.all, ">>");
+         Raw_Trace ("<<" & Message &  ">>");
       end if;
    end Trace;
 
@@ -524,23 +520,18 @@ package body Utilities is
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;
                     With_Source : Boolean      := False) is
-      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded, Ada.Wide_Text_IO, Asis.Text;
+      use Asis.Text;
    begin
       if Debug_Option then
-         if not Is_Open (Current_Trace.all) then
-            Safe_Open (Trace_File, To_String (To_Wide_String (Trace_Name)), Append, Overwrite_Option => False);
-         end if;
-         Put (Current_Trace.all, "<<");
-         Put (Current_Trace.all, Message);
-         New_Line (Current_Trace.all);
+         Raw_Trace ( "<<" & Message);
 
          Trace_Elem (Element);
 
          if With_Source then
-            Put_Line (Current_Trace.all, Element_Image (Element));
+            Raw_Trace (Element_Image (Element));
          end if;
 
-         Put_Line (Current_Trace.all, ">>");
+         Raw_Trace(">>");
       end if;
    end Trace;
 
@@ -551,25 +542,20 @@ package body Utilities is
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element_List;
                     With_Source : Boolean           := False) is
-      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded, Ada.Wide_Text_IO, Asis.Text;
+      use Asis.Text;
    begin
       if Debug_Option then
-         if not Is_Open (Current_Trace.all) then
-            Safe_Open (Trace_File, To_String (To_Wide_String (Trace_Name)), Append, Overwrite_Option => False);
-         end if;
-         Put (Current_Trace.all, "<<");
-         Put (Current_Trace.all, Message);
-         New_Line (Current_Trace.all);
+         Raw_Trace("<<" & Message);
 
          for E in Element'Range loop
             Trace_Elem (Element (E));
 
             if With_Source then
-               Put_Line (Current_Trace.all, Element_Image (Element (E)));
+               Raw_Trace (Element_Image (Element (E)));
             end if;
          end loop;
 
-         Put_Line (Current_Trace.all, ">>");
+         Raw_Trace (">>");
       end if;
    end Trace;
 

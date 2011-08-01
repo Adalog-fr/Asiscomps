@@ -76,7 +76,7 @@ package A4G_Bugs is
    -- Reason      : Endless loop when subtype of T'Base
    -- Bug report  : [EA18-001]
    -- Gnat version: GAP 2005, GnatPro 5.02
-   -- Fixed in    :
+   -- Fixed in    : GnatPro 6.1.0
    function Corresponding_Last_Subtype (Declaration : in Asis.Declaration) return Asis.Declaration;
 
    -- Reason      : Renaming of attribute returns A_Function_Call (or A_Procedure_Call_Statement)
@@ -131,6 +131,12 @@ package A4G_Bugs is
    -- Gnat version: GAP 1.1.0
    -- Fixed in    : current wavefront, not released
    function Corresponding_Called_Function (Expression : in Asis.Expression) return Asis.Declaration;
+
+   -- Reason      : ASIS failure in some cases (notably with generic formals)
+   -- Bug report  : [G223-008]
+   -- Gnat version: 6.0.x
+   -- Fixed in    : 6.1.?
+   function Name_Image (Expression : Asis.Expression) return Asis.Program_Text;
 
    --
    -- From Asis.Statements

@@ -43,6 +43,7 @@ with   -- ASIS
   Asis.Declarations,
   Asis.Definitions,
   Asis.Elements,
+  Asis.Exceptions,
   Asis.Expressions,
   Asis.Statements;
 
@@ -403,6 +404,7 @@ package body A4G_Bugs is
 
    function Corresponding_Last_Subtype (Declaration : in Asis.Declaration) return Asis.Declaration is
       -- Since this is a complete rewriting of the function, there is no call to Trace_Bug
+      -- (and since the bug is an endless loop, there is no way to diagnose it)
       use Asis.Declarations, Asis.Elements, Asis.Expressions, Ada.Exceptions;
       use Thick_Queries;
       Mark : Asis.Expression;
@@ -416,11 +418,7 @@ package body A4G_Bugs is
          when An_Identifier =>
             return Corresponding_Name_Declaration (Mark);
          when An_Attribute_Reference =>
-            Mark := Prefix (Mark);
-            if Expression_Kind (Mark) = A_Selected_Component then
-               Mark := Selector (Mark);
-            end if;
-            return Corresponding_Name_Declaration (Mark);
+            return Corresponding_Name_Declaration (Simple_Name (Prefix (Mark)));
          when others =>
             Raise_Exception (Program_Error'Identity,
                              "Bug in Corresponding_Last_Subtype, returned "
@@ -465,6 +463,26 @@ package body A4G_Bugs is
       end loop;
    end Corresponding_Root_Type;
 
+   ----------------
+   -- Name_Image --
+   ----------------
+
+   function Name_Image (Expression : Asis.Expression) return Asis.Program_Text is
+      use Asis.Declarations, Asis.Elements, Asis.Expressions, Asis.Exceptions;
+      Def : Asis.Defining_Name;
+   begin
+      return Asis.Expressions.Name_Image (Expression);
+   exception
+      when ASIS_Failed =>
+         -- This work-around seems OK:
+         Trace_Bug ("A4G_Bugs.Name_Image");
+         Def := Corresponding_Name_Definition (Expression);
+         if Defining_Name_Kind (Def) = A_Defining_Expanded_Name then
+            Def := Defining_Selector (Def);
+         end if;
+         return Defining_Name_Image (Def);
+   end Name_Image;
+
    ---------------------
    -- Renamed_Entity --
    ---------------------
@@ -485,14 +503,14 @@ package body A4G_Bugs is
             return Ren;
          when A_Procedure_Renaming_Declaration =>
             if Statement_Kind (Ren) = A_Procedure_Call_Statement then
-               Trace_Bug ("Renamed_Entity");
+               Trace_Bug ("A4G_Bugs.Renamed_Entity");
                return Called_Name (Ren);
             else
                return Ren;
             end if;
          when A_Function_Renaming_Declaration =>
             if Expression_Kind (Ren) = A_Function_Call then
-               Trace_Bug ("Renamed_Entity");
+               Trace_Bug ("A4G_Bugs.Renamed_Entity");
                return Prefix (Ren);
             else
                return Ren;

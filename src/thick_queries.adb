@@ -1,4 +1,4 @@
-----------------------------------------------------------------------
+--------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002 Adalog                                       --
 --  Author: J-P. Rosen                                              --
@@ -34,13 +34,15 @@
 with   -- Standard Ada units
   Ada.Characters.Handling,
   Ada.Exceptions,
-  Ada.Strings.Wide_Fixed;
+  Ada.Strings.Wide_Fixed,
+  Ada.Strings.Wide_Maps.Wide_Constants;
 
 with   -- Reusable components
   A4G_Bugs;
 
 with   -- ASIS units
   Asis.Clauses,
+  Asis.Compilation_Units,
   Asis.Declarations,
   Asis.Definitions,
   Asis.Elements,
@@ -111,9 +113,8 @@ package body Thick_Queries is
    --------------------------
 
    function Attribute_Name_Image (Attribute : Asis.Expression) return Wide_String is
-      use Asis.Expressions;
    begin
-      return Name_Image (A4G_Bugs.Attribute_Designator_Identifier (Attribute));
+      return A4G_Bugs.Name_Image (A4G_Bugs.Attribute_Designator_Identifier (Attribute));
    end Attribute_Name_Image;
 
    ------------------------
@@ -159,6 +160,16 @@ package body Thick_Queries is
          Callee := A4G_Bugs.Corresponding_Called_Function (Call);
       else
          Callee := A4G_Bugs.Corresponding_Called_Entity (Call);
+      end if;
+
+      -- Callee might be a declaration whose body is provided by renaming.
+      -- This must be handled as renaming
+      if Declaration_Kind (Callee) in A_Procedure_Declaration .. A_Function_Declaration then
+         if Declaration_Kind (Corresponding_Body (Callee))
+            in A_Procedure_Renaming_Declaration .. A_Function_Renaming_Declaration
+         then
+            Callee := Corresponding_Body (Callee);
+         end if;
       end if;
 
       if Declaration_Kind (Callee) in A_Renaming_Declaration then
@@ -496,8 +507,12 @@ package body Thick_Queries is
                     | A_Generic_Function_Declaration
                     | A_Generic_Package_Declaration
                     =>
-                     Result := Names(My_Enclosing_Element)(1);
-                     exit;
+                     Result := Names (My_Enclosing_Element) (1);
+                     -- If Element was a defining name of a callable construct or task,
+                     -- we are back to it. We must go one level higher.
+                     if not Is_Equal (Result, Element) then
+                        exit;
+                     end if;
 
                   when others =>
                      null;
@@ -709,9 +724,9 @@ package body Thick_Queries is
             case Expression_Kind (Name_Elem) is
                when A_Selected_Component =>
                   return Extended_Name_Image (Prefix (Name_Elem)) & '.'
-                    & Name_Image (Selector (Name_Elem));
+                    & A4G_Bugs.Name_Image (Selector (Name_Elem));
                when An_Identifier =>
-                  return Name_Image (Name_Elem);
+                  return A4G_Bugs.Name_Image (Name_Elem);
                when others =>
                   Impossible ("Not a name in Extended_Name_Image", Name_Elem);
             end case;
@@ -728,8 +743,11 @@ package body Thick_Queries is
    --------------------------
 
    function External_Call_Target (Call : Asis.Element) return Asis.Expression is
+      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps.Wide_Constants;
       use Asis.Expressions;
-      Name     : Asis.Expression;
+      Name          : Asis.Expression;
+      Pref          : Asis.Expression;
+      Enclosing_Obj : Asis.Element;
    begin
       if Expression_Kind (Call) = A_Function_Call then
          Name := Prefix (Call);
@@ -749,10 +767,43 @@ package body Thick_Queries is
          return Nil_Element;
       end if;
 
-      case Definition_Kind (Ultimate_Expression_Type (Prefix (Name))) is
-         when A_Task_Definition | A_Protected_Definition =>
-            return Prefix (Name);
+      Pref := Prefix (Name);
+      case Definition_Kind (Ultimate_Expression_Type (Pref)) is
+         when A_Task_Definition =>
+            return Pref;
+         when A_Protected_Definition =>
+            -- It is an external call unless the prefix designates a protected object
+            -- that statically includes the location of the call.
+            -- The precondition requires that the call be nested in a protected body
+            Enclosing_Obj := Enclosing_Element (Call);
+            while Declaration_Kind (Enclosing_Obj) /= A_Protected_Body_Declaration loop
+               Enclosing_Obj := Enclosing_Element (Enclosing_Obj);
+               if Is_Nil (Enclosing_Obj) then
+                  -- Call not in a PTO => always external
+                  return Pref;
+               end if;
+            end loop;
+
+            declare
+               Obj_Name : constant Wide_String := Translate (Full_Name_Image (Names (Enclosing_Obj) (1),
+                                                                                     With_Profile => True),
+                                                             Upper_Case_Map);
+               Pfx_Name : constant Wide_String := Translate (Full_Name_Image (Pref, With_Profile => True),
+                                                             Upper_Case_Map);
+            begin
+               if Pfx_Name'Length <= Obj_Name'Length
+                 and then Obj_Name (1 .. Pfx_Name'Length) = Pfx_Name
+               then
+                  return Nil_Element;
+               else
+                  return Pref;
+               end if;
+            end;
+
          when others =>
+            -- This includes the case where the prefix is the name of a protected
+            -- *type*, since Ultimate_Expression_Type returns Nil_Element. But such
+            -- calls are always internal calls.
             return Nil_Element;
       end case;
 
@@ -797,10 +848,8 @@ package body Thick_Queries is
 
       if Element_Kind (The_Name) = A_Defining_Name then
          Decl_Name := The_Name;
-      elsif Expression_Kind (The_Name) = A_Selected_Component then
-         Decl_Name := Corresponding_Name_Definition (Selector (The_Name));
       else
-         Decl_Name := Corresponding_Name_Definition (The_Name);
+         Decl_Name := Corresponding_Name_Definition (Simple_Name (The_Name));
       end if;
 
       -- Get rid of (annoying) special cases where we have no declaration:
@@ -822,7 +871,7 @@ package body Thick_Queries is
             return "";
          end if;
 
-         return "STANDARD." & Name_Image (The_Name);
+         return "STANDARD." & A4G_Bugs.Name_Image (The_Name);
       end if;
 
       -- Get rid of another annoying special case:
@@ -1226,11 +1275,22 @@ package body Thick_Queries is
             return Is_Static_Object (Prefix (Obj))
               and then Discrete_Constraining_Lengths (Slice_Range (Obj)) (1) /= Not_Static;
          when A_Selected_Component =>
-            if Is_Access_Expression (Prefix (Obj)) then
-               -- Implicit dereference
-               return False;
-            end if;
-            return Is_Static_Object (Selector (Obj)) and then Is_Static_Object (Prefix (Obj));
+            case Declaration_Kind (Corresponding_Name_Declaration (Simple_Name (Prefix (Obj)))) is
+               when A_Constant_Declaration
+                  | A_Variable_Declaration
+                  | A_Parameter_Specification
+                  | A_Formal_Object_Declaration
+                    =>
+                  -- Prefix is an object
+                  if Is_Access_Expression (Prefix (Obj)) then
+                     -- Implicit dereference
+                     return False;
+                  end if;
+                  return Is_Static_Object (Selector (Obj)) and then Is_Static_Object (Prefix (Obj));
+               when others =>
+                  -- Prefix must be a unit name
+                  return Is_Static_Object (Selector (Obj));
+            end case;
          when A_Type_Conversion | A_Qualified_Expression =>
             return Is_Static_Object (Converted_Or_Qualified_Expression (Obj));
          when others =>
@@ -1518,6 +1578,7 @@ package body Thick_Queries is
    -------------------------------
 
    function Ultimate_Type_Declaration (The_Subtype : Asis.Declaration) return Asis.Declaration is
+      use Asis.Compilation_Units;
       Decl : Asis.Declaration := The_Subtype;
    begin
       loop
@@ -1526,6 +1587,10 @@ package body Thick_Queries is
                if Type_Kind (Type_Declaration_View (Decl))
                  not in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition
                then
+                  return Decl;
+               end if;
+               if Unit_Origin (Enclosing_Compilation_Unit (Decl)) = A_Predefined_Unit then
+                  -- Predefined element: stop here
                   return Decl;
                end if;
                Decl := A4G_Bugs.Corresponding_Root_Type (Type_Declaration_View (Decl));
@@ -1566,20 +1631,25 @@ package body Thick_Queries is
    end Is_Type_Declaration_Kind;
 
 
-   --------------------------
-   -- Size_Clause_Expression --
-   --------------------------
+   ---------------------------------
+   -- Attribute_Clause_Expression --
+   ---------------------------------
 
-   function Size_Clause_Expression (Name : Asis.Element) return Asis.Expression is
+   function Attribute_Clause_Expression (Attribute : in Asis.Attribute_Kinds;
+                                         Elem      : in Asis.Element)
+                                         return Asis.Expression
+   is
       use Asis.Clauses, Asis.Expressions;
       Decl      : Asis.Declaration;
       Good_Name : Asis.Expression;
    begin
-      case Element_Kind (Name) is
+      case Element_Kind (Elem) is
+         when A_Declaration =>
+            Decl := Elem;
          when A_Defining_Name =>
-            Decl := Enclosing_Element (Name);
+            Decl := Enclosing_Element (Elem);
          when An_Expression =>
-            Good_Name := Name;
+            Good_Name := Elem;
             loop
                case Expression_Kind (Good_Name) is
                   when A_Selected_Component =>
@@ -1587,7 +1657,7 @@ package body Thick_Queries is
                      if Declaration_Kind (Corresponding_Name_Declaration (Good_Name))
                         in A_Discriminant_Specification .. A_Component_Declaration
                      then
-                        -- 'Size of a record field => give up
+                        -- Attribute of a record field => give up
                         return Nil_Element;
                      end if;
                   when An_Indexed_Component =>
@@ -1612,7 +1682,7 @@ package body Thick_Queries is
             end loop;
             Decl := Corresponding_Name_Declaration (Good_Name);
          when others =>
-            Impossible ("Bad parameter to Type_Size_Expression", Name);
+            Impossible ("Bad parameter to Type_Size_Expression", Elem);
       end case;
 
       if Declaration_Kind (Decl) = An_Ordinary_Type_Declaration then
@@ -1627,16 +1697,16 @@ package body Thick_Queries is
       begin
          for R in Reprs'Range loop
             if Representation_Clause_Kind (Reprs (R)) = An_Attribute_Definition_Clause
-              and then A4G_Bugs.Attribute_Kind (Representation_Clause_Name (Reprs (R))) = A_Size_Attribute
+              and then A4G_Bugs.Attribute_Kind (Representation_Clause_Name (Reprs (R))) = Attribute
             then
                return Representation_Clause_Expression (Reprs (R));
             end if;
          end loop;
 
-         -- No size clause found
+         -- Clause not found
          return Nil_Element;
       end;
-   end Size_Clause_Expression;
+   end Attribute_Clause_Expression;
 
 
    ------------------------------------
@@ -2127,7 +2197,7 @@ package body Thick_Queries is
    function Ultimate_Name (The_Name : Asis.Element) return Asis.Element is
       use Asis.Expressions;
       Decl   : Asis.Declaration;
-      Result : Asis.Element := The_Name;
+      Result : Asis.Element := Simple_Name (The_Name);
    begin
       if Is_Nil (Result) then
          return Nil_Element;
@@ -2142,9 +2212,6 @@ package body Thick_Queries is
 
       if Element_Kind (Result) = A_Defining_Name then
          Decl := Enclosing_Element (The_Name);
-      elsif Expression_Kind (The_Name) = A_Selected_Component then
-         Result := Selector (The_Name);
-         Decl   := Corresponding_Name_Declaration (Result);
       else
          Decl := Corresponding_Name_Declaration (Result);
       end if;
@@ -2603,7 +2670,7 @@ package body Thick_Queries is
                end case;                         ----------------- Expressions
 
             when A_Defining_Name =>              ----------------- Defining name
-               Item := Object_Declaration_View (Enclosing_Element (Item));
+               Item := Enclosing_Element (Item);
 
             when A_Declaration =>                ----------------- Declarations
                case Declaration_Kind (Item) is
@@ -2631,6 +2698,10 @@ package body Thick_Queries is
                      No_Unconstrained := True;
                      Item             := Object_Declaration_View (Item);
 
+                  when A_Loop_Parameter_Specification =>
+                     No_Unconstrained := True;
+                     Item             := Specification_Subtype_Definition (Item);
+
                   when A_Parameter_Specification
                      | A_Formal_Object_Declaration
                        =>
@@ -2655,11 +2726,52 @@ package body Thick_Queries is
 
 
    -----------------------------------
+   -- Discrete_Constraining_Values --
+   -----------------------------------
+
+   function Discrete_Constraining_Values (Elem : Asis.Element) return Extended_Biggest_Int_List is
+      Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Elem);
+      Result : Extended_Biggest_Int_List (Bounds'Range);
+   begin
+      if Result'Length = 0 then
+         return Nil_Extended_Biggest_Int_List;
+      end if;
+
+      for I in Result'Range loop
+         begin
+            case Element_Kind (Bounds (I)) is
+               when An_Expression =>
+                  Result (I) := Discrete_Static_Expression_Value (Bounds (I));
+               when A_Defining_Name =>
+                  -- Enumeration
+                  Result (I) := Biggest_Int'Wide_Value (Position_Number_Image (Bounds (I)));
+               when Not_An_Element =>
+                  if I rem 2 = 1 and then not Is_Nil (Bounds (I + 1)) then
+                     -- Lower bound of modular type (not subtype)
+                     Result (I) := 0;
+                  else
+                     Result (I) := Not_Static;
+                  end if;
+               when others =>
+                  Impossible ("Bad return from Discrete_Range_Bounds", Bounds (2));
+            end case;
+         exception
+            when Constraint_Error =>
+               -- Not in range of Biggest_Int...
+               Result (I) := Not_Static;
+         end;
+      end loop;
+
+      return Result;
+   end Discrete_Constraining_Values;
+
+
+   -----------------------------------
    -- Discrete_Constraining_Lengths --
    -----------------------------------
 
    function Discrete_Constraining_Lengths (Elem : Asis.Element) return Extended_Biggest_Natural_List is
-      Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Elem);
+      Bounds : constant Extended_Biggest_Int_List := Discrete_Constraining_Values (Elem);
       Result : Extended_Biggest_Natural_List (1 .. Bounds'Length / 2);
    begin
       if Result'Length = 0 then
@@ -2667,33 +2779,18 @@ package body Thick_Queries is
       end if;
 
       for I in Result'Range loop
+         declare
+            Low  : constant Extended_Biggest_Int := Bounds (2 * I - 1);
+            High : constant Extended_Biggest_Int := Bounds (2 * I);
          begin
-            case Element_Kind (Bounds (2*I-1)) is
-               when An_Expression =>
-                  declare
-                     Low  : constant Wide_String := Static_Expression_Value_Image (Bounds (2*I-1));
-                     High : constant Wide_String := Static_Expression_Value_Image (Bounds (2*I));
-                  begin
-                     if Low = "" or High = "" then
-                        -- Some bound is dynamic
-                        Result (I) := Not_Static;
-                     elsif Biggest_Int'Wide_Value (Low) > Biggest_Int'Wide_Value (High) then
-                        Result (I) := 0;
-                     else
-                        Result (I) := Biggest_Int'Wide_Value (High) - Biggest_Int'Wide_Value (Low) + 1;
-                     end if;
-                  end;
-               when A_Defining_Name =>
-                  -- Enumeration
-                  Result (I) := Biggest_Int'Wide_Value (Position_Number_Image (Bounds (2*I)))
-                    - Biggest_Int'Wide_Value (Position_Number_Image (Bounds (2*I-1)))
-                    + 1;
-               when Not_An_Element =>
-                  -- Modular type (not subtype)
-                  Result (I) := Biggest_Int'Wide_Value (Static_Expression_Value_Image (Bounds (2*I)));
-               when others =>
-                  Impossible ("Bad return from Discrete_Range_Bounds", Bounds (2));
-            end case;
+            if Low = Not_Static or High = Not_Static then
+               -- Some bound is dynamic
+               Result (I) := Not_Static;
+            elsif Low > High then
+               Result (I) := 0;
+            else
+               Result (I) := High - Low + 1;
+            end if;
          exception
             when Constraint_Error =>
                -- Not in range of Biggest_Int...
@@ -2979,12 +3076,8 @@ package body Thick_Queries is
          when A_Function_Call =>
             declare
                Params  : constant Association_List := Function_Call_Parameters (Expression);
-               Op_Name : Asis.Expression := Prefix (Expression);
+               Op_Name : constant Asis.Expression := Simple_Name (Prefix (Expression));
             begin
-               if Expression_Kind (Op_Name) = A_Selected_Component then
-                  Op_Name := Selector (Op_Name);
-               end if;
-
                case Expression_Kind (Op_Name) is
                   when An_Operator_Symbol =>
                      -- Check that the operator is the real one, not some user-defined function
@@ -3143,7 +3236,7 @@ package body Thick_Queries is
                   end;
                when A_Size_Attribute =>
                   -- If a size clause has been given, we may try it, otherwise give up
-                  Expr := Size_Clause_Expression (Prefix (Expression));
+                  Expr := Attribute_Clause_Expression (A_Size_Attribute, Prefix (Expression));
                   if Is_Nil (Expr) then
                      return "";
                   else
@@ -3163,6 +3256,24 @@ package body Thick_Queries is
          -- Out of range of Biggest_Int f.e., give up
          return "";
    end Static_Expression_Value_Image;
+
+
+   --------------------------------------
+   -- Discrete_Static_Expression_Value --
+   --------------------------------------
+
+   function Discrete_Static_Expression_Value (Expression : Asis.Expression) return Extended_Biggest_Int is
+      Str_Val : constant Wide_String := Static_Expression_Value_Image (Expression);
+   begin
+      if Str_Val = "" then
+         return Not_Static;
+      end if;
+
+      return Biggest_Int'Wide_Value (Str_Val);
+   exception
+      when Constraint_Error =>
+         return Not_Static;
+   end Discrete_Static_Expression_Value;
 
 
    -------------------------

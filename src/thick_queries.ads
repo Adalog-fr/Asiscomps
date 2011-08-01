@@ -286,6 +286,8 @@ package Thick_Queries is
    -- that tells what the type really is!
    -- Note that for tagged types, derivations are also unwound up to the declaration that
    -- includes the word "tagged".
+   -- Unwinding stops at declarations in predefined units (i.e. do not look into compiler's
+   -- implementation)
    -- Unwinding stops at formal types, even if they are derived formal types.
    --
    -- Appropriate Declaration_Kinds:
@@ -344,11 +346,18 @@ package Thick_Queries is
    --       A_Formal_Type_Declaration
 
 
-   function Size_Clause_Expression (Name : Asis.Element) return Asis.Expression;
-   -- Returns the Expression of the size clause that applies to the indicated type or object
-   -- Returns Nil_Element if there is no applicable size clause.
+   function Attribute_Clause_Expression (Attribute : in Asis.Attribute_Kinds;
+                                         Elem      : in Asis.Element)
+                                         return Asis.Expression;
+   -- Returns the Expression of the attribute specification clause that applies
+   -- to the indicated type or object (or declaration thereof)
+   -- Returns Nil_Element if there is no applicable clause.
+   --
+   -- Warning: implementation relies on Corresponding_Representation_Clauses, and therefore
+   --          cannot be trusted for objects.
    --
    -- Appropriate Element_Kinds:
+   --     A_Declaration
    --     A_Defining_Name
    --     An_Expression
    --
@@ -508,7 +517,7 @@ package Thick_Queries is
 
    type Call_Kind is (A_Regular_Call,     A_Predefined_Entity_Call, An_Attribute_Call,
                       A_Dereference_Call, A_Dispatching_Call);
-   type Call_Descriptor (Kind : Call_Kind) is
+   type Call_Descriptor (Kind : Call_Kind := A_Regular_Call) is
       record
          case Kind is
             when A_Regular_Call =>
@@ -617,7 +626,7 @@ package Thick_Queries is
    -- Appropriate Statement_Kinds:
    --   A_Procedure_Call_Statement
    --   An_Entry_Call_Statement
-   --   A_Reqeue_Statement
+   --   A_Requeue_Statement
    --   A_Requeue_Statement_With_Abort
 
    -------------------------------------------------------------------------------------------------
@@ -626,15 +635,20 @@ package Thick_Queries is
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
 
-   type Biggest_Int is range System.Min_Int .. System.Max_Int; -- The best we can do
-   Not_Static : constant Biggest_Int := -1;
+   type Extended_Biggest_Int is range System.Min_Int .. System.Max_Int; -- The best we can do
+   Not_Static : constant Extended_Biggest_Int := Extended_Biggest_Int'Last;
 
-   subtype Biggest_Natural          is Biggest_Int range 0          .. Biggest_Int'Last;
-   subtype Extended_Biggest_Natural is Biggest_Int range Not_Static .. Biggest_Int'Last;
+   subtype Biggest_Int              is Extended_Biggest_Int range Extended_Biggest_Int'First .. Not_Static - 1;
+   subtype Biggest_Natural          is Biggest_Int          range 0 .. Biggest_Int'Last;
+   subtype Biggest_Positive         is Biggest_Int          range 1 .. Biggest_Int'Last;
+   subtype Extended_Biggest_Natural is Extended_Biggest_Int range 0 .. Not_Static;
 
    function Biggest_Int_Img (Item : Biggest_Int) return Wide_String;
    -- Like Biggest_Int'Wide_Image, without the !*#!! initial space.
    -- (avoids depending on the Gnat specific attribute 'Img)
+
+   type Extended_Biggest_Int_List is array (Positive range <>) of Extended_Biggest_Int;
+   Nil_Extended_Biggest_Int_List : constant Extended_Biggest_Int_List (1 .. 0) := (others => 0);
 
    type Extended_Biggest_Natural_List is array (Positive range <>) of Extended_Biggest_Natural;
    Nil_Extended_Biggest_Natural_List : constant Extended_Biggest_Natural_List (1 .. 0) := (others => 0);
@@ -677,6 +691,11 @@ package Thick_Queries is
    --  The specification of this function is derived (and compatible with) the one
    --  declared in the GNAT extension ASIS.Extensions
    --  (except that we do not have the same set of implemented/non-implemented features)
+
+
+   function Discrete_Static_Expression_Value (Expression : Asis.Expression) return Extended_Biggest_Int;
+   -- Like Static_Expression_Value_Image, but returns the actual value for static discrete expressions.
+   -- Returns Not_Static for other cases
 
 
    function Discrete_Constraining_Bounds (Elem : Asis.Element) return Asis.Element_List;
@@ -737,6 +756,12 @@ package Thick_Queries is
    --   Not_An_Element
    --   An_Expression
    --   A_Defining_Name
+
+
+   function Discrete_Constraining_Values (Elem : Asis.Element) return Extended_Biggest_Int_List;
+   -- Like Discrete_Constraining_Bounds, but returns the actual values of the bounds
+   -- if statically determinable.
+   -- Returns Not_Static (-1) if not statically determinable
 
 
    function Discrete_Constraining_Lengths (Elem : Asis.Element) return Extended_Biggest_Natural_List;

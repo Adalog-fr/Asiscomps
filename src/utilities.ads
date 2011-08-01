@@ -116,6 +116,8 @@ package Utilities is
 
    procedure Set_Trace (File_Name : Wide_String);
 
+   procedure Raw_Trace (Message : Wide_String);
+
    procedure Trace (Message : Wide_String);
    procedure Trace (Message : Wide_String; Value : Boolean);
    procedure Trace (Message : Wide_String; Value : Integer);

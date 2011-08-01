@@ -35,12 +35,13 @@
 with Asis;
 package Units_List is
 
+   procedure Initialize (Context : access Asis.Context);
+
    -- Register unit specification
    -- Syntax : <unit>{+|-<unit>} | @<file>
-   procedure Register (Unit_Spec  : in     Wide_String;
-                       Recursive  : in     Boolean;
-                       Add_Stubs  : in     Boolean;
-                       My_Context : in out Asis.Context);
+   procedure Register (Unit_Spec : in Wide_String;
+                       Recursive : in Boolean;
+                       Add_Stubs : in Boolean);
    Specification_Error : exception;
 
    -- List iterator:
