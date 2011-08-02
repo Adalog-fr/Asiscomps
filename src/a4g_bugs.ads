@@ -67,12 +67,6 @@ package A4G_Bugs is
    -- From Asis.Declarations
    --
 
-   -- Reason      : Does not (not always?) follow a chain of renamings
-   -- Bug report  : [E901-003]
-   -- Gnat version: GAP 2005
-   -- Fixed in    : GnatPro 5.02, GnatGPL 2006
-   function Corresponding_Base_Entity (Declaration : in Asis.Declaration) return Asis.Expression;
-
    -- Reason      : Endless loop when subtype of T'Base
    -- Bug report  : [EA18-001]
    -- Gnat version: GAP 2005, GnatPro 5.02

@@ -281,7 +281,7 @@ package body Units_List is
          end if;
 
          if Unit_Origin (My_Unit) /= An_Application_Unit or else
-           Must_Ignore (To_Upper(Unit_Full_Name (My_Unit)))
+           Must_Ignore (To_Upper (Unit_Full_Name (My_Unit)))
          then
             return;
          end if;
@@ -307,7 +307,7 @@ package body Units_List is
          use Ada.Characters.Handling;
 
          procedure Process_Indirect_File (Name : String) is
-            use Ada.Wide_Text_IO;
+            use Ada.Wide_Text_IO, Ada.Exceptions;
 
             Units_File : Ada.Wide_Text_IO.File_Type;
 
@@ -341,14 +341,19 @@ package body Units_List is
                end;
             end loop;
 
-            Close (Units_File);
+            -- Never comes here
+
          exception
             when Name_Error =>
                Raise_Specification_Error ("Missing units file: " & Name);
-            when others =>  -- Including End_Error
+            when End_Error =>
+               -- normal exit
+               Close (Units_File);
+            when Occur : others =>
                if Is_Open (Units_File) then
                   Close (Units_File);
                end if;
+               Raise_Specification_Error ("Exception while processing " & Name & ": " & Exception_Name (Occur));
          end Process_Indirect_File;
 
          Start : Positive;
@@ -386,9 +391,9 @@ package body Units_List is
                Stop := Stop - 1;
             end if;
             if Start = Spec'First or else Spec (Start-1) = '+' then
-               Add (To_Upper(Spec (Start .. Stop)));
+               Add (To_Upper (Spec (Start .. Stop)));
             else
-               Append (Ignored_Units, To_Upper(Spec (Start .. Stop)));
+               Append (Ignored_Units, To_Upper (Spec (Start .. Stop)));
             end if;
             exit when Stop = Spec'Last;
             Start := Stop + 2;

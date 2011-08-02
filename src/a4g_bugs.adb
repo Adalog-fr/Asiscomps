@@ -132,31 +132,6 @@ package body A4G_Bugs is
       end;
    end Attribute_Kind;
 
-   -------------------------------
-   -- Corresponding_Base_Entity --
-   -------------------------------
-
-   function Corresponding_Base_Entity (Declaration : in Asis.Declaration) return Asis.Expression is
-      use Asis.Elements, Asis.Expressions;
-      Result : Asis.Expression := Asis.Declarations.Corresponding_Base_Entity (Declaration);
-      Decl   : Asis.Declaration;
-   begin
-      loop
-         if Expression_Kind (Result) = A_Selected_Component then
-            Result := Selector (Result);
-         end if;
-
-         -- (Object) Renaming of a complicated expression:
-         exit when Expression_Kind (Result) not in An_Identifier .. An_Operator_Symbol;
-
-         Decl := Corresponding_Name_Declaration (Result);
-         exit when Declaration_Kind (Decl) not in A_Renaming_Declaration;
-
-         Result := Asis.Declarations.Corresponding_Base_Entity (Decl);
-      end loop;
-      return Result;
-   end Corresponding_Base_Entity;
-
    ---------------------------------
    -- Corresponding_Called_Entity --
    ---------------------------------
@@ -228,136 +203,136 @@ package body A4G_Bugs is
       Result : Asis.Element;
       Temp   : Asis.Element;
    begin
-      if Expression_Kind (Expression) = An_Explicit_Dereference then
-         -- For An_Explicit_Dereference, ASIS returns the type of the pointer
-         -- instead of the type of the dereference.
-         -- Take the type from the declaration of the prefix (certainly a pointer)
-         --
-         -- Agreed, this is awfully complicated, but after all it is only a fix for an
-         -- ASIS bug. If someone feels like spending more time improving it...
-         Temp := Prefix (Expression);
-
-         if Expression_Kind (Temp) = A_Selected_Component then
-            Temp := Selector (Temp);
-         end if;
-
-         -- Here, Temp is either an object name or a function call
-         case Expression_Kind (Temp) is
-            when  A_Function_Call =>
-               -- The type of a function return cannot (yet!) be anonymous
-               Result := Corresponding_Called_Function (Temp);
-
-               -- If the function is an instantiation, go to the corresponding generic
-               if Declaration_Kind (Result) = A_Function_Instantiation then
-                  Result := Corresponding_Declaration (Result);
-               end if;
-
-               Result := Result_Profile (Result);
-               Temp   := Nil_Element;
-            when An_Indexed_Component
-              | An_Explicit_Dereference
-              =>
-               -- The type of the name of an indexed component cannot (yet!) be anonymous
-               -- Similarly, for X.all.all
-               Result := Corresponding_Expression_Type (Temp);
-               Temp   := Nil_Element;
-            when others =>
-               Temp   := Corresponding_Name_Declaration (Temp);
-               case Declaration_Kind (Temp) is
-                  when  A_Discriminant_Specification
-                    | A_Parameter_Specification
-                    | A_Formal_Object_Declaration
-                    | An_Object_Renaming_Declaration
-                    =>
-                     Result := Declaration_Subtype_Mark (Temp);
-                  when A_Variable_Declaration
-                    | A_Constant_Declaration
-                    | A_Deferred_Constant_Declaration
-                    | A_Single_Protected_Declaration
-                    | A_Single_Task_Declaration
-                    =>
-                     Result := Subtype_Simple_Name (Object_Declaration_View (Temp));
-                  when  A_Component_Declaration=>
-                     Result := Subtype_Simple_Name (Component_Subtype_Indication (Object_Declaration_View (Temp)));
-                  when others =>
-                     -- ???
-                     Raise_Exception (Program_Error'Identity,
-                                      "Unexpected declaration in Corresponding_Expression_Type: "
-                                        & Declaration_Kinds'Image (Declaration_Kind (Temp)));
-               end case;
-         end case;
-         if Expression_Kind (Result) = A_Selected_Component then
-            Result := Selector (Result);
-         end if;
-
-         -- Here, Temp is the declaration of the prefix (or Nil_Element)
-         -- When not nil, its type is either a named type or an anonymous access type.
-         -- When nil, it is always a named access type
-         --
-         -- For an anonymous access type, Result is already the type we are looking for.
-         -- Otherwise, Result is the name or the declaration of the named access type
-         if Trait_Kind (Temp) /= An_Access_Definition_Trait then
-            -- Named access type (including the case where Temp is null)
-
-            -- Make Result a declaration in all cases
-            if Element_Kind (Result) /= A_Declaration then
-               Result := Corresponding_Name_Declaration (Result);
-            end if;
-
-            -- Go to the full declaration if necessary (incomplete and private)
-            if Declaration_Kind (Result) in
-              An_Incomplete_Type_Declaration .. A_Private_Extension_Declaration
-            then
-               Result := Corresponding_Type_Declaration (Result);
-            end if;
-
-            -- Get the designated type from the declaration of the access type
-            -- (but beware of intermediate subtyping)
-            Result := Type_Declaration_View (Corresponding_First_Subtype (Result));
-
-            -- Get rid of derivations
-            if Type_Kind (Result) in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition then
-               Result := Type_Declaration_View (Corresponding_Root_Type (Result));
-            elsif Formal_Type_Kind (Result) = A_Formal_Derived_Type_Definition then
-               Result := Type_Declaration_View (Corresponding_Name_Declaration (Subtype_Simple_Name (Result)));
-            end if;
-
-            -- Here, Result is either the definition of an access-to-object or an access-to-subprogram
-            -- In the latter case, we should probably return a Nil_Element (not clear from the standard,
-            -- but there is nothing else to return).
-            if Access_Type_Kind (Result) in Access_To_Subprogram_Definition then
-               return Nil_Element;
-            end if;
-
-            Result := Subtype_Simple_Name (Asis.Definitions.Access_To_Object_Definition (Result));
-         end if;
-
-         -- Here, Result is the name that follows "access" in the access type definition
-         -- Possible forms are: T, T'Base, T'Access, Pack.T'Base, Pack.T'Access
-         if Expression_Kind (Result) = An_Attribute_Reference then
-            case Attribute_Kind (Result) is
-               when A_Base_Attribute =>
-                  -- Ignore 'Base
-                  Result := Prefix (Result);
-               when A_Class_Attribute =>
-                  return Nil_Element;  -- As specified by ASIS
-               when others =>
-                  -- What's that?
-                  Raise_Exception (Program_Error'Identity,
-                                   "Bug in Corresponding_Expression_Type, attribute "
-                                     & Attribute_Kinds'Image (Attribute_Kind (Result)));
-            end case;
-         end if;
-         if Expression_Kind (Result) = A_Selected_Component then
-            Result := Selector (Result);
-         end if;
-
-         -- At this point, Result is the "clean" name of the expression's type
-         Result := Corresponding_Name_Declaration (Result);
-
-      else  -- Not an explicit dereference
-         Result := Asis.Expressions.Corresponding_Expression_Type (Expression);
-      end if; -- Expression_Kind (Expression) = An_Explicit_Dereference
+--        if Expression_Kind (Expression) = An_Explicit_Dereference then
+--           -- For An_Explicit_Dereference, ASIS returns the type of the pointer
+--           -- instead of the type of the dereference.
+--           -- Take the type from the declaration of the prefix (certainly a pointer)
+--           --
+--           -- Agreed, this is awfully complicated, but after all it is only a fix for an
+--           -- ASIS bug. If someone feels like spending more time improving it...
+--           Temp := Prefix (Expression);
+--
+--           if Expression_Kind (Temp) = A_Selected_Component then
+--              Temp := Selector (Temp);
+--           end if;
+--
+--           -- Here, Temp is either an object name or a function call
+--           case Expression_Kind (Temp) is
+--              when  A_Function_Call =>
+--                 -- The type of a function return cannot (yet!) be anonymous
+--                 Result := Corresponding_Called_Function (Temp);
+--
+--                 -- If the function is an instantiation, go to the corresponding generic
+--                 if Declaration_Kind (Result) = A_Function_Instantiation then
+--                    Result := Corresponding_Declaration (Result);
+--                 end if;
+--
+--                 Result := Result_Profile (Result);
+--                 Temp   := Nil_Element;
+--              when An_Indexed_Component
+--                | An_Explicit_Dereference
+--                =>
+--                 -- The type of the name of an indexed component cannot (yet!) be anonymous
+--                 -- Similarly, for X.all.all
+--                 Result := Corresponding_Expression_Type (Temp);
+--                 Temp   := Nil_Element;
+--              when others =>
+--                 Temp   := Corresponding_Name_Declaration (Temp);
+--                 case Declaration_Kind (Temp) is
+--                    when  A_Discriminant_Specification
+--                      | A_Parameter_Specification
+--                      | A_Formal_Object_Declaration
+--                      | An_Object_Renaming_Declaration
+--                      =>
+--                       Result := Declaration_Subtype_Mark (Temp);
+--                    when A_Variable_Declaration
+--                      | A_Constant_Declaration
+--                      | A_Deferred_Constant_Declaration
+--                      | A_Single_Protected_Declaration
+--                      | A_Single_Task_Declaration
+--                      =>
+--                       Result := Subtype_Simple_Name (Object_Declaration_View (Temp));
+--                    when  A_Component_Declaration=>
+--                       Result := Subtype_Simple_Name (Component_Subtype_Indication (Object_Declaration_View (Temp)));
+--                    when others =>
+--                       -- ???
+--                       Raise_Exception (Program_Error'Identity,
+--                                        "Unexpected declaration in Corresponding_Expression_Type: "
+--                                          & Declaration_Kinds'Image (Declaration_Kind (Temp)));
+--                 end case;
+--           end case;
+--           if Expression_Kind (Result) = A_Selected_Component then
+--              Result := Selector (Result);
+--           end if;
+--
+--           -- Here, Temp is the declaration of the prefix (or Nil_Element)
+--           -- When not nil, its type is either a named type or an anonymous access type.
+--           -- When nil, it is always a named access type
+--           --
+--           -- For an anonymous access type, Result is already the type we are looking for.
+--           -- Otherwise, Result is the name or the declaration of the named access type
+--           if Trait_Kind (Temp) /= An_Access_Definition_Trait then
+--              -- Named access type (including the case where Temp is null)
+--
+--              -- Make Result a declaration in all cases
+--              if Element_Kind (Result) /= A_Declaration then
+--                 Result := Corresponding_Name_Declaration (Result);
+--              end if;
+--
+--              -- Go to the full declaration if necessary (incomplete and private)
+--              if Declaration_Kind (Result) in
+--                An_Incomplete_Type_Declaration .. A_Private_Extension_Declaration
+--              then
+--                 Result := Corresponding_Type_Declaration (Result);
+--              end if;
+--
+--              -- Get the designated type from the declaration of the access type
+--              -- (but beware of intermediate subtyping)
+--              Result := Type_Declaration_View (Corresponding_First_Subtype (Result));
+--
+--              -- Get rid of derivations
+--              if Type_Kind (Result) in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition then
+--                 Result := Type_Declaration_View (Corresponding_Root_Type (Result));
+--              elsif Formal_Type_Kind (Result) = A_Formal_Derived_Type_Definition then
+--                 Result := Type_Declaration_View (Corresponding_Name_Declaration (Subtype_Simple_Name (Result)));
+--              end if;
+--
+--              -- Here, Result is either the definition of an access-to-object or an access-to-subprogram
+--              -- In the latter case, we should probably return a Nil_Element (not clear from the standard,
+--              -- but there is nothing else to return).
+--              if Access_Type_Kind (Result) in Access_To_Subprogram_Definition then
+--                 return Nil_Element;
+--              end if;
+--
+--              Result := Subtype_Simple_Name (Asis.Definitions.Access_To_Object_Definition (Result));
+--           end if;
+--
+--           -- Here, Result is the name that follows "access" in the access type definition
+--           -- Possible forms are: T, T'Base, T'Access, Pack.T'Base, Pack.T'Access
+--           if Expression_Kind (Result) = An_Attribute_Reference then
+--              case Attribute_Kind (Result) is
+--                 when A_Base_Attribute =>
+--                    -- Ignore 'Base
+--                    Result := Prefix (Result);
+--                 when A_Class_Attribute =>
+--                    return Nil_Element;  -- As specified by ASIS
+--                 when others =>
+--                    -- What's that?
+--                    Raise_Exception (Program_Error'Identity,
+--                                     "Bug in Corresponding_Expression_Type, attribute "
+--                                       & Attribute_Kinds'Image (Attribute_Kind (Result)));
+--              end case;
+--           end if;
+--           if Expression_Kind (Result) = A_Selected_Component then
+--              Result := Selector (Result);
+--           end if;
+--
+--           -- At this point, Result is the "clean" name of the expression's type
+--           Result := Corresponding_Name_Declaration (Result);
+--
+--        else  -- Not an explicit dereference
+      Result := Asis.Expressions.Corresponding_Expression_Type (Expression);
+--        end if; -- Expression_Kind (Expression) = An_Explicit_Dereference
 
       if Is_Nil (Result) then
          -- There are cases where Corresponding_Expression_Type returns a wrong Nil result

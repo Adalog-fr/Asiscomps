@@ -296,6 +296,22 @@ package body Utilities is
          end;
    end Safe_Open;
 
+   ----------------
+   -- Set_Casing --
+   ----------------
+
+   function Set_Casing (Item : in Wide_String; To : in Casing) return Wide_String is
+   begin
+      case To is
+         when Upper_Case =>
+            return To_Upper (Item);
+         when Lower_Case =>
+            return To_Lower (Item);
+         when Title_Case =>
+            return To_Title (Item);
+      end case;    -- Really end case!
+   end Set_Casing;
+
    --------------
    -- To_Lower --
    --------------
@@ -322,7 +338,6 @@ package body Utilities is
 
    function To_Title (Item : in Wide_String) return Wide_String is
       use Ada.Strings.Wide_Maps, Ada.Strings.Wide_Maps.Wide_Constants;
-
       Result     : Wide_String (1 .. Item'Length);
       Capitalize : Boolean := True;
       --  True if next character should be upper case
@@ -334,8 +349,8 @@ package body Utilities is
             Result (I - (Item'First - 1)) := Value (Lower_Case_Map, Item (I));
          end if;
          Capitalize := Item (I) not in 'a' .. 'z' and
-                       Item (I) not in 'A' .. 'Z' and
-                       Item (I) not in '0' .. '9';
+           Item (I) not in 'A' .. 'Z' and
+           Item (I) not in '0' .. '9';
       end loop;
 
       return Result;

@@ -70,14 +70,21 @@ package Utilities is
    --  String facilities
    --
 
+   type Casing is (Lower_Case, Upper_Case, Title_Case);
+
+   function Set_Casing (Item : in Wide_String; To : in Casing) return Wide_String;
+
    function To_Lower (Item : in Wide_String) return Wide_String;
    --  The language provides this only for String, this is the same for Wide_String
+   pragma Inline (To_Lower);
 
    function To_Upper (Item : in Wide_String) return Wide_String;
    --  The language provides this only for String, this is the same for Wide_String
+   pragma Inline (To_Upper);
 
    function To_Title (Item : in Wide_String) return Wide_String;
    --  Similar to To_Upper, but makes the string Title_Case
+   pragma Inline (To_Title);
 
    function Trim_All (Item : in Wide_String) return Wide_String;
    -- Remove spaces and control characters from both ends of the string

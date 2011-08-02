@@ -85,6 +85,14 @@ package Thick_Queries is
    -- that appear in generics.
 
 
+   function Is_Generic_Unit (Element : in Asis.Element) return Boolean;
+   -- Returns True if Element is the declaration or the body of a generic unit
+   -- Returns False in all other cases
+   --
+   --  Appropriate Element_Kinds:
+   --     Any element
+
+
    function Is_Part_Of_Generic (Element : in Asis.Element) return Boolean;
    -- Checks whether the Element is included (directly or indirectly) in a generic
    --
@@ -268,9 +276,47 @@ package Thick_Queries is
    -- Like Subtype_Mark, but returns the selector if the subtype mark is a selected component
    -- Moreover, it avoids the ambiguity between Asis.Subtype_Mark and Asis.Definitions.Subtype_Mark
 
-   function Is_Access (The_Subtype : Asis.Declaration) return Boolean;
+   function First_Subtype_Name (The_Subtype : Asis.Expression) return Asis.Expression;
+   -- Unwinds subtype declarations and returns the simple *name* of the first subtype denoted by The_Subtype,
+   -- picked up from the last subtype declaration
+   -- Returns its argument if The_Subtype already denotes a first subtype.
+   -- Unlike Corresponding_First_Subtype, this works in case of subtyping of a class wide type
+   --
+   -- Appropriate Expression_Kinds:
+   --   An_Identifier
+   --   A_Selected_Component (works on selector)
+   --
+   -- Returns Expression_Kinds:
+   --   An_Identifier
+   --   An_Attribute_Reference
+
+   function Is_Access_Subtype (The_Subtype : Asis.Declaration) return Boolean;
    -- Returns True if The_Subtype is a declaration of an access type
    -- Returns False in all other cases
+
+   function Is_Array_Subtype (The_Subtype : Asis.Declaration) return Boolean;
+   -- Returns True if The_Subtype is a declaration of an array type, or a name of an array type
+   -- Returns False in all other cases
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Declaration
+   --    A_Defining_Name
+   --    An_Expression
+   --
+   -- Appropriate Declaration_Kinds:
+   --    An_Ordinary_Type_Declaration
+   --    A_Task_Type_Declaration
+   --    A_Protected_Type_Declaration
+   --    A_Private_Type_Declaration
+   --    A_Private_Extension_Declaration
+   --    A_Subtype_Declaration
+   --    A_Formal_Type_Declaration
+   --
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component (applies on selector)
+   --    An_Attribute_Reference
+
 
    function Is_Class_Wide_Subtype (The_Subtype : Asis.Element) return Boolean;
    -- Unwinds subtype declarations and returns true if the given subtype declaration,
@@ -294,8 +340,8 @@ package Thick_Queries is
    --    An_Attribute_Reference
 
    function Is_Limited (The_Element : Asis.Element) return Boolean;
-   -- Returns True if The_Element is a declaration or definition of an (explicit or implicit) limited type
-   -- or an expression whose type is limited.
+   -- Returns True if The_Element is a defining_name, declaration or definition of an (explicit or implicit)
+   -- limited type, of an object of a limited type, or an expression whose type is limited.
    -- Returns False in all other cases
    --
    -- Appropriate Element_Kinds
@@ -312,13 +358,15 @@ package Thick_Queries is
    --       A_Selected_Component (applies to selector)
 
 
-   function Ultimate_Type_Declaration (The_Subtype : Asis.Declaration) return Asis.Declaration;
+   function Ultimate_Type_Declaration (The_Subtype       : Asis.Declaration;
+                                       Follow_Predefined : Boolean := False)
+                                       return Asis.Declaration;
    -- Unwinds subtype declarations, derivations, private types and returns the real declaration
    -- that tells what the type really is!
    -- Note that for tagged types, derivations are also unwound up to the declaration that
    -- includes the word "tagged".
-   -- Unwinding stops at declarations in predefined units (i.e. do not look into compiler's
-   -- implementation)
+   -- If Follow_Predefined is False, unwinding stops at private declarations in predefined units
+   -- (i.e. do not look into compiler's implementation)
    -- Unwinding stops at formal types, even if they are derived formal types.
    --
    -- Appropriate Declaration_Kinds:
@@ -397,6 +445,51 @@ package Thick_Queries is
    --       A_Selected_Component (applies to selector)
    --       An_Attribute_Reference (T'Base or T'Class)
 
+   type Type_Categories is (Not_A_Type,
+                            An_Enumeration_Type,
+                            A_Signed_Integer_Type,
+                            A_Modular_Type,
+                            A_Fixed_Point_Type,
+                            A_Floating_Point_Type,
+                            An_Array_Type,
+                            A_Record_Type,               -- untagged
+                            A_Tagged_Type,               -- including record extensions
+                            An_Access_Type,
+                            A_Derived_Type,
+                            A_Private_Type,
+                            A_Task_Type,
+                            A_Protected_Type);
+   subtype Discrete_Types  is Type_Categories range An_Enumeration_Type   .. A_Modular_Type;
+   subtype Numeric_Types   is Type_Categories range A_Signed_Integer_type .. A_Modular_Type;
+   subtype Composite_Types is Type_Categories range An_Array_Type         .. A_Tagged_Type;
+
+   function Type_Category (Elem           : in Asis.Element;
+                           Follow_Derived : in Boolean := False;
+                           Follow_Private : in Boolean := False) return Type_Categories;
+   -- If Follow_Derived (resp. Follow_Private) is True, returns the category of the
+   -- parent (full) type instead of Cat_Derived (Cat_Private). Formal derived (private)
+   -- types still return Cat_Derived (Cat_Private). Incomplete types are always followed.
+   --
+   -- Appropriate Element_Kinds:
+   --       A_Declaration
+   --       A_Definition
+   -- Appropriate Declaration_Kinds:
+   --       An_Ordinary_Type_Declaration
+   --       A_Task_Type_Declaration
+   --       A_Protected_Type_Declaration
+   --       A_Private_Type_Declaration
+   --       A_Private_Extension_Declaration
+   --       A_Subtype_Declaration
+   --       A_Formal_Type_Declaration
+   -- Appropriate Definition_Types:
+   --       A_Type_Definition
+   --       A_Task_Definition
+   --       A_Protected_Definition
+   --
+   -- Note:
+   -- We do not distinguish between ordinary and decimal fixed point types, because we
+   -- would be unable to know what to return for expressions that are universal_fixed
+
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
    -- Queries about names and expressions                                                         --
@@ -407,12 +500,16 @@ package Thick_Queries is
    -- Gets rid of selection, i.e. returns the selector of its argument if a selected_name,
    -- its argument otherwise.
 
-   function Ultimate_Name (The_Name : Asis.Element) return Asis.Element;
+   function Ultimate_Name (The_Name : Asis.Element; No_Component : Boolean := False) return Asis.Element;
    -- For a name defined by a renaming declaration: returns the name of the entity, which is not
    --   itself defined by a renaming.
-   --   - In the case of a renaming whose target is part of a composite type, returns the name
-   --     of the field for A_Selected_Component and the name of the array for An_Indexed_Component
-   --        (i.e. X : T renames V.Field (2) => Field).
+   --   - In the case of a renaming whose target is part of a record (or protected) type:
+   --        if No_Component is False, returns the name of the component
+   --        if No_Component is True, returns the name of the object the field belongs to
+   --   - In the case of a renaming whose target is part of an array, returns the name of
+   --     array object
+   --        (i.e. X : T renames V.Field (2) => Field if No_Component is false,
+     --                                      => V if No_Component is True).
    --   - In the case of a renaming whose target is An_Explicit_Dereference, returns Nil_Element
    --     (the target is statically unknown)
    --   - In the case of a renaming whose target is A_Function_Call, returns Nil_Element
@@ -764,10 +861,13 @@ package Thick_Queries is
    -- Returns Not_Static for other cases
 
 
-   function Discrete_Constraining_Bounds (Elem : Asis.Element) return Asis.Element_List;
+   function Discrete_Constraining_Bounds (Elem          : Asis.Element;
+                                          Follow_Access : Boolean := False)
+                                          return Asis.Element_List;
    -- Elem must designate a type, a variable, a constant, a formal parameter,
    -- or a generic formal object.
    --
+   -- Discrete or real type:
    -- Returns the expressions that constrain the values of a discrete or real type.
    -- Returned list has two elements
    -- Enumerated type     : returns (First_Defining_Name, Last_Defining_Name)
@@ -778,10 +878,16 @@ package Thick_Queries is
    --                               (Nil_Element, Nil_Element) otherwise
    -- The expressions are replaced by Nil_Element if they cannot be determined (formal type, root type)
    --
+   -- Arrays:
    -- Returns the expressions that constrain the indexes of an array object or type.
    -- Returned list has an even number of elements (First(1), Last (1), First (2), Last (2), ...)
    -- Each pair of elements is the same as above
    --
+   -- Access types:
+   -- Returns the Discrete_Constraining_Bounds of the accessed type if Follow_Access is True,
+   -- Nil_Element_List otherwise
+   --
+   -- Others:
    -- Returns Nil_Element_List if the type that applies to Elem is not discrete or array
    --
    -- Appropriate Element_Kinds:
@@ -824,13 +930,17 @@ package Thick_Queries is
    --   A_Defining_Name
 
 
-   function Discrete_Constraining_Values (Elem : Asis.Element) return Extended_Biggest_Int_List;
+   function Discrete_Constraining_Values (Elem          : Asis.Element;
+                                          Follow_Access : Boolean := False)
+                                          return Extended_Biggest_Int_List;
    -- Like Discrete_Constraining_Bounds, but returns the actual values of the bounds
    -- if statically determinable.
    -- Returns Not_Static (-1) if not statically determinable
 
 
-   function Discrete_Constraining_Lengths (Elem : Asis.Element) return Extended_Biggest_Natural_List;
+   function Discrete_Constraining_Lengths (Elem          : Asis.Element;
+                                           Follow_Access : Boolean := False)
+                                           return Extended_Biggest_Natural_List;
    -- Like Discrete_Constraining_Bounds, but returns the number of values in the range instead of
    -- the bounds if statically determinable
    -- Returns Not_Static (-1) if not statically determinable
