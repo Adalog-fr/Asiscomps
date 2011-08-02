@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
 --  Thick_Queries - Package specification                           --
---  Copyright (C) 2002 Adalog                                       --
+--  Copyright (C) 2002-2009 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -292,7 +292,7 @@ package Thick_Queries is
    --   An_Attribute_Reference
 
    function Is_Access_Subtype (The_Subtype : Asis.Declaration) return Boolean;
-   -- Returns True if The_Subtype is a declaration of an access type
+   -- Returns True if The_Subtype is a declaration of an access type or of a formal access type
    -- Returns False in all other cases
 
    function Is_Array_Subtype (The_Subtype : Asis.Declaration) return Boolean;
@@ -432,6 +432,7 @@ package Thick_Queries is
    -- Returns the Expression of the attribute specification clause that applies
    -- to the indicated type or object (or declaration thereof)
    -- Returns Nil_Element if there is no applicable clause.
+   -- If Attribute is 'Address or 'Alignment, Ada83 equivalent forms are considered
    --
    -- Warning: implementation relies on Corresponding_Representation_Clauses, and therefore
    --          cannot be trusted for objects.
@@ -445,6 +446,14 @@ package Thick_Queries is
    --       An_Identifier
    --       A_Selected_Component (applies to selector)
    --       An_Attribute_Reference (T'Base or T'Class)
+
+   function Corresponding_Component_Clause (Component : in Asis.Defining_Name) return Asis.Component_Clause;
+   -- Returns the component clause that applies to the indicated component.
+   -- Returns Nil_Element if there is no applicable component clause.
+   --
+   -- We use the defining_name rather than the component declaration here to avoid problems in
+   -- case of declarations with several defining names.
+
 
    type Type_Categories is (Not_A_Type,
                             An_Enumeration_Type,
@@ -469,12 +478,15 @@ package Thick_Queries is
                            Follow_Derived     : in Boolean := False;
                            Follow_Private     : in Boolean := False;
                            Separate_Extension : in Boolean := False) return Type_Categories;
-   -- If Follow_Derived (resp. Follow_Private) is True, returns the category of the
-   -- parent (full) type instead of Cat_Derived (Cat_Private). Formal derived (private)
-   -- types still return Cat_Derived (Cat_Private). Incomplete types are always followed.
+   -- For private and derived types:
+   --    If Follow_Derived (resp. Follow_Private) is True, returns the category of the
+   --    parent (full) type instead of A_Derived_Type (A_Private_Type). Formal derived (private)
+   --    types still return A_Derived_Type (A_Private_Type).
    --
-   -- If Separate_Extension is True, returns An_Extended_Tagged_Type for (private) type extensions,
-   -- otherwise returns A_Tagged_Type.
+   -- For (private) type extensions:
+   --   if Separate_Extension is True, returns An_Extended_Tagged_Type, otherwise returns A_Tagged_Type.
+   --
+   -- Incomplete types are always followed.
    --
    -- Appropriate Element_Kinds:
    --       A_Declaration
@@ -493,9 +505,13 @@ package Thick_Queries is
    --       A_Task_Definition
    --       A_Protected_Definition
    --
-   -- Note:
-   -- We do not distinguish between ordinary and decimal fixed point types, because we
-   -- would be unable to know what to return for expressions that are universal_fixed
+   -- Notes:
+   -- 1- We do not distinguish between ordinary and decimal fixed point types, because we
+   --    would be unable to know what to return for expressions that are universal_fixed
+   -- 2- Handling of expressions of a root or universal type:
+   --    Root_Integer and Universal_Integer returns A_Signed_Integer_Type
+   --    Root_Real and Universal_Real returns A_Floating_Point_Type (which is the best we can do)
+   --    Universal_Fixed returns A_Fixed_Point type, of course
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
@@ -525,7 +541,8 @@ package Thick_Queries is
    -- Otherwise: returns its argument (including A_Nil_Element)
    --
    -- In any case, if The_Name is A_Defining_Name, then A_Defining_Name is returned
-   -- if The_Name is An_Identifier, then An_Identifier (or An_Attribute_Reference) is returned
+   -- if The_Name is An_Identifier, then An_Identifier (or An_Attribute_Reference) is returned,
+   --   and always as a simple name.
    --
    -- Appropriate Element_Kinds:
    --    A_Defining_Name
@@ -541,7 +558,7 @@ package Thick_Queries is
    -- For a program unit with a spec: the defining name from the spec, given the name
    --     of a spec, the name of a body, the name of a stub, or the name of a proper body
    -- For a subprogram without a spec: the defining name from the body (given same input)
-   -- For a private or incomplete or deferred declaration, or the a full declaration of one
+   -- For a private or incomplete or deferred declaration, or the full declaration of one
    --     of these: the defining name of the private or incomplete or deferred declaration.
    -- For a formal parameter of a body: the corresponding formal parameter of the spec if
    --     there is one, the one from the body otherwise.
@@ -565,6 +582,29 @@ package Thick_Queries is
    -- Return True if Obj is a name that designates a statically determinable object
    -- (including, f.e., statically indexed array components).
    -- Return False in all other cases, including when Obj does not designate an Object
+
+
+   function Used_Identifiers (Name : Asis.Expression) return Asis.Expression_List;
+   -- Return all identifiers corresponding to entities accessed by the use of the name.
+   -- For identifiers that are not renamings, returns Name in a list of length 1
+   -- For identifiers declared by renaming, returns Name plus every record field and object name which
+   -- is part of the renamed expression, but not parts that are evaluated by the
+   -- elaboration of the renaming declaration itself. In short, if we see a name "Ren" declared by:
+   --    Ren : Integer renames Integer'(Pack.Tab(I).F);
+   -- we must consider that when Ren is used, Tab (a variable) is used, and F (a record field)
+   -- is used, but not Pack (a package) nor I (evaluated by the elaboration of the renaming),
+   -- nor Integer (evaluated by the elaboration of the renaming).
+   -- Of course, this is recursive. Given:
+   --    Ren : Integer renames A.I;
+   --    A   : Rec renames B;
+   --    B   : Rec;
+   -- The returned list is (Ren, A, B, I)
+   -- Lower bound of result is always 1, and the first element of the list Is_Identical to Name
+   --
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    An_Operator_Symbol
+   --    An_Enumeration_Literal
 
 
    function Corresponding_Expression_Type_Definition (The_Element : Asis.Expression) return Asis.Definition;
@@ -617,6 +657,7 @@ package Thick_Queries is
    type Pragma_Set is array (Asis.Pragma_Kinds) of Boolean;
    function Corresponding_Pragma_Set (Element : in Asis.Element) return Pragma_Set;
    -- Returns the set of pragmas that apply to the corresponding name or defining name
+   -- (including, for an object, those inherited from its type).
    -- Note that unlike Corresponding_Pragmas, this query makes sure that the pragma applies
    -- really to the given element in the case of a multiple declaration.
    --
@@ -633,7 +674,12 @@ package Thick_Queries is
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
 
-   function Is_Callable_Construct (Element : Asis.Element) return Boolean;
+   type Callable_Kinds is (Not_A_Callable,          A_Procedure_Callable,  A_Function_Callable,
+                           An_Enumeration_Callable, A_Task_Entry_Callable, A_Protected_Entry_Callable);
+   subtype A_Subprogram_Callable is Callable_Kinds range A_Procedure_Callable  .. A_Function_Callable;
+   subtype An_Entry_Callable     is Callable_Kinds range A_Task_Entry_Callable .. A_Protected_Entry_Callable;
+
+   function Callable_Kind (Element : Asis.Element) return Callable_Kinds;
    -- Checks whether the Element is a callable construct
    -- Expected elements:
    --    A_Declaration
@@ -645,6 +691,9 @@ package Thick_Queries is
    --    An_Attribute_Reference
    --    A_Selected_Component (applies to the selector)
 
+   function Is_Callable_Construct (Element : Asis.Element) return Boolean;
+   -- Checks whether the Element is a callable construct
+   -- Expected elements like Callable_Kind
 
    function Is_Task_Entry (Declaration : Asis.Declaration) return Boolean;
    -- Returns True if the Declaration is An_Entry_Declaration of a task.
@@ -676,7 +725,7 @@ package Thick_Queries is
 
 
    type Call_Kind is (A_Regular_Call,     A_Predefined_Entity_Call, An_Attribute_Call,
-                      A_Dereference_Call, A_Dispatching_Call);
+                      A_Dereference_Call, A_Dispatching_Call,       An_Enumeration_Literal);
    type Call_Descriptor (Kind : Call_Kind := A_Regular_Call) is
       record
          case Kind is
@@ -734,14 +783,9 @@ package Thick_Queries is
    -- Same as above, but retrieves the call (or instantiation) and the position given an association
 
 
-   function Other_Formal_Name (Name : Asis.Defining_Name; From_Spec : Boolean := False) return Asis.Defining_Name;
+   function Matching_Formal_Name (Name : Asis.Defining_Name; Into : Asis.Declaration) return Asis.Defining_Name;
    -- Given the defining name of a formal parameter of a callable entity, returns the defining name
-   -- of the same parameter:
-   -- from the other part of the callable entity (body if Name is from a spec,
-   -- spec if Name is from a body) if From_Spec is False
-   -- from the specification in any case, if From_Spec is True
-   -- If there is no such defining name (subprogram body without spec,
-   -- task entry, generic formal SP), a Nil_Element is returned.
+   -- of the same parameter from the provided other part of the callable entity (spec, body, stub)
 
 
    function Actual_Expression (Call           : Asis.Element;
@@ -868,6 +912,40 @@ package Thick_Queries is
    -- Like Static_Expression_Value_Image, but returns the actual value for static discrete expressions.
    -- Returns Not_Static for other cases
 
+
+   function Size_Value_Image (Name : Asis.Expression) return Wide_String;
+   -- Name must be the name of a type or object
+   --
+   -- For a type:
+   --   - If a Size clause applies to the type, returns the value from the clause (including
+   --     when the clause is inherited from some ancestor)
+   --   - returns the host value for usual predefined types (Boolean, [Wide_[Wide_]Character,
+   --     [Long_]Integer, [Long_]Float). For a cross-compiler, this may differ from the target!
+   -- For a stand-alone object:
+   --   - If a Size clause applies to the object, returns the value from the clause
+   -- For a record component
+   --   - if the component has a component clause from a record representation clause, returns
+   --     the size computed from the component clause
+   -- For an array component
+   --   - If there is a Component_Size clause for the type of the array, returns the value from
+   --     the clause
+   -- In all other cases:
+   --   - returns ""
+   --
+   -- Appropriate Element_Kinds:
+   --   A_Defining_Name
+   --   An_Expression
+   --
+   -- Appropriate Expression_Kinds:
+   --   An_Identifier
+   --   A_Selected_Component (applies to selector)
+   --   An_Indexed_Component
+
+
+   function Size_Value (Name : Asis.Expression) return Extended_Biggest_Int;
+   -- Name must be the name of a type or object
+   -- Like Size_Value_Image, but returns the actual value.
+   -- Returns Not_Static if Size_Value_Image is ""
 
    function Discrete_Constraining_Bounds (Elem          : Asis.Element;
                                           Follow_Access : Boolean := False)

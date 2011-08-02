@@ -1,6 +1,6 @@
---------------------------------------------------------------------
+----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
---  Copyright (C) 2002 Adalog                                       --
+--  Copyright (C) 2002-2009 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -19,7 +19,7 @@
 --  without even the implied warranty of MERCHANTABILITY or FITNESS --
 --  FOR A  PARTICULAR PURPOSE.  See the GNU  General Public License --
 --  for more details.   You should have received a  copy of the GNU --
---  General Public License distributed  with this program; se file --
+--  General Public License distributed  with this program; see file --
 --  COPYING.   If not, write  to the  Free Software  Foundation, 59 --
 --  Temple Place - Suite 330, Boston, MA 02111-1307, USA.           --
 --                                                                  --
@@ -126,8 +126,9 @@ package body Thick_Queries is
    --------------------------
 
    function Attribute_Name_Image (Attribute : Asis.Expression) return Wide_String is
+      use Asis.Expressions;
    begin
-      return A4G_Bugs.Name_Image (A4G_Bugs.Attribute_Designator_Identifier (Attribute));
+      return A4G_Bugs.Name_Image (Attribute_Designator_Identifier (Attribute));
    end Attribute_Name_Image;
 
    ------------------------
@@ -170,7 +171,7 @@ package body Thick_Queries is
       Name   : Asis.Expression;
    begin
       if Expression_Kind (Call) = A_Function_Call then
-         Callee := A4G_Bugs.Corresponding_Called_Function (Call);
+         Callee := Corresponding_Called_Function (Call);
       else
          Callee := A4G_Bugs.Corresponding_Called_Entity (Call);
       end if;
@@ -183,9 +184,14 @@ package body Thick_Queries is
                if Declaration_Kind (Corresponding_Body (Callee))
                   not in A_Procedure_Renaming_Declaration .. A_Function_Renaming_Declaration
                then
+                  -- Note that this includes Not_A_Declaration when there is
+                  -- no body (like "/=" when "=" has been redefined)
                   exit;
                end if;
                Callee := Corresponding_Body (Callee);
+
+            when An_Enumeration_Literal_Specification =>
+               return (Kind => An_Enumeration_Literal);
 
             when A_Renaming_Declaration =>
                Name := Simple_Name (Corresponding_Base_Entity (Callee));
@@ -239,7 +245,7 @@ package body Thick_Queries is
       Name   : Asis.Expression;
    begin
       if Expression_Kind (Call) = A_Function_Call then
-         Callee := A4G_Bugs.Corresponding_Called_Function (Call);
+         Callee := Corresponding_Called_Function (Call);
       else
          Callee := A4G_Bugs.Corresponding_Called_Entity (Call);
       end if;
@@ -382,87 +388,28 @@ package body Thick_Queries is
       Impossible ("Association not found in association list", Assoc);
    end Formal_Name;
 
-   -----------------------
-   -- Other_Formal_Name --
-   -----------------------
+   --------------------------
+   -- Matching_Formal_Name --
+   --------------------------
 
-   function Other_Formal_Name (Name : Asis.Defining_Name; From_Spec : Boolean := False) return Asis.Defining_Name is
-      This_Part  : constant Asis.Declaration := Enclosing_Element (Enclosing_Element (Name));
-      Other_Part : Asis.Declaration;
-   begin
-      case Element_Kind (This_Part) is
-         when A_Declaration =>
-            case Declaration_Kind (This_Part) is
-               when A_Procedure_Declaration
-                  | A_Function_Declaration
-                  | A_Generic_Procedure_Declaration
-                  | A_Generic_Function_Declaration
-                    =>
-                  if From_Spec then
-                     return Name;
-                  end if;
-                  Other_Part := Corresponding_Body (This_Part);
-               when An_Entry_Declaration =>
-                  if From_Spec then
-                     return Name;
-                  elsif Is_Task_Entry (This_Part) then
-                     return Nil_Element;
-                  end if;
-                  Other_Part := Corresponding_Body (This_Part);
-               when A_Procedure_Body_Declaration
-                  | A_Procedure_Body_Stub
-                  | A_Function_Body_Declaration
-                  | A_Function_Body_Stub
-                  | An_Entry_Body_Declaration
-                    =>
-                  Other_Part := Corresponding_Declaration (This_Part);
-               when A_Formal_Procedure_Declaration
-                  | A_Formal_Function_Declaration
-                    =>
-                  if From_Spec then
-                     return Name;
-                  else
-                     return Nil_Element;
-                  end if;
-               when others =>
-                  Impossible ("Other_Formal_Name: not a calllable entity", Name);
-            end case;
-
-         when A_Statement =>
-            case Statement_Kind (This_Part) is
-               when An_Accept_Statement =>
-                  Other_Part := A4G_Bugs.Corresponding_Entry (This_Part);
-               when others =>
-                  Impossible ("Other_Formal_Name: not an accept", Name);
-            end case;
-
-         when others =>
-            Impossible ("Other_Formal_Name: not a calllable entity", Name);
-      end case;
-
-      if Is_Nil (Other_Part) then
-         return Nil_Element;
-      end if;
-
-      declare
+   function Matching_Formal_Name (Name : Asis.Defining_Name; Into : Asis.Declaration) return Asis.Defining_Name is
          This_Name : constant Wide_String := To_Upper (Defining_Name_Image (Name));
-         Formals   : constant Asis.Parameter_Specification_List := Parameter_Profile (Other_Part);
-      begin
-         for F in Formals'Range loop
-            declare
-               Other_Names : constant Asis.Defining_Name_List := Names (Formals (F));
-            begin
-               for N in Other_Names'Range loop
-                  if To_Upper (Defining_Name_Image (Other_Names (N))) = This_Name then
-                     return Other_Names (N);
-                  end if;
-               end loop;
-            end;
-         end loop;
-         -- Not found here
-         Impossible ("Other_Formal_Name: not found", Name);
-      end;
-   end Other_Formal_Name;
+         Formals   : constant Asis.Parameter_Specification_List := Parameter_Profile (Into);
+   begin
+      for F in Formals'Range loop
+         declare
+            Other_Names : constant Asis.Defining_Name_List := Names (Formals (F));
+         begin
+            for N in Other_Names'Range loop
+               if To_Upper (Defining_Name_Image (Other_Names (N))) = This_Name then
+                  return Other_Names (N);
+               end if;
+            end loop;
+         end;
+      end loop;
+      -- Not found here
+      Impossible ("Matching_Formal_Name: not found", Name);
+   end Matching_Formal_Name;
 
    -----------------------
    -- Actual_Expression --
@@ -1018,7 +965,7 @@ package body Thick_Queries is
 
       Parent          : Element;
       Anonymous_Count : Natural;
-      Up_Count        : Natural;
+      --Up_Count        : Natural;
       Decl_Name       : Asis.Defining_Name;
 
       function Simple_Name_Image (N : Asis.Defining_Name) return Wide_String is
@@ -1084,46 +1031,15 @@ package body Thick_Queries is
          return Simple_Name_Image (Decl_Name_Enclosing);
       end if;
 
-      -- Set Up_Count, the number of enclosing elements we have to go up
-      -- to reach the real parent (the unit whose name is used to qualify Decl_Name)
-      if Is_Part_Of_Implicit (Decl_Name) then
-         if Defining_Name_Kind (Decl_Name) = A_Defining_Operator_Symbol then
-            -- Implicit operator: (is this a A4G bug?), the definition is *not* enclosed in the
-            -- derived type definition as in the normal case below
-            Up_Count := 2;
-         else
-            --  Implicit element: The name is enclosed in a subprogram declaration, whose
-            --  enclosing element is the derived type definition, whose enclosing element
-            --  is the derived type declaration, whose enclosing element is the parent (Ouch).
-            --  See the comment for Corresponding_Name_Definition in Asis.Expressions.
-            Up_Count := 4;
-         end if;
-      elsif Declaration_Kind (Enclosing_Element (Decl_Name)) = An_Enumeration_Literal_Specification then
-         -- Enumeration literal: The name is enclosed in an enumeration_literal_specification,
-         -- whose enclosing element is the type definition, whose enclosing element is the type
-         -- declaration, whose enclosing element is the parent (Ouch again).
-         Up_Count := 4;
-      else
-         -- Normal case: The name is enclosed in a declaration or statement, whose enclosing
-         -- element is the parent
-         Up_Count := 2;
-      end if;
+      -- First, leave the declaration that encloses the name
+      Parent := Enclosing_Element (Enclosing_Element (Decl_Name));
 
-      Parent := Decl_Name;
-      for I in Natural range 1 .. Up_Count loop
-         Parent := Enclosing_Element (Parent);
-      end loop;
-
-      -- There are cases of nested definitions => go up one (or more) levels
-      -- until we find something that's the "real" parent.
+      -- There are cases of nested definitions (enumeration litterals, implicit declarations inside
+      -- derived types, instantiations...) => go up  until we find something that's the "real"
+      -- parent (i.e. the previous element of the full name).
       --
-      -- We must skip declarations that are instantiations (i.e. if we have an instantiation of
-      -- a generic package, the package declaration is enclosed in a package instantiation; the actual
-      -- parent is the parent of the instantiation).
-      -- Things we may encounter (and skip) are paths (they do not correspond to any (terminal) Ada
-      -- element) and exception handlers (case of when E: others =>)
-      -- If we encounter unnamed loops or blocks, we count them, but continue to go up. This allows
-      -- generating a junk name that includes as many "_anonymous_." as unnamed statements
+      -- If we encounter unnamed loops or blocks, we count them, but continue to go up. This
+      -- allows generating a junk name that includes as many "_anonymous_." as unnamed statements
 
       Anonymous_Count := 0;
       loop
@@ -1142,16 +1058,54 @@ package body Thick_Queries is
 
             when A_Declaration =>
                case Declaration_Kind (Parent) is
-                  when A_Generic_Instantiation
-                    | A_Formal_Package_Declaration
-                    | A_Formal_Package_Declaration_With_Box
-                    =>
-                     null;
-                  when others =>
+                  when A_Task_Type_Declaration
+                     | A_Protected_Type_Declaration
+                     | A_Single_Task_Declaration
+                     | A_Single_Protected_Declaration
+                     | A_Procedure_Declaration
+                     | A_Function_Declaration
+                     | A_Procedure_Body_Declaration
+                     | A_Function_Body_Declaration
+                     | A_Null_Procedure_Declaration   --Ada 2005
+                     | A_Package_Declaration
+                     | A_Package_Body_Declaration
+                     | A_Task_Body_Declaration
+                     | A_Protected_Body_Declaration
+                     | An_Entry_Declaration
+                     | An_Entry_Body_Declaration
+                     | A_Generic_Procedure_Declaration
+                     | A_Generic_Function_Declaration
+                     | A_Generic_Package_Declaration
+                       =>
                      return Full_Name_Image (Names (Parent) (1), With_Profile)
                        & '.'
                        & Anonymous_Count * "_anonymous_."
                        & Simple_Name_Image (Decl_Name);
+                  when An_Ordinary_Type_Declaration =>
+                     case Type_Kind (Type_Declaration_View (Parent)) is
+                        when A_Record_Type_Definition
+                           | A_Tagged_Record_Type_Definition
+                           | A_Derived_Record_Extension_Definition
+                             =>
+                           -- No (anonymous) blocks can be nested in a type declaration
+                           return Full_Name_Image (Names (Parent) (1), With_Profile)
+                             & '.'
+                             & Simple_Name_Image (Decl_Name);
+                        when An_Access_Type_Definition =>
+                           case Access_Type_Kind (Type_Declaration_View (Parent)) is
+                              when Access_To_Subprogram_Definition =>
+                                 -- No (anonymous) blocks can be nested in a type declaration
+                                 return Full_Name_Image (Names (Parent) (1), With_Profile)
+                                   & '.'
+                                   & Simple_Name_Image (Decl_Name);
+                              when others =>
+                                 null;
+                           end case;
+                        when others =>
+                           null;
+                     end case;
+                  when others =>
+                     null;
                end case;
 
             when A_Statement =>
@@ -1164,6 +1118,7 @@ package body Thick_Queries is
                           & Anonymous_Count * "_anonymous_."
                           & Simple_Name_Image (Decl_Name);
                      end if;
+
                      Anonymous_Count := Anonymous_Count + 1;
                   when An_Accept_Statement =>
                      return Full_Name_Image (Names (A4G_Bugs.Corresponding_Entry (Parent))(1), With_Profile)
@@ -1310,7 +1265,7 @@ package body Thick_Queries is
       Decl     : Asis.Declaration;
    begin
       if Is_Nil (The_Type) then
-         -- This may mean that The_Element is of an anonymous access type
+         -- This may mean that The_Element is of an anonymous access type (ASIS 95)
          -- This can happen only if it is a (possibly selected) identifier.
          The_Name := Simple_Name (The_Element);
          if Expression_Kind (The_Name) /= An_Identifier then
@@ -1327,35 +1282,39 @@ package body Thick_Queries is
                return False;
          end case;
 
-      elsif Type_Kind (The_Type) = An_Access_Type_Definition then
-         return True;
-      elsif Formal_Type_Kind (The_Type) = A_Formal_Access_Type_Definition then
+      elsif     Definition_Kind  (The_Type) = An_Access_Definition   -- ASIS 2005
+        or else Type_Kind        (The_Type) = An_Access_Type_Definition
+        or else Formal_Type_Kind (The_Type) = A_Formal_Access_Type_Definition
+      then
          return True;
       else
          return False;
       end if;
    end Is_Access_Expression;
 
-   ---------------------------
-   -- Is_Callable_Construct --
-   ---------------------------
+   -------------------
+   -- Callable_Kind --
+   -------------------
 
-   Callable_Attributes : constant array (Asis.Attribute_Kinds) of Boolean
-     := (An_Adjacent_Attribute          | A_Ceiling_Attribute    | A_Compose_Attribute    |
-         A_Copy_Sign_Attribute          | An_Exponent_Attribute  | A_Floor_Attribute      |
-         A_Fraction_Attribute           | An_Image_Attribute     | An_Input_Attribute     |
-         A_Leading_Part_Attribute       | A_Machine_Attribute    | A_Max_Attribute        |
-         A_Min_Attribute                | A_Model_Attribute      | An_Output_Attribute    |
-         A_Pos_Attribute                | A_Pred_Attribute       | A_Read_Attribute       |
-         A_Remainder_Attribute          | A_Round_Attribute      | A_Rounding_Attribute   |
-         A_Scaling_Attribute            | A_Succ_Attribute       | A_Truncation_Attribute |
-         An_Unbiased_Rounding_Attribute | A_Val_Attribute        | A_Value_Attribute      |
-         A_Wide_Image_Attribute         | A_Wide_Value_Attribute | A_Write_Attribute
-           => True,
+   Callable_Attributes : constant array (Asis.Attribute_Kinds) of Callable_Kinds
+     := (An_Adjacent_Attribute          | A_Ceiling_Attribute    | A_Compose_Attribute      |
+         A_Copy_Sign_Attribute          | An_Exponent_Attribute  | A_Floor_Attribute        |
+         A_Fraction_Attribute           | An_Image_Attribute     | A_Leading_Part_Attribute |
+         A_Machine_Attribute            | A_Max_Attribute        | A_Min_Attribute          |
+         A_Model_Attribute              | A_Pos_Attribute        | A_Pred_Attribute         |
+         A_Remainder_Attribute          | A_Round_Attribute      | A_Rounding_Attribute     |
+         A_Scaling_Attribute            | A_Succ_Attribute       | A_Truncation_Attribute   |
+         An_Unbiased_Rounding_Attribute | A_Val_Attribute        | A_Value_Attribute        |
+         A_Wide_Image_Attribute         | A_Wide_Value_Attribute
+         => A_Function_Callable,
+
+         An_Input_Attribute | An_Output_Attribute | A_Read_Attribute | A_Write_Attribute
+         => A_Procedure_Callable,
+
          others
-           => False);
+           => Not_A_Callable);
 
-   function Is_Callable_Construct (Element : Asis.Element) return Boolean is
+   function Callable_Kind (Element : Asis.Element) return Callable_Kinds is
       use Asis.Expressions;
       The_Declaration : Asis.Element;
    begin
@@ -1377,12 +1336,12 @@ package body Thick_Queries is
                   The_Declaration := A4G_Bugs.Corresponding_Name_Declaration (Element);
                when An_Enumeration_Literal =>
                   -- Always considered a function
-                  return True;
+                  return An_Enumeration_Callable;
                when A_Selected_Component =>
                   The_Declaration := A4G_Bugs.Corresponding_Name_Declaration (Selector (Element));
                when An_Operator_Symbol =>
                   -- These are always functions
-                  return True;
+                  return A_Function_Callable;
                when An_Attribute_Reference =>
                   return Callable_Attributes (A4G_Bugs.Attribute_Kind (Element));
                when others =>
@@ -1398,32 +1357,50 @@ package body Thick_Queries is
       end case;
 
       case Declaration_Kind (The_Declaration) is
-         when
-           A_Procedure_Declaration |
-           A_Procedure_Body_Declaration |
-           A_Procedure_Renaming_Declaration |
-           A_Procedure_Body_Stub |
-           A_Generic_Procedure_Declaration |
-           A_Formal_Procedure_Declaration |
-           --
-           A_Function_Declaration |
-           A_Function_Body_Declaration |
-           A_Function_Renaming_Declaration |
-           A_Function_Body_Stub |
-           A_Generic_Function_Declaration |
-           A_Formal_Function_Declaration |
-           --
-           An_Enumeration_Literal_Specification |
-           --
-           An_Entry_Declaration |
-           An_Entry_Body_Declaration =>
+         when A_Procedure_Declaration
+            | A_Procedure_Body_Declaration
+            | A_Procedure_Renaming_Declaration
+            | A_Procedure_Body_Stub
+            | A_Generic_Procedure_Declaration
+            | A_Formal_Procedure_Declaration
+              =>
+            return A_Procedure_Callable;
 
-            return True;
+         when A_Function_Declaration
+            | A_Function_Body_Declaration
+            | A_Function_Renaming_Declaration
+            | A_Function_Body_Stub
+            | A_Generic_Function_Declaration
+            | A_Formal_Function_Declaration
+              =>
+            return A_Function_Callable;
+
+         when An_Enumeration_Literal_Specification =>
+            return An_Enumeration_Callable;
+
+         when An_Entry_Declaration
+            | An_Entry_Body_Declaration
+              =>
+            if Is_Task_Entry (The_Declaration) then
+               return A_Task_Entry_Callable;
+            else
+               return A_Protected_Entry_Callable;
+            end if;
+
          when others =>
-            return False;
+            return Not_A_Callable;
       end case;
-   end Is_Callable_Construct;
+   end Callable_Kind;
 
+
+   ---------------------------
+   -- Is_Callable_Construct --
+   ---------------------------
+
+   function Is_Callable_Construct (Element : Asis.Element) return Boolean is
+   begin
+      return Callable_Kind (Element) /= Not_A_Callable;
+   end Is_Callable_Construct;
 
    ----------------------
    -- Is_Static_Object --
@@ -1711,15 +1688,22 @@ package body Thick_Queries is
                case Element_Kind (Components (I)) is
                   when A_Declaration =>
                      -- Can only be A_Component_Declaration
-                     Comp_Name := Subtype_Simple_Name (Component_Subtype_Indication
-                                                       (Object_Declaration_View (Components (I))));
-                     if Expression_Kind (Comp_Name) = An_Attribute_Reference then
-                        -- Limitedness is the same for 'Base and 'Class as the prefix
-                        Comp_Name := Simple_Name (Prefix (Comp_Name));
-                     end if;
-                     if Is_Limited (A4G_Bugs.Corresponding_Name_Declaration (Comp_Name)) then
-                        return True;
-                     end if;
+                     declare
+                        CSI : constant Asis.Definition := Component_Subtype_Indication
+                                                          (Object_Declaration_View (Components (I)));
+                     begin
+                        if not Is_Nil (CSI) then
+                           -- TBSL 2005: CSI is nil if the component is of an anonymous access type
+                           Comp_Name := Subtype_Simple_Name (CSI);
+                           if Expression_Kind (Comp_Name) = An_Attribute_Reference then
+                              -- Limitedness is the same for 'Base and 'Class as the prefix
+                              Comp_Name := Simple_Name (Prefix (Comp_Name));
+                           end if;
+                           if Is_Limited (A4G_Bugs.Corresponding_Name_Declaration (Comp_Name)) then
+                              return True;
+                           end if;
+                        end if;
+                     end;
                   when A_Definition =>
                      case Definition_Kind (Components (I)) is
                         when A_Null_Component =>
@@ -1980,17 +1964,70 @@ package body Thick_Queries is
          Reprs : constant Asis.Representation_Clause_List := Corresponding_Representation_Clauses (Decl);
       begin
          for R in Reprs'Range loop
-            if Representation_Clause_Kind (Reprs (R)) = An_Attribute_Definition_Clause
-              and then A4G_Bugs.Attribute_Kind (Representation_Clause_Name (Reprs (R))) = Attribute
-            then
-               return Representation_Clause_Expression (Reprs (R));
-            end if;
+            case Representation_Clause_Kind (Reprs (R)) is
+               when An_Attribute_Definition_Clause =>
+                  if A4G_Bugs.Attribute_Kind (Representation_Clause_Name (Reprs (R))) = Attribute then
+                     return Representation_Clause_Expression (Reprs (R));
+                  end if;
+               when An_At_Clause =>
+                  if Attribute = An_Address_Attribute then
+                     return Representation_Clause_Expression (Reprs (R));
+                  end if;
+               when A_Record_Representation_Clause =>
+                  if Attribute = An_Alignment_Attribute then
+                     return Mod_Clause_Expression (Reprs (R));
+                  end if;
+               when others =>
+                  null;
+            end case;
          end loop;
 
          -- Clause not found
          return Nil_Element;
       end;
    end Attribute_Clause_Expression;
+
+
+   ------------------------------------
+   -- Corresponding_Component_Clause --
+   ------------------------------------
+
+   function Corresponding_Component_Clause (Component : in Asis.Defining_Name) return Asis.Component_Clause is
+      use Asis.Clauses, Asis.Expressions;
+
+      Parent_Decl : Asis.Declaration:= Enclosing_Element (Enclosing_Element (Component));
+   begin
+      -- There are various nesting levels up to the enclosing record, depending on
+      -- whether we are in a variant or not... This is the easiest:
+      while Element_Kind (Parent_Decl) /= A_Declaration loop
+         Parent_Decl := Enclosing_Element (Parent_Decl);
+      end loop;
+
+      declare
+         Repr_List : constant Asis.Representation_Clause_List
+           := Corresponding_Representation_Clauses (Parent_Decl);
+      begin
+         for R in Repr_List'Range loop
+            if Representation_Clause_Kind (Repr_List (R)) = A_Record_Representation_Clause then
+               declare
+                  Components : constant Asis.Component_Clause_List := Component_Clauses (Repr_List (R));
+               begin
+                  for C in Components'Range loop
+                     if Is_Equal (Corresponding_Name_Definition (Representation_Clause_Name (Components (C))),
+                                  Component)
+                     then
+                        -- Found the clause for this component.
+                        return Components (C);
+                     end if;
+                  end loop;
+               end;
+               return Nil_Element;  -- Cannot have several record representation clauses
+            end if;
+         end loop;
+      end;
+      return Nil_Element;  -- No record representation clause found
+   end Corresponding_Component_Clause;
+
 
    -------------------
    -- Type_Category --
@@ -2016,9 +2053,9 @@ package body Thick_Queries is
                   Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
                                                                (Object_Declaration_View (Elem)));
                when A_Component_Declaration =>
-                    Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                                 (Component_Subtype_Indication
-                                                                  (Object_Declaration_View (Elem))));
+                  Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                               (Component_Subtype_Indication
+                                                                (Object_Declaration_View (Elem))));
                when A_Discriminant_Specification =>
                   Good_Elem := Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Elem)));
                when An_Ordinary_Type_Declaration
@@ -2078,6 +2115,8 @@ package body Thick_Queries is
                return A_Task_Type;
             when A_Protected_Definition =>
                return A_Protected_Type;
+            when An_Access_Definition =>
+               return An_Access_Type;
             when others =>
                Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
          end case;
@@ -2105,6 +2144,17 @@ package body Thick_Queries is
                      return A_Signed_Integer_Type;
                   when A_Modular_Type_Definition =>
                      return A_Modular_Type;
+                  when A_Root_Type_Definition =>
+                     case Root_Type_Kind (Type_Declaration_View (Good_Elem)) is
+                        when Not_A_Root_Type_Definition =>
+                           Impossible ("Not a root type", Good_Elem);
+                        when A_Root_Integer_Definition | A_Universal_Integer_Definition =>
+                           return A_Signed_Integer_Type;
+                        when A_Root_Real_Definition | A_Universal_Real_Definition =>
+                           return A_Floating_Point_Type;
+                        when A_Universal_Fixed_Definition =>
+                           return A_Fixed_Point_Type;
+                     end case;
                   when A_Floating_Point_Definition =>
                      return A_Floating_Point_Type;
                   when An_Ordinary_Fixed_Point_Definition =>
@@ -2567,43 +2617,50 @@ package body Thick_Queries is
       Local_Elem : Asis.Element := A4G_Bugs.Corresponding_Expression_Type (The_Element);
       Def        : Asis.Definition;
    begin
-      if Is_Nil (Local_Elem) then
-         case Expression_Kind (The_Element) is
-            when A_Selected_Component =>
-               Local_Elem := Selector (The_Element);
-            when An_Identifier =>
-               Local_Elem := The_Element;
-            when others =>
-               return Nil_Element;
-         end case;
-
-         Local_Elem := A4G_Bugs.Corresponding_Name_Declaration (Local_Elem);
-         case Declaration_Kind (Local_Elem) is
-            when A_Variable_Declaration
-              | A_Constant_Declaration
-              | A_Deferred_Constant_Declaration
-              =>
-               Def := Object_Declaration_View (Local_Elem);
-               if Definition_Kind (Def) = A_Type_Definition then
-                  -- This can only be an anonymous array => we have the definition
-                  return Def;
-               else
-                  return Type_Declaration_View (A4G_Bugs.Corresponding_Name_Declaration
-                                                (Subtype_Simple_Name
-                                                 (Def)));
-               end if;
-            when A_Single_Protected_Declaration
-              | A_Single_Task_Declaration
-              =>
-               return Object_Declaration_View (Local_Elem);
-            when others =>
-               return Nil_Element;
-         end case;
+      if not Is_Nil (Local_Elem) then
+         -- Normal case, we have a type declaration
+         return Type_Declaration_View (Corresponding_First_Subtype (Local_Elem));
       end if;
 
-      -- Normal case, we have a type declaration
-      return Type_Declaration_View (Corresponding_First_Subtype (Local_Elem));
+      -- No type declaration, see if we can retrieve the definition of an anonymous type
+      case Expression_Kind (The_Element) is
+         when A_Selected_Component =>
+            Local_Elem := Selector (The_Element);
+         when An_Identifier =>
+            Local_Elem := The_Element;
+         when others =>
+            return Nil_Element;
+      end case;
+
+      Local_Elem := A4G_Bugs.Corresponding_Name_Declaration (Local_Elem);
+      case Declaration_Kind (Local_Elem) is
+         when A_Variable_Declaration
+            | A_Constant_Declaration
+            | A_Deferred_Constant_Declaration
+            | A_Discriminant_Specification
+            | A_Parameter_Specification
+              =>
+            Def := Object_Declaration_View (Local_Elem);
+            if Definition_Kind (Def) = A_Type_Definition then
+               -- This can only be an anonymous array => we have the definition
+               return Def;
+            elsif Definition_Kind (Def) = An_Access_Definition then
+               -- Anonymous access type
+               return Def;
+            else
+               return Type_Declaration_View (A4G_Bugs.Corresponding_Name_Declaration
+                                             (Subtype_Simple_Name (Def)));
+            end if;
+         when A_Single_Protected_Declaration
+            | A_Single_Task_Declaration
+              =>
+            return Object_Declaration_View (Local_Elem);
+         when others =>
+            return Nil_Element;
+      end case;
+
    end Corresponding_Expression_Type_Definition;
+
 
    ------------------------------
    -- Ultimate_Expression_Type --
@@ -2613,7 +2670,7 @@ package body Thick_Queries is
       Local_Elem : Asis.Element := A4G_Bugs.Corresponding_Expression_Type (The_Element);
    begin
       if Is_Nil (Local_Elem) then
-         -- The_Element is a package, subprogram, task...
+         -- The_Element is a package, subprogram, task, anonymous access...
          -- For array, task and protected, we can still go to the definition
          return Corresponding_Expression_Type_Definition (The_Element);
       end if;
@@ -2699,6 +2756,12 @@ package body Thick_Queries is
          loop
             case Expression_Kind (Result) is
                when A_Selected_Component =>
+                  if Is_Access_Expression (Prefix (Result)) then
+                     -- Implicit dereference
+                     Result := Nil_Element;
+                     exit Going_Up_Renamings;
+                  end if;
+
                   if No_Component
                     and then Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Selector (Result)))
                   in A_Discriminant_Specification .. A_Component_Declaration
@@ -2710,12 +2773,18 @@ package body Thick_Queries is
                when A_Slice
                   | An_Indexed_Component
                     =>
+                  if Is_Access_Expression (Prefix (Result)) then
+                     -- Implicit dereference
+                     Result := Nil_Element;
+                     exit Going_Up_Renamings;
+                  end if;
+
                   Result := Prefix (Result);
                when An_Explicit_Dereference
                   | A_Function_Call =>
                   Result := Nil_Element;
                   exit Going_Up_Renamings;
-                  when A_Type_Conversion =>
+               when A_Type_Conversion =>
                   Result := Converted_Or_Qualified_Expression (Result);
                when An_Identifier
                   | An_Enumeration_Literal
@@ -2726,7 +2795,7 @@ package body Thick_Queries is
                when An_Attribute_Reference =>
                   -- Renaming of an attribute => return the attribute
                   exit Going_Up_Renamings;
-                  when others =>
+               when others =>
                   Impossible ("Ultimate_Name: unexpected expression in renaming", Result);
             end case;
          end loop;
@@ -2763,6 +2832,7 @@ package body Thick_Queries is
       Decl := Enclosing_Element (Def);
       if Is_Subunit (Decl) then
          Decl := Corresponding_Body_Stub (Decl);
+         Def  := Names (Decl)(1);
       end if;
 
       case Declaration_Kind (Decl) is
@@ -2813,9 +2883,62 @@ package body Thick_Queries is
             | A_Protected_Body_Stub
               =>
             -- these have always a spec
-            return Names (Corresponding_Declaration (Decl))(1);
+            return Names (Corresponding_Declaration (Decl)) (1);
+
          when A_Parameter_Specification =>
-            return Other_Formal_Name (Def, From_Spec => True);
+            Other_Decl := Enclosing_Element (Decl);
+            case Element_Kind (Other_Decl) is
+               when A_Declaration =>
+                  case Declaration_Kind (Other_Decl) is
+                     when A_Procedure_Declaration
+                        | A_Function_Declaration
+                        | A_Generic_Procedure_Declaration
+                        | A_Generic_Function_Declaration
+                        | An_Entry_Declaration
+                        | A_Formal_Procedure_Declaration
+                        | A_Formal_Function_Declaration
+                          =>
+                        return Def;
+                     when A_Procedure_Body_Stub
+                        | A_Function_Body_Stub
+                          =>
+                        Other_Decl := Corresponding_Declaration (Other_Decl);
+                        if Is_Nil (Other_Decl) then
+                           return Def;
+                        else
+                           return Matching_Formal_Name (Def, Other_Decl);
+                        end if;
+                     when A_Procedure_Body_Declaration
+                        | A_Function_Body_Declaration
+                        | An_Entry_Body_Declaration
+                          =>
+                        --Beware: these can be proper bodies
+                        if Is_Subunit (Other_Decl) then
+                           Other_Decl := Corresponding_Body_Stub (Other_Decl);
+                           Def  := Names (Decl) (1);
+                        end if;
+                        Other_Decl := Corresponding_Declaration (Other_Decl);
+                        if Is_Nil (Other_Decl) then
+                           return Def;
+                        else
+                           return Matching_Formal_Name (Def, Other_Decl);
+                        end if;
+                     when others =>
+                        Impossible ("First_Defining_Name: not a calllable entity", Other_Decl);
+                  end case;
+
+               when A_Statement =>
+                  case Statement_Kind (Other_Decl) is
+                     when An_Accept_Statement =>
+                        return Matching_Formal_Name (Def, A4G_Bugs.Corresponding_Entry (Other_Decl));
+                     when others =>
+                        Impossible ("First_Defining_Name: not an accept", Other_Decl);
+                  end case;
+
+               when others =>
+                  Impossible ("First_Defining_Name: not a calllable entity", Other_Decl);
+            end case;
+
          when others =>
             return Def;
       end case;
@@ -3599,6 +3722,139 @@ package body Thick_Queries is
       end case;
    end Exception_Handlers;
 
+   ----------------------
+   -- Size_Value_Image --
+   ----------------------
+
+   function Size_Value_Image (Name : Asis.Expression) return Wide_String is
+      use Asis.Clauses, Asis.Definitions, Asis.Expressions;
+
+      Expr      : Asis.Expression;
+      Decl      : Asis.Declaration;
+      Good_Name : Asis.Expression := Simple_Name (Name);
+   begin
+      case Element_Kind (Name) is
+         when An_Expression =>
+            case Expression_Kind (Good_Name) is
+               when An_Indexed_Component =>
+                  -- Special case: cannot be a type, only component_size is relevant
+                  Decl := A4G_Bugs.Corresponding_Expression_Type (Prefix (Good_Name));
+                  if Is_Nil (Decl) then
+                     -- Anonymous array, cannot specify Component_Size
+                     return "";
+                  end if;
+                  Expr := Attribute_Clause_Expression (A_Component_Size_Attribute, Decl);
+                  if Is_Nil (Expr) then
+                     return "";
+                  else
+                     return Static_Expression_Value_Image (Expr);
+                  end if;
+               when A_Slice =>
+                  -- Yes, taking Tab(1..5)'Size is allowed.
+                  -- TBSL: Requires Discrete_Constraining_Lengths to be able to process a slice
+                  -- Give up for the moment
+                  return "";
+               when others =>
+                  null;
+            end case;
+
+            Good_Name := Ultimate_Name (Good_Name);
+            Decl      := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
+         when A_Defining_Name =>
+            Decl := Enclosing_Element (Good_Name);
+         when others =>
+            Impossible ("Size_Value_Image: wrong name", Name);
+      end case;
+
+      -- Do we have a size clause (type or object)?
+      Expr := Attribute_Clause_Expression (A_Size_Attribute, Good_Name);
+      if not Is_Nil (Expr) then
+         -- we have a size clause
+         return Static_Expression_Value_Image (Expr);
+      end if;
+
+      case Declaration_Kind (Decl) is
+         when An_Ordinary_Type_Declaration =>
+            -- Is it a type derived from a type with a computable size?
+            if Type_Kind (Type_Declaration_View (Decl)) = A_Derived_Type_Definition then
+               return Size_Value_Image (Subtype_Simple_Name (Parent_Subtype_Indication (Type_Declaration_View (Decl))));
+            end if;
+
+            -- Last chance: some predefined stuff whose size is known (but not necessarily represented
+            -- properly with a size clause)
+            declare
+               Pfx : constant Wide_String := To_Upper (Full_Name_Image (Name));
+            begin
+               if Pfx = "STANDARD.BOOLEAN" then
+                  return "1";
+               elsif Pfx = "STANDARD.CHARACTER" then
+                  return "8";
+               elsif Pfx = "STANDARD.INTEGER" then
+                  return Integer'Wide_Image (Integer'Size);
+               elsif Pfx = "STANDARD.FLOAT" then
+                  return Integer'Wide_Image (Float'Size);
+
+               elsif Pfx = "STANDARD.LONG_INTEGER" then
+                  return Integer'Wide_Image (Long_Integer'Size);
+               elsif Pfx = "STANDARD.LONG_FLOAT" then
+                  return Integer'Wide_Image (Long_Float'Size);
+               elsif Pfx = "STANDARD.WIDE_CHARACTER" then
+                  return "16";
+
+               elsif Pfx = "STANDARD.WIDE_WIDE_CHARACTER" then
+                  return "32";
+               end if;
+            end;
+
+         when A_Component_Declaration =>
+            -- Is this component sized by a component clause of the enclosing record?
+            declare
+               Compo_Clause : constant Asis.Component_Clause := Corresponding_Component_Clause
+                                                                 (Corresponding_Name_Definition (Good_Name));
+               R            : Asis.Discrete_Range;
+               L            : Extended_Biggest_Natural;
+               H            : Extended_Biggest_Int;
+            begin
+               if Is_Nil (Compo_Clause) then
+                  return "";
+               end if;
+
+               R := Component_Clause_Range (Compo_Clause);
+               L := Discrete_Static_Expression_Value (Lower_Bound (R));
+               H := Discrete_Static_Expression_Value (Upper_Bound (R));
+               if L /= Not_Static and H /= Not_Static then
+                  return Extended_Biggest_Int'Wide_Image (H - L + 1);
+               else
+                  return "";
+               end if;
+            end;
+
+         when others =>
+            null;
+      end case;
+
+      -- Bad luck...
+      return "";
+   end Size_Value_Image;
+
+   ----------------
+   -- Size_Value --
+   ----------------
+
+   function Size_Value (Name : Asis.Expression) return Extended_Biggest_Int is
+      Str_Val : constant Wide_String := Size_Value_Image (Name);
+   begin
+      if Str_Val = "" then
+         return Not_Static;
+      end if;
+
+      return Biggest_Int'Wide_Value (Str_Val);
+   exception
+      when Constraint_Error =>
+         return Not_Static;
+   end Size_Value;
+
+
    -----------------------------------
    -- Static_Expression_Value_Image --
    -----------------------------------
@@ -3713,65 +3969,6 @@ package body Thick_Queries is
          return Result (Result'First .. R_Inx);
       end Strip_Quotes;
 
-      function Size_Value (Name : Asis.Expression) return Wide_String is
-      -- returns the value of the 'Size of Name (if available), or ""
-         use Asis.Definitions;
-
-         Expr : Asis.Expression;
-         Decl : Asis.Declaration;
-      begin
-         -- Do we have a size clause?
-         Expr := Attribute_Clause_Expression (A_Size_Attribute, Name);
-         if not Is_Nil (Expr) then
-            -- we have a size clause
-            return Static_Expression_Value_Image (Expr);
-         end if;
-
-         -- We may have extra possibilities for type names only
-         if Expression_Kind (Name) /= An_Identifier then
-            -- indexed component... cannot be a type
-            return "";
-         end if;
-         Decl := Corresponding_Name_Declaration (Name);
-         if Declaration_Kind (Decl) /= An_Ordinary_Type_Declaration then
-            return "";
-         end if;
-
-         -- Is it a type derived from a type with a computable size?
-         if Type_Kind (Type_Declaration_View (Decl)) = A_Derived_Type_Definition then
-            return Size_Value (Subtype_Simple_Name (Parent_Subtype_Indication (Type_Declaration_View (Decl))));
-         end if;
-
-         -- Last chance: some predefined stuff whose size is known (but not necessarily represented
-         -- properly with a size clause)
-         declare
-            Pfx : constant Wide_String := To_Upper (Full_Name_Image (Name));
-         begin
-            if Pfx = "STANDARD.BOOLEAN" then
-               return "1";
-            elsif Pfx = "STANDARD.CHARACTER" then
-               return "8";
-            elsif Pfx = "STANDARD.INTEGER" then
-               return Integer'Wide_Image (Integer'Size);
-            elsif Pfx = "STANDARD.FLOAT" then
-               return Integer'Wide_Image (Float'Size);
-
-            elsif Pfx = "STANDARD.LONG_INTEGER" then
-               return Integer'Wide_Image (Long_Integer'Size);
-            elsif Pfx = "STANDARD.LONG_FLOAT" then
-               return Integer'Wide_Image (Long_Float'Size);
-            elsif Pfx = "STANDARD.WIDE_CHARACTER" then
-               return "16";
-
-            elsif Pfx = "STANDARD.WIDE_WIDE_CHARACTER" then
-               return "32";
-            end if;
-         end;
-
-         -- Bad luck...
-         return "";
-      end Size_Value;
-
       Decl : Asis.Declaration;
    begin  -- Static_Expression_Value_Image
       case Expression_Kind (Expression) is
@@ -3829,7 +4026,7 @@ package body Thick_Queries is
                      -- For predefined operations, either there is no "fake" declaration and
                      -- Corresponding_Name_Declaration returns Nil_Element (GNAT case), or the
                      -- Declaration_Origin is An_Implicit_Predefined_Declaration.
-                     Decl := A4G_Bugs.Corresponding_Called_Function (Expression);
+                     Decl := Corresponding_Called_Function (Expression);
                      if not Is_Nil (Decl)
                        and then Declaration_Origin (Decl) /= An_Implicit_Predefined_Declaration
                      then
@@ -4010,7 +4207,7 @@ package body Thick_Queries is
                         raise;
                   end;
                when A_Size_Attribute =>
-                  return Size_Value (Simple_Name (Prefix (Expression)));
+                  return Size_Value_Image (Simple_Name (Prefix (Expression)));
                when others =>
                   return "";
             end case;
@@ -4141,7 +4338,7 @@ package body Thick_Queries is
                   return Complete_For_Access ((1 => (The_Kind => Call)));
 
                when An_Explicit_Dereference =>
-                   return Complete_For_Access (Descriptor (Prefix (E), With_Deref => True));
+                  return Complete_For_Access (Descriptor (Prefix (E)) &  Name_Part'(The_Kind => Dereference));
 
                when A_Type_Conversion =>
                   E := Converted_Or_Qualified_Expression (E);
@@ -4336,6 +4533,79 @@ package body Thick_Queries is
          return Left_Value /= "" and then Left_Value = Right_Value;
       end;
    end Same_Value;
+
+   function Used_Identifiers (Name : Asis.Expression) return Asis.Expression_List is
+      Decl : Asis.Declaration;
+
+      function Expression_Used_Identifiers (Expr : Asis.Expression) return Asis.Expression_List is
+      -- Builds the list of used identifiers in the expression of an object renaming by scanning
+      -- Expr right to left, until we find a name that is not used, nor any of its predecessors
+      -- (like a package name, a dereference...)
+      -- This function could be (partly) iterative, but making it recursive avoids to deal with
+      -- the number of elements of the results, and the call depth should be quite small in practice.
+         use Asis.Expressions;
+         Pref : Asis.Expression;
+      begin
+         case Expression_Kind (Expr) is
+            when An_Identifier
+               | An_Operator_Symbol
+               | An_Enumeration_Literal
+               | A_Character_Literal
+                 =>
+               return Used_Identifiers (Expr);
+            when An_Attribute_Reference =>
+               -- The prefix of an attribute is evaluated at the place of the renaming
+               -- not when using the renamed entity
+               return (1 => Expr);
+            when A_Selected_Component =>
+               Pref := Prefix (Expr);
+               if Is_Access_Expression (Pref) then
+                  -- Implicit dereference
+                  -- everything left of the dereference is "used" at the place of the renaming
+                  -- not when using the renamed entity
+                  return Used_Identifiers (Selector (Expr));
+               else
+                  return Expression_Used_Identifiers (Pref) & Used_Identifiers (Selector (Expr));
+               end if;
+            when An_Explicit_Dereference =>
+               -- The dereference is "used" at the place of the renaming
+               -- not when using the renamed entity
+               return Nil_Element_List;
+            when A_Slice
+               | An_Indexed_Component
+                 =>
+               -- The indexing expression is "used" at the place of the renanming,
+               -- not when using the renamed entity
+               Pref := Prefix (Expr);
+               if Is_Access_Expression (Pref) then
+                  -- Implicit dereference
+                  -- everything left of the dereference is "used" at the place of the renaming
+                  -- not when using the renamed entity
+                  return Nil_Element_List;
+               else
+                  return Expression_Used_Identifiers (Pref);
+               end if;
+            when A_Function_Call =>
+               -- The function is "used" at the place of the renanming,
+               -- not when using the renamed entity
+               return Nil_Element_List;
+            when A_Type_Conversion =>
+               -- Allowed for tagged types TBSL
+               return Expression_Used_Identifiers (Converted_Or_Qualified_Expression (Expr));
+            when others =>
+               Impossible ("Expression_Used_Identifiers: unexpected expression in renaming", Expr);
+         end case;
+      end Expression_Used_Identifiers;
+
+   begin -- Used_Identifiers
+      Decl := A4G_Bugs.Corresponding_Name_Declaration (Name);
+      if Declaration_Kind (Decl) in A_Renaming_Declaration then
+         return Name & Expression_Used_Identifiers (A4G_Bugs.Renamed_Entity (Decl));
+      else
+         -- including Not_A_Declaration for predefined stuff
+         return (1 => Name);
+      end if;
+   end Used_Identifiers;
 
 end Thick_Queries;
 

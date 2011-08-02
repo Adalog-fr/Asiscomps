@@ -88,6 +88,9 @@ package body Utilities is
                Put (Current_Trace.all, Clause_Kinds'Wide_Image (Clause_Kind (Element)));
             when An_Exception_Handler =>
                null;
+            when others =>
+               -- Corresponds to GNAT extensions: An_Expression_Path
+               Put (Current_Trace.all, "(non-standard)");
          end case;
 
          Put (Current_Trace.all, " at ");
