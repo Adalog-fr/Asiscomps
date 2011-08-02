@@ -277,10 +277,11 @@ package Thick_Queries is
    -- Moreover, it avoids the ambiguity between Asis.Subtype_Mark and Asis.Definitions.Subtype_Mark
 
    function First_Subtype_Name (The_Subtype : Asis.Expression) return Asis.Expression;
-   -- Unwinds subtype declarations and returns the simple *name* of the first subtype denoted by The_Subtype,
-   -- picked up from the last subtype declaration
+   -- Unwinds subtype declarations and returns the *name* of the first subtype denoted by The_Subtype,
+   -- picked up from the last subtype declaration.
    -- Returns its argument if The_Subtype already denotes a first subtype.
    -- Unlike Corresponding_First_Subtype, this works in case of subtyping of a class wide type
+   -- (returns the XXX'class)
    --
    -- Appropriate Expression_Kinds:
    --   An_Identifier
@@ -453,7 +454,8 @@ package Thick_Queries is
                             A_Floating_Point_Type,
                             An_Array_Type,
                             A_Record_Type,               -- untagged
-                            A_Tagged_Type,               -- including record extensions
+                            A_Tagged_Type,               -- including record extensions if Separate_Extension is false
+                            An_Extended_Tagged_Type,
                             An_Access_Type,
                             A_Derived_Type,
                             A_Private_Type,
@@ -463,16 +465,21 @@ package Thick_Queries is
    subtype Numeric_Types   is Type_Categories range A_Signed_Integer_type .. A_Modular_Type;
    subtype Composite_Types is Type_Categories range An_Array_Type         .. A_Tagged_Type;
 
-   function Type_Category (Elem           : in Asis.Element;
-                           Follow_Derived : in Boolean := False;
-                           Follow_Private : in Boolean := False) return Type_Categories;
+   function Type_Category (Elem               : in Asis.Element;
+                           Follow_Derived     : in Boolean := False;
+                           Follow_Private     : in Boolean := False;
+                           Separate_Extension : in Boolean := False) return Type_Categories;
    -- If Follow_Derived (resp. Follow_Private) is True, returns the category of the
    -- parent (full) type instead of Cat_Derived (Cat_Private). Formal derived (private)
    -- types still return Cat_Derived (Cat_Private). Incomplete types are always followed.
    --
+   -- If Separate_Extension is True, returns An_Extended_Tagged_Type for (private) type extensions,
+   -- otherwise returns A_Tagged_Type.
+   --
    -- Appropriate Element_Kinds:
    --       A_Declaration
    --       A_Definition
+   --       An_Expression
    -- Appropriate Declaration_Kinds:
    --       An_Ordinary_Type_Declaration
    --       A_Task_Type_Declaration
@@ -832,6 +839,7 @@ package Thick_Queries is
    --     Constant
    --     Parenthesized expression
    --     'Pred, 'Succ, 'Pos, 'Val, 'First, 'Last
+   --     'Size if specified by a size clause, or a standard type, or a type derived type from one of these
    --     Conversions and qualified expressions
    --     Comparison operators
    --  Integer: (provided values are within System.Min_Int .. System.Max_Int)

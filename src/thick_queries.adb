@@ -31,6 +31,9 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
+
+--## Rule off Use_Img_Function ## This package should not depend on utilities
+
 with   -- Standard Ada units
   Ada.Characters.Handling,
   Ada.Exceptions,
@@ -172,31 +175,37 @@ package body Thick_Queries is
          Callee := A4G_Bugs.Corresponding_Called_Entity (Call);
       end if;
 
-      -- Callee might be a declaration whose body is provided by renaming.
-      -- This must be handled as renaming
-      if Declaration_Kind (Callee) in A_Procedure_Declaration .. A_Function_Declaration then
-         if Declaration_Kind (Corresponding_Body (Callee))
-            in A_Procedure_Renaming_Declaration .. A_Function_Renaming_Declaration
-         then
-            Callee := Corresponding_Body (Callee);
-         end if;
-      end if;
+      loop
+         case Declaration_Kind (Callee) is
+            when A_Procedure_Declaration .. A_Function_Declaration =>
+               -- Callee might be a declaration whose body is provided by renaming.
+               -- This must be handled as renaming
+               if Declaration_Kind (Corresponding_Body (Callee))
+                  not in A_Procedure_Renaming_Declaration .. A_Function_Renaming_Declaration
+               then
+                  exit;
+               end if;
+               Callee := Corresponding_Body (Callee);
 
-      if Declaration_Kind (Callee) in A_Renaming_Declaration then
-         Name := Simple_Name (Corresponding_Base_Entity (Callee));
-         case Expression_Kind (Name) is
-            when An_Attribute_Reference =>
-               return (Kind => An_Attribute_Call);
-            when An_Explicit_Dereference =>
-               -- No possible implicit dereference here
-               return (Kind => A_Dereference_Call);
-            when An_Indexed_Component =>
-               -- Renaming of a member of an entry family
-               Callee := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Prefix (Name)));
+            when A_Renaming_Declaration =>
+               Name := Simple_Name (Corresponding_Base_Entity (Callee));
+               case Expression_Kind (Name) is
+                  when An_Attribute_Reference =>
+                     return (Kind => An_Attribute_Call);
+                  when An_Explicit_Dereference =>
+                     -- No possible implicit dereference here
+                     return (Kind => A_Dereference_Call);
+                  when An_Indexed_Component =>
+                     -- Renaming of a member of an entry family
+                     Callee := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Prefix (Name)));
+                  when others =>
+                     Callee := A4G_Bugs.Corresponding_Name_Declaration (Name);
+               end case;
+
             when others =>
-               Callee:= A4G_Bugs.Corresponding_Name_Declaration (Name);
+               exit;
          end case;
-      end if;
+      end loop;
 
       if not Is_Nil (Callee) then
          return (Kind => A_Regular_Call, Declaration => Callee);
@@ -1524,20 +1533,44 @@ package body Thick_Queries is
    ------------------------
 
    function First_Subtype_Name (The_Subtype : Asis.Expression) return Asis.Expression is
-      ST : Asis.Declaration := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (The_Subtype));
+      use Asis.Expressions;
+      ST   : Asis.Declaration := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (The_Subtype));
+      Mark : Asis.Expression;
    begin
       if Declaration_Kind (ST) /= A_Subtype_Declaration then
          -- The_Subtype was already the first named subtype
-         return Simple_Name (The_Subtype);
+         return The_Subtype;
       end if;
 
       -- We must unwind subtypes up to the last subtype (but not up to the type as
-      -- Corresponding_First_Subtype would do), and check if the subtype mark is a
-      -- 'Class attribute.
-      while Declaration_Kind (A4G_Bugs.Corresponding_Last_Subtype (ST)) = A_Subtype_Declaration loop
-         ST := A4G_Bugs.Corresponding_Last_Subtype (ST);
+      -- Corresponding_First_Subtype would do). We ignore the 'Base attribute,
+      -- but return the 'Class attribute
+      -- We do not use Corresponding_Last_Subtype, because the ASIS standard does not
+      -- specify what happens in the case of a subtype of a 'class.
+      loop
+         Mark := Subtype_Simple_Name (Type_Declaration_View (ST));
+         case Expression_Kind (Mark) is
+            when An_Identifier =>
+               ST := Corresponding_Name_Declaration (Mark);
+               if Declaration_Kind (ST) /= A_Subtype_Declaration then
+                  return Mark;
+               end if;
+            when An_Attribute_Reference =>
+               case A4G_Bugs.Attribute_Kind (Mark) is
+                  when A_Base_Attribute =>
+                     ST := Corresponding_Name_Declaration (Simple_Name (Prefix (Mark)));
+                     if Declaration_Kind (ST) /= A_Subtype_Declaration then
+                        return Prefix (Mark);
+                     end if;
+                  when A_Class_Attribute =>
+                     return Mark;
+                  when others =>
+                     Impossible ("First_Subtype_Name: unexpected attribute", Mark);
+               end case;
+            when others =>
+               Impossible ("First_Subtype_Name: unexpected mark", Mark);
+         end case;
       end loop;
-      return Subtype_Simple_Name (Type_Declaration_View (ST));
    end First_Subtype_Name;
 
    -----------------------
@@ -1959,20 +1992,52 @@ package body Thick_Queries is
       end;
    end Attribute_Clause_Expression;
 
-   -------------------------
-   -- Type_Category_Image --
-   -------------------------
+   -------------------
+   -- Type_Category --
+   -------------------
 
-   function Type_Category (Elem           : in Asis.Element;
-                           Follow_Derived : in Boolean := False;
-                           Follow_Private : in Boolean := False) return Type_Categories
+   function Type_Category (Elem               : in Asis.Element;
+                           Follow_Derived     : in Boolean := False;
+                           Follow_Private     : in Boolean := False;
+                           Separate_Extension : in Boolean := False) return Type_Categories
    is
       use Asis.Definitions, Asis.Expressions;
-      Good_Elem : Asis.Declaration := Elem;
+      Good_Elem : Asis.Declaration;
    begin
-      if Element_Kind (Good_Elem) = An_Expression then
-         Good_Elem := Corresponding_Expression_Type_Definition (Good_Elem);
-      end if;
+      case Element_Kind (Elem) is
+         when An_Expression =>
+            Good_Elem := Corresponding_Expression_Type_Definition (Elem);
+         when A_Declaration =>
+            case Declaration_Kind (Elem) is
+               when A_Variable_Declaration
+                  | A_Constant_Declaration
+                  | A_Deferred_Constant_Declaration
+                    =>
+                  Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                               (Object_Declaration_View (Elem)));
+               when A_Component_Declaration =>
+                    Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                                 (Component_Subtype_Indication
+                                                                  (Object_Declaration_View (Elem))));
+               when A_Discriminant_Specification =>
+                  Good_Elem := Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Elem)));
+               when An_Ordinary_Type_Declaration
+                  | A_Task_Type_Declaration
+                  | A_Protected_Type_Declaration
+                  | A_Private_Type_Declaration
+                  | A_Private_Extension_Declaration
+                  | A_Subtype_Declaration
+                  | A_Formal_Type_Declaration
+                    =>
+                  Good_Elem := Elem;
+               when others =>
+                  return Not_A_Type;
+            end case;
+         when A_Definition =>
+            Good_Elem := Elem;
+         when others =>
+            return Not_A_Type;
+      end case;
 
       if Is_Nil (Good_Elem) then
          -- Special case: not a good ol' type.
@@ -2021,6 +2086,7 @@ package body Thick_Queries is
          Good_Elem := Corresponding_First_Subtype (Good_Elem);
       end if;
 
+      -- At this point, Good_Elem is a type declaration
       loop -- because of derived and incomplete types
          case Declaration_Kind (Good_Elem) is
             when An_Ordinary_Type_Declaration =>
@@ -2051,10 +2117,14 @@ package body Thick_Queries is
                         return An_Array_Type;
                   when A_Record_Type_Definition =>
                      return A_Record_Type;
-                  when A_Tagged_Record_Type_Definition
-                     | A_Derived_Record_Extension_Definition
-                       =>
+                  when A_Tagged_Record_Type_Definition =>
                      return A_Tagged_Type;
+                  when A_Derived_Record_Extension_Definition =>
+                     if Separate_Extension then
+                        return An_Extended_Tagged_Type;
+                     else
+                        return A_Tagged_Type;
+                     end if;
                   when An_Access_Type_Definition =>
                      return An_Access_Type;
                   when others =>
@@ -2095,13 +2165,17 @@ package body Thick_Queries is
                return A_Protected_Type;
             when An_Incomplete_Type_Declaration =>
                Good_Elem := Corresponding_Type_Declaration (Good_Elem);
-            when A_Private_Type_Declaration
-               | A_Private_Extension_Declaration
-                 =>
+            when A_Private_Type_Declaration =>
                if not Follow_Private then
                   return A_Private_Type;
                end if;
                Good_Elem := Corresponding_Type_Declaration (Good_Elem);
+            when A_Private_Extension_Declaration =>
+               if Separate_Extension then
+                  return An_Extended_Tagged_Type;
+               else
+                  return A_Tagged_Type;
+               end if;
             when others =>
                return Not_A_Type;
          end case;
@@ -3435,9 +3509,18 @@ package body Thick_Queries is
    function Are_Null_Statements (Stats : Asis.Statement_List; Except_Labelled : Boolean := False) return Boolean is
    begin
       for I in Stats'Range loop
-         if Statement_Kind (Stats (I)) /= A_Null_Statement then
-            return False;
-         end if;
+         case Statement_Kind (Stats (I)) is
+            when A_Null_Statement =>
+               null;
+            when A_Block_Statement =>
+               if Block_Declarative_Items (Stats (I)) /= Nil_Element_List
+                 or else not Are_Null_Statements (Block_Statements (Stats (I)))
+               then
+                  return False;
+               end if;
+            when others =>
+               return False;
+         end case;
 
          if Except_Labelled and then not Is_Nil (Label_Names (Stats (I)))then
             return False;
@@ -3630,8 +3713,66 @@ package body Thick_Queries is
          return Result (Result'First .. R_Inx);
       end Strip_Quotes;
 
+      function Size_Value (Name : Asis.Expression) return Wide_String is
+      -- returns the value of the 'Size of Name (if available), or ""
+         use Asis.Definitions;
+
+         Expr : Asis.Expression;
+         Decl : Asis.Declaration;
+      begin
+         -- Do we have a size clause?
+         Expr := Attribute_Clause_Expression (A_Size_Attribute, Name);
+         if not Is_Nil (Expr) then
+            -- we have a size clause
+            return Static_Expression_Value_Image (Expr);
+         end if;
+
+         -- We may have extra possibilities for type names only
+         if Expression_Kind (Name) /= An_Identifier then
+            -- indexed component... cannot be a type
+            return "";
+         end if;
+         Decl := Corresponding_Name_Declaration (Name);
+         if Declaration_Kind (Decl) /= An_Ordinary_Type_Declaration then
+            return "";
+         end if;
+
+         -- Is it a type derived from a type with a computable size?
+         if Type_Kind (Type_Declaration_View (Decl)) = A_Derived_Type_Definition then
+            return Size_Value (Subtype_Simple_Name (Parent_Subtype_Indication (Type_Declaration_View (Decl))));
+         end if;
+
+         -- Last chance: some predefined stuff whose size is known (but not necessarily represented
+         -- properly with a size clause)
+         declare
+            Pfx : constant Wide_String := To_Upper (Full_Name_Image (Name));
+         begin
+            if Pfx = "STANDARD.BOOLEAN" then
+               return "1";
+            elsif Pfx = "STANDARD.CHARACTER" then
+               return "8";
+            elsif Pfx = "STANDARD.INTEGER" then
+               return Integer'Wide_Image (Integer'Size);
+            elsif Pfx = "STANDARD.FLOAT" then
+               return Integer'Wide_Image (Float'Size);
+
+            elsif Pfx = "STANDARD.LONG_INTEGER" then
+               return Integer'Wide_Image (Long_Integer'Size);
+            elsif Pfx = "STANDARD.LONG_FLOAT" then
+               return Integer'Wide_Image (Long_Float'Size);
+            elsif Pfx = "STANDARD.WIDE_CHARACTER" then
+               return "16";
+
+            elsif Pfx = "STANDARD.WIDE_WIDE_CHARACTER" then
+               return "32";
+            end if;
+         end;
+
+         -- Bad luck...
+         return "";
+      end Size_Value;
+
       Decl : Asis.Declaration;
-      Expr : Asis.Expression;
    begin  -- Static_Expression_Value_Image
       case Expression_Kind (Expression) is
          when An_Integer_Literal =>
@@ -3869,13 +4010,7 @@ package body Thick_Queries is
                         raise;
                   end;
                when A_Size_Attribute =>
-                  -- If a size clause has been given, we may try it, otherwise give up
-                  Expr := Attribute_Clause_Expression (A_Size_Attribute, Prefix (Expression));
-                  if Is_Nil (Expr) then
-                     return "";
-                  else
-                     return Static_Expression_Value_Image (Expr);
-                  end if;
+                  return Size_Value (Simple_Name (Prefix (Expression)));
                when others =>
                   return "";
             end case;
