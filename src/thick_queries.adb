@@ -965,7 +965,6 @@ package body Thick_Queries is
 
       Parent          : Element;
       Anonymous_Count : Natural;
-      --Up_Count        : Natural;
       Decl_Name       : Asis.Defining_Name;
 
       function Simple_Name_Image (N : Asis.Defining_Name) return Wide_String is
@@ -1032,7 +1031,7 @@ package body Thick_Queries is
       end if;
 
       -- First, leave the declaration that encloses the name
-      Parent := Enclosing_Element (Enclosing_Element (Decl_Name));
+      Parent := Enclosing_Element (Decl_Name_Enclosing);
 
       -- There are cases of nested definitions (enumeration litterals, implicit declarations inside
       -- derived types, instantiations...) => go up  until we find something that's the "real"
@@ -1047,10 +1046,9 @@ package body Thick_Queries is
             when Not_An_Element =>
                -- No parent => compilation unit
                -- But can still be a proper body
-               if Is_Subunit (Enclosing_Element (Decl_Name)) then
+               if Is_Subunit (Decl_Name_Enclosing) then
                   -- The full name is the same as the name of the stub
-                  return Full_Name_Image (Names (Corresponding_Body_Stub
-                                                 (Enclosing_Element (Decl_Name)))(1),
+                  return Full_Name_Image (Names (Corresponding_Body_Stub(Decl_Name_Enclosing))(1),
                                           With_Profile);
                else
                   return Simple_Name_Image (Decl_Name);
@@ -1058,21 +1056,29 @@ package body Thick_Queries is
 
             when A_Declaration =>
                case Declaration_Kind (Parent) is
-                  when A_Task_Type_Declaration
-                     | A_Protected_Type_Declaration
-                     | A_Single_Task_Declaration
-                     | A_Single_Protected_Declaration
-                     | A_Procedure_Declaration
+                  when A_Procedure_Declaration
+                     | A_Null_Procedure_Declaration   --Ada 2005
                      | A_Function_Declaration
+                     | A_Package_Declaration
+                     | A_Task_Type_Declaration
+                     | A_Single_Task_Declaration
+                     | A_Protected_Type_Declaration
+                     | A_Single_Protected_Declaration
+                     | An_Entry_Declaration
+
                      | A_Procedure_Body_Declaration
                      | A_Function_Body_Declaration
-                     | A_Null_Procedure_Declaration   --Ada 2005
-                     | A_Package_Declaration
                      | A_Package_Body_Declaration
                      | A_Task_Body_Declaration
                      | A_Protected_Body_Declaration
-                     | An_Entry_Declaration
                      | An_Entry_Body_Declaration
+
+                     | A_Procedure_Body_Stub
+                     | A_Function_Body_Stub
+                     | A_Package_Body_Stub
+                     | A_Task_Body_Stub
+                     | A_Protected_Body_Stub
+
                      | A_Generic_Procedure_Declaration
                      | A_Generic_Function_Declaration
                      | A_Generic_Package_Declaration
@@ -1693,7 +1699,7 @@ package body Thick_Queries is
                                                           (Object_Declaration_View (Components (I)));
                      begin
                         if not Is_Nil (CSI) then
-                           -- TBSL 2005: CSI is nil if the component is of an anonymous access type
+                           --2005: CSI is nil if the component is of an anonymous access type
                            Comp_Name := Subtype_Simple_Name (CSI);
                            if Expression_Kind (Comp_Name) = An_Attribute_Reference then
                               -- Limitedness is the same for 'Base and 'Class as the prefix
