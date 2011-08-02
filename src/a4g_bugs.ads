@@ -40,6 +40,9 @@
 -- A comment tells in which version we first observed the problem, and in which version
 -- we found it fixed. You may have to experiment if you have an intermediate version.
 --
+-- When a bug has been fixed, we leave the entry as comments (with an indication of AdaControl's
+-- version where the entry has been removed). This may prove useful in case of regression.
+--
 -- The replacements are written in such a way that they still work correctly if the
 -- bug is fixed; i.e. there is no harm in still using the replacements after the bug
 -- has been fixed.
@@ -110,13 +113,15 @@ package A4G_Bugs is
    -- Bug report  : [E225-002]
    -- Gnat version: GAP 1.1.0
    -- Fixed in    : GnatPro 5.02
-   function Attribute_Designator_Identifier (Expression : in Asis.Expression) return Asis.Expression;
+   -- Removed from: 1.12b1
+   -- function Attribute_Designator_Identifier (Expression : in Asis.Expression) return Asis.Expression;
 
    -- Reason      : Bug when Argument is a call to a child function
    -- Bug report  : [E317-007]
    -- Gnat version: GAP 1.1.0
-   -- Fixed in    : current wavefront, not released
-   function Corresponding_Called_Function (Expression : in Asis.Expression) return Asis.Declaration;
+   -- Fixed in    :
+   -- Removed from: 1.11b6
+   -- function Corresponding_Called_Function (Expression : in Asis.Expression) return Asis.Declaration;
 
    -- Reason      : Bug when Argument is A_Selected_Component or An_Indexed_Component
    --             : Bug when Argument is the selector of A_Selected_Component (sometimes)
