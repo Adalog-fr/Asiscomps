@@ -19,7 +19,7 @@
 --  without even the implied warranty of MERCHANTABILITY or FITNESS --
 --  FOR A  PARTICULAR PURPOSE.  See the GNU  General Public License --
 --  for more details.   You should have received a  copy of the GNU --
---  General Public License distributed  with this program; see file --
+--  General Public License distributed  with this program; se file --
 --  COPYING.   If not, write  to the  Free Software  Foundation, 59 --
 --  Temple Place - Suite 330, Boston, MA 02111-1307, USA.           --
 --                                                                  --
@@ -192,9 +192,9 @@ package body Thick_Queries is
                return (Kind => A_Dereference_Call);
             when An_Indexed_Component =>
                -- Renaming of a member of an entry family
-               Callee := Corresponding_Name_Declaration (Simple_Name (Prefix (Name)));
+               Callee := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Prefix (Name)));
             when others =>
-               Callee:= Corresponding_Name_Declaration (Name);
+               Callee:= A4G_Bugs.Corresponding_Name_Declaration (Name);
          end case;
       end if;
 
@@ -282,8 +282,9 @@ package body Thick_Queries is
            or Declaration_Kind (Call) = A_Formal_Package_Declaration
          then
             declare
-               Formal_Part : Asis.Element_List
-                 :=  Generic_Formal_Part (Corresponding_Name_Declaration (Ultimate_Name (Generic_Unit_Name (Call))));
+               Formal_Part : Asis.Element_List :=  Generic_Formal_Part (A4G_Bugs.Corresponding_Name_Declaration
+                                                                        (Ultimate_Name
+                                                                         (Generic_Unit_Name (Call))));
                Last : List_Index := Formal_Part'Last;
                Inx  : List_Index := Formal_Part'First;
             begin
@@ -1180,7 +1181,7 @@ package body Thick_Queries is
    begin
       case Expression_Kind (Path) is
          when An_Identifier =>
-            return Declaration_Kind (Corresponding_Name_Declaration (Path)) in A_Renaming_Declaration;
+            return Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Path)) in A_Renaming_Declaration;
          when A_Selected_Component =>
             return Includes_Renaming (Selector (Path)) or else Includes_Renaming (Prefix (Path));
          when A_Function_Call | An_Indexed_Component | A_Slice =>
@@ -1267,14 +1268,14 @@ package body Thick_Queries is
                      when A_Component_Definition =>
                         Result := Result or Corresponding_Pragma_Set (Names
                                                                       (Corresponding_First_Subtype
-                                                                       (Corresponding_Name_Declaration
+                                                                       (A4G_Bugs.Corresponding_Name_Declaration
                                                                         (Subtype_Simple_Name
                                                                          (Component_Subtype_Indication
                                                                           (Element_Type_Definition)))))(1));
                      when A_Subtype_Indication =>
                         Result := Result or Corresponding_Pragma_Set (Names
                                                                       (Corresponding_First_Subtype
-                                                                       (Corresponding_Name_Declaration
+                                                                       (A4G_Bugs.Corresponding_Name_Declaration
                                                                         (Subtype_Simple_Name
                                                                          (Element_Type_Definition))))(1));
 
@@ -1294,7 +1295,6 @@ package body Thick_Queries is
    --------------------------
 
    function Is_Access_Expression (The_Element : Asis.Expression) return Boolean is
-      use Asis.Expressions;
 
       The_Type : constant Asis.Definition := Ultimate_Expression_Type (The_Element);
       The_Name : Asis.Expression;
@@ -1308,7 +1308,7 @@ package body Thick_Queries is
             return False;
          end if;
 
-         Decl := Corresponding_Name_Declaration (The_Name);
+         Decl := A4G_Bugs.Corresponding_Name_Declaration (The_Name);
          case Declaration_Kind (Decl) is
             when A_Parameter_Specification
                | A_Discriminant_Specification
@@ -1359,17 +1359,18 @@ package body Thick_Queries is
             if Declaration_Kind (The_Declaration) in A_Generic_Instantiation then
                -- For a generic instantiation, take the declaration from the generic
                -- Beware: the generic name can be a selected component
-               The_Declaration := Corresponding_Name_Declaration (Simple_Name (Generic_Unit_Name (The_Declaration)));
+               The_Declaration := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name
+                                                                           (Generic_Unit_Name (The_Declaration)));
             end if;
          when An_Expression =>
             case Expression_Kind (Element) is
                when An_Identifier =>
-                  The_Declaration := Corresponding_Name_Declaration (Element);
+                  The_Declaration := A4G_Bugs.Corresponding_Name_Declaration (Element);
                when An_Enumeration_Literal =>
                   -- Always considered a function
                   return True;
                when A_Selected_Component =>
-                  The_Declaration := Corresponding_Name_Declaration (Selector (Element));
+                  The_Declaration := A4G_Bugs.Corresponding_Name_Declaration (Selector (Element));
                when An_Operator_Symbol =>
                   -- These are always functions
                   return True;
@@ -1456,7 +1457,7 @@ package body Thick_Queries is
             return Is_Static_Object (Prefix (Obj))
               and then Discrete_Constraining_Lengths (Slice_Range (Obj), Follow_Access => False) (1) /= Not_Static;
          when A_Selected_Component =>
-            case Declaration_Kind (Corresponding_Name_Declaration (Simple_Name (Prefix (Obj)))) is
+            case Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Prefix (Obj)))) is
                when A_Constant_Declaration
                   | A_Variable_Declaration
                   | A_Parameter_Specification
@@ -1486,7 +1487,7 @@ package body Thick_Queries is
    -------------------
 
    function Is_Task_Entry (Declaration : Asis.Declaration) return Boolean is
-      use Asis.Definitions, Asis.Expressions;
+      use Asis.Definitions;
       Enclosing : Asis.Declaration := Enclosing_Element (Declaration);
    begin
       case Definition_Kind (Enclosing) is
@@ -1494,7 +1495,7 @@ package body Thick_Queries is
             return True;
          when A_Type_Definition =>
             -- Must be A_Derived_Type_Defintion
-            Enclosing := Ultimate_Type_Declaration (Corresponding_Name_Declaration
+            Enclosing := Ultimate_Type_Declaration (A4G_Bugs.Corresponding_Name_Declaration
                                                       (Subtype_Simple_Name
                                                          (Parent_Subtype_Indication (Enclosing))));
             return Declaration_Kind (Enclosing) = A_Task_Type_Declaration;
@@ -1523,8 +1524,7 @@ package body Thick_Queries is
    ------------------------
 
    function First_Subtype_Name (The_Subtype : Asis.Expression) return Asis.Expression is
-      use Asis.Expressions;
-      ST : Asis.Declaration := Corresponding_Name_Declaration (Simple_Name (The_Subtype));
+      ST : Asis.Declaration := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (The_Subtype));
    begin
       if Declaration_Kind (ST) /= A_Subtype_Declaration then
          -- The_Subtype was already the first named subtype
@@ -1561,7 +1561,6 @@ package body Thick_Queries is
    ----------------------
 
    function Is_Array_Subtype (The_Subtype : Asis.Declaration) return Boolean is
-      use Asis.Expressions;
 
       Good_Name : Asis.Expression;
       Good_Decl : Asis.Declaration;
@@ -1578,7 +1577,7 @@ package body Thick_Queries is
                -- 'Base and 'Class cannot be arrays
                return False;
             end if;
-            Good_Decl := Corresponding_Name_Declaration (Good_Name);
+            Good_Decl := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
          when others =>
             return False;
       end case;
@@ -1602,7 +1601,6 @@ package body Thick_Queries is
    ---------------------------
 
    function Is_Class_Wide_Subtype (The_Subtype : Asis.Element) return Boolean is
-      use Asis.Expressions;
 
       ST        : Asis.Declaration;
       Good_Name : Asis.Expression;
@@ -1615,7 +1613,7 @@ package body Thick_Queries is
             if Expression_Kind (Good_Name) = An_Attribute_Reference then
                return A4G_Bugs.Attribute_Kind (Good_Name) = A_Class_Attribute;
             end if;
-            ST := Corresponding_Name_Declaration (Good_Name);
+            ST := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
          when A_Defining_Name =>
             ST := Enclosing_Element (The_Subtype);
          when An_Expression =>
@@ -1623,7 +1621,7 @@ package body Thick_Queries is
             if Expression_Kind (Good_Name) = An_Attribute_Reference then
                return A4G_Bugs.Attribute_Kind (Good_Name) = A_Class_Attribute;
             end if;
-            ST := Corresponding_Name_Declaration (Good_Name);
+            ST := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
          when others =>
             return False;
       end case;
@@ -1686,7 +1684,7 @@ package body Thick_Queries is
                         -- Limitedness is the same for 'Base and 'Class as the prefix
                         Comp_Name := Simple_Name (Prefix (Comp_Name));
                      end if;
-                     if Is_Limited (Corresponding_Name_Declaration (Comp_Name)) then
+                     if Is_Limited (A4G_Bugs.Corresponding_Name_Declaration (Comp_Name)) then
                         return True;
                      end if;
                   when A_Definition =>
@@ -1802,7 +1800,7 @@ package body Thick_Queries is
                      | A_Character_Literal
                      | An_Enumeration_Literal
                        =>
-                     Decl := Corresponding_Name_Declaration (Decl);
+                     Decl := A4G_Bugs.Corresponding_Name_Declaration (Decl);
                   when A_Selected_Component =>
                      Decl := Selector (Decl);
                   when An_Attribute_Reference =>
@@ -1907,7 +1905,7 @@ package body Thick_Queries is
                case Expression_Kind (Good_Name) is
                   when A_Selected_Component =>
                      Good_Name := Selector (Good_Name);
-                     if Declaration_Kind (Corresponding_Name_Declaration (Good_Name))
+                     if Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Good_Name))
                         in A_Discriminant_Specification .. A_Component_Declaration
                      then
                         -- Attribute of a record field => give up
@@ -1933,7 +1931,7 @@ package body Thick_Queries is
                      exit;
                end case;
             end loop;
-            Decl := Corresponding_Name_Declaration (Good_Name);
+            Decl := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
          when others =>
             Impossible ("Bad parameter to Type_Size_Expression", Elem);
       end case;
@@ -1987,7 +1985,7 @@ package body Thick_Queries is
 
          -- Here, we have "*" or "/"
          declare
-            Params : Asis.Association_List := Function_Call_Parameters (Elem);
+            Params : constant Asis.Association_List := Function_Call_Parameters (Elem);
          begin
             if Type_Category (Actual_Parameter (Params (1)), Follow_Derived => True) = A_Fixed_Point_Type
               and then Type_Category (Actual_Parameter (Params (2)), Follow_Derived => True) = A_Fixed_Point_Type
@@ -2031,7 +2029,7 @@ package body Thick_Queries is
                      if not Follow_Derived then
                         return A_Derived_Type;
                      end if;
-                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
+                     Good_Elem := Corresponding_First_Subtype (A4G_Bugs.Corresponding_Name_Declaration
                                                               (Subtype_Simple_Name
                                                                (Parent_Subtype_Indication
                                                                 (Type_Declaration_View (Good_Elem)))));
@@ -2130,7 +2128,7 @@ package body Thick_Queries is
                      -- A record component can't be 'Class, must be 'Base
                      Name := Simple_Name (Prefix (Name));
                   end if;
-                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (Name), The_Kind) then
+                  if Contains_Type_Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Name), The_Kind) then
                      return True;
                   end if;
                when A_Definition =>
@@ -2180,7 +2178,7 @@ package body Thick_Queries is
                      Impossible ("Wrong declaration_subtype_mark", SM);
                end case;
 
-               if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (SM), The_Kind) then
+               if Contains_Type_Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (SM), The_Kind) then
                   return True;
                end if;
             end loop;
@@ -2206,7 +2204,7 @@ package body Thick_Queries is
          when An_Ordinary_Type_Declaration =>
             case Type_Kind (Def) is
                when An_Unconstrained_Array_Definition | A_Constrained_Array_Definition =>
-                  return Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
+                  return Contains_Type_Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration
                                                          (Subtype_Simple_Name
                                                           (Component_Subtype_Indication
                                                            (Array_Component_Definition (Def)))),
@@ -2222,7 +2220,7 @@ package body Thick_Queries is
                   return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
 
                when A_Derived_Record_Extension_Definition =>
-                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
+                  if Contains_Type_Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration
                                                      (Subtype_Simple_Name (Parent_Subtype_Indication (Def))),
                                                     The_Kind)
                   then
@@ -2252,7 +2250,7 @@ package body Thick_Queries is
             begin
                for I in Decls'Range loop
                   if Declaration_Kind (Decls (I)) = A_Component_Declaration
-                    and then Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
+                    and then Contains_Type_Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration
                                                              (Subtype_Simple_Name
                                                               (Component_Subtype_Indication
                                                                (Object_Declaration_View (Decls (I))))),
@@ -2265,7 +2263,7 @@ package body Thick_Queries is
             return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
 
          when A_Private_Extension_Declaration =>
-            if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
+            if Contains_Type_Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration
                                                (Subtype_Simple_Name (Ancestor_Subtype_Indication (Def))),
                                               The_Kind)
             then
@@ -2325,9 +2323,9 @@ package body Thick_Queries is
       if Element_Kind (The_Name) = A_Defining_Name then
          Decl_Name := Enclosing_Element (The_Name);
       elsif Expression_Kind (The_Name) = A_Selected_Component then
-         Decl_Name := Corresponding_Name_Declaration (Selector (The_Name));
+         Decl_Name := A4G_Bugs.Corresponding_Name_Declaration (Selector (The_Name));
       else
-         Decl_Name := Corresponding_Name_Declaration (The_Name);
+         Decl_Name := A4G_Bugs.Corresponding_Name_Declaration (The_Name);
       end if;
 
       if  not Is_Callable_Construct (The_Name) then
@@ -2386,7 +2384,7 @@ package body Thick_Queries is
             Good_Mark := Selector (Good_Mark);
          end if;
 
-         Decl := Corresponding_Name_Declaration (Good_Mark);
+         Decl := A4G_Bugs.Corresponding_Name_Declaration (Good_Mark);
          if Declaration_Kind (Decl) = An_Incomplete_Type_Declaration then
             -- cannot take the Corresponding_First_Subtype of an incomplete type
             Decl := Corresponding_Type_Declaration (Decl);
@@ -2505,7 +2503,7 @@ package body Thick_Queries is
                return Nil_Element;
          end case;
 
-         Local_Elem := Corresponding_Name_Declaration (Local_Elem);
+         Local_Elem := A4G_Bugs.Corresponding_Name_Declaration (Local_Elem);
          case Declaration_Kind (Local_Elem) is
             when A_Variable_Declaration
               | A_Constant_Declaration
@@ -2516,7 +2514,7 @@ package body Thick_Queries is
                   -- This can only be an anonymous array => we have the definition
                   return Def;
                else
-                  return Type_Declaration_View (Corresponding_Name_Declaration
+                  return Type_Declaration_View (A4G_Bugs.Corresponding_Name_Declaration
                                                 (Subtype_Simple_Name
                                                  (Def)));
                end if;
@@ -2611,7 +2609,7 @@ package body Thick_Queries is
       if Element_Kind (Result) = A_Defining_Name then
          Decl := Enclosing_Element (The_Name);
       else
-         Decl := Corresponding_Name_Declaration (Result);
+         Decl := A4G_Bugs.Corresponding_Name_Declaration (Result);
       end if;
 
       if Declaration_Kind (Decl) not in A_Renaming_Declaration then
@@ -2628,7 +2626,7 @@ package body Thick_Queries is
             case Expression_Kind (Result) is
                when A_Selected_Component =>
                   if No_Component
-                    and then Declaration_Kind (Corresponding_Name_Declaration (Selector (Result)))
+                    and then Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Selector (Result)))
                   in A_Discriminant_Specification .. A_Component_Declaration
                   then
                      Result := Prefix (Result);
@@ -2658,7 +2656,7 @@ package body Thick_Queries is
                   Impossible ("Ultimate_Name: unexpected expression in renaming", Result);
             end case;
          end loop;
-         Decl := Corresponding_Name_Declaration (Result);
+         Decl := A4G_Bugs.Corresponding_Name_Declaration (Result);
       end loop Going_Up_Renamings;
 
       -- If A_Defining_Name, return A_Defining_Name
@@ -2778,10 +2776,10 @@ package body Thick_Queries is
       loop
          case Expression_Kind (Result) is
             when An_Identifier =>
-               if Declaration_Kind (Corresponding_Name_Declaration (Result)) /= A_Constant_Declaration then
+               if Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Result)) /= A_Constant_Declaration then
                   exit;
                end if;
-               Result := Initialization_Expression (Corresponding_Name_Declaration  (Result));
+               Result := Initialization_Expression (A4G_Bugs.Corresponding_Name_Declaration  (Result));
             when A_Selected_Component =>
                Result := Selector (Result);
             when others =>
@@ -3227,7 +3225,7 @@ package body Thick_Queries is
                   when others =>
                      -- Assume it's a name, but it can be a type name, therefore
                      -- we cannot take directly Corresponding_Expression_Type
-                     Item := Corresponding_Name_Declaration (Item);
+                     Item := A4G_Bugs.Corresponding_Name_Declaration (Item);
                end case;                         ----------------- Expressions
 
             when A_Defining_Name =>              ----------------- Defining name
@@ -3658,7 +3656,7 @@ package body Thick_Queries is
             return Static_Expression_Value_Image (Expression_Parenthesized (Expression));
 
          when An_Identifier =>
-            Decl := Corresponding_Name_Declaration (Expression);
+            Decl := A4G_Bugs.Corresponding_Name_Declaration (Expression);
             case Declaration_Kind (Decl) is
                when An_Integer_Number_Declaration
                  | A_Real_Number_Declaration
@@ -3975,7 +3973,7 @@ package body Thick_Queries is
                   E := A4G_Bugs.Renamed_Entity (Variable_Enclosing);
 
                when A_Selected_Component =>
-                  case Declaration_Kind (Corresponding_Name_Declaration (Selector (E))) is
+                  case Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Selector (E))) is
                      when A_Component_Declaration | A_Discriminant_Specification =>
                         -- It's a record field, a protected type field...
                         return Complete_For_Access (Descriptor (Prefix (E), With_Deref => True)
@@ -4149,7 +4147,7 @@ package body Thick_Queries is
          -- Precondition: Left_C and Right_C are An_Identifier
          use Asis.Expressions;
 
-         Decl : constant Asis.Declaration := Corresponding_Name_Declaration (Left_C);
+         Decl : constant Asis.Declaration := A4G_Bugs.Corresponding_Name_Declaration (Left_C);
          Left_Obj  : Asis.Expression;
          Right_Obj : Asis.Expression;
       begin

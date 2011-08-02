@@ -126,6 +126,13 @@ package A4G_Bugs is
    -- Fixed in    : current wavefront, not released
    function Corresponding_Expression_Type (Expression : in Asis.Expression) return Asis.Declaration;
 
+   -- Reason      : In some complicated case involving instantiations of child generic, returns
+   --             : A_Defining_Expanded_Name instead of a declaration
+   -- Bug report  : [HB03-014]
+   -- Gnat version: GnatPro 6.1.2, GnatGPL2008
+   -- Fixed in    :
+   function Corresponding_Name_Declaration (Reference : in Asis.Expression) return Asis.Element;
+
    -- Reason      : ASIS failure in some cases (notably with generic formals)
    -- Bug report  : [G223-008]
    -- Gnat version: 6.0.x
