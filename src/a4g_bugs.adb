@@ -201,7 +201,6 @@ package body A4G_Bugs is
       use Thick_Queries;
 
       Result : Asis.Element;
-      Temp   : Asis.Element;
    begin
       Result := Asis.Expressions.Corresponding_Expression_Type (Expression);
 
