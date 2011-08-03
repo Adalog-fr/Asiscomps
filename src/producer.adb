@@ -1,0 +1,716 @@
+----------------------------------------------------------------------
+--  Producer - Package body                                         --
+--  Copyright (C) 2002 Adalog                                       --
+--  Author: J-P. Rosen                                              --
+--                                                                  --
+--  ADALOG   is   providing   training,   consultancy,   expertise, --
+--  assistance and custom developments  in Ada and related software --
+--  engineering techniques.  For more info about our services:      --
+--  ADALOG                   Tel: +33 1 41 24 31 40                 --
+--  19-21 rue du 8 mai 1945  Fax: +33 1 41 24 07 36                 --
+--  94110 ARCUEIL            E-m: info@adalog.fr                    --
+--  FRANCE                   URL: http://www.adalog.fr              --
+--                                                                  --
+--  This  unit is  free software;  you can  redistribute  it and/or --
+--  modify  it under  terms of  the GNU  General Public  License as --
+--  published by the Free Software Foundation; either version 2, or --
+--  (at your  option) any later version.  This  unit is distributed --
+--  in the hope  that it will be useful,  but WITHOUT ANY WARRANTY; --
+--  without even the implied warranty of MERCHANTABILITY or FITNESS --
+--  FOR A  PARTICULAR PURPOSE.  See the GNU  General Public License --
+--  for more details.   You should have received a  copy of the GNU --
+--  General Public License distributed  with this program; see file --
+--  COPYING.   If not, write  to the  Free Software  Foundation, 59 --
+--  Temple Place - Suite 330, Boston, MA 02111-1307, USA.           --
+--                                                                  --
+--  As  a special  exception, if  other files  instantiate generics --
+--  from  this unit,  or you  link this  unit with  other  files to --
+--  produce an executable,  this unit does not by  itself cause the --
+--  resulting executable  to be covered  by the GNU  General Public --
+--  License.  This exception does  not however invalidate any other --
+--  reasons why  the executable  file might be  covered by  the GNU --
+--  Public License.                                                 --
+----------------------------------------------------------------------
+
+with   -- with for KLUDGE, to be removed when A4G fixed
+  Asis.Elements,   -- For KLUDGE
+  Ada.Strings.Wide_Fixed;
+
+with   -- Standard Ada units
+  Ada.Characters.Handling,
+  Ada.Unchecked_Deallocation,
+  Ada.Wide_Text_IO;
+
+with   -- Application specific units
+  Utilities;
+package body Producer is
+  -- use Utilities;
+
+   -- Positions from source
+   Last_Printed_Line   : Line_Number := 1;
+   Last_Printed_Column : Character_Position := 0;
+
+   -- Position in output
+   Current_Line : Line_Number := 1;
+
+   -- Local buffer and its management variables
+   -- Dynamically allocated since it depends on the -l option
+   type Wide_String_Access is access Wide_String;
+   Buffer     : Wide_String_Access;
+   Buffer_Inx : Natural := 0;
+   Cut_Point  : Natural := 0;
+   In_Quotes  : Boolean := False;
+   In_Comment : Boolean := False;
+
+   -- Global state of the producer
+   Print_Changed_Lines   : Boolean := False;
+   There_Is_Substitution : Boolean := False; -- (c) Bob Marley
+   Insert_Count          : Line_Number := 0;
+   Global_Changes        : Boolean := False;
+   Col_At_Insert         : Character_Position;
+   Line_At_Rewind        : Line_Number;
+   In_Rewind_Span        : Boolean := False;
+
+   ---------------------------------------------------------------------------------
+   -----------------------------  Internal utilities  ------------------------------
+   ---------------------------------------------------------------------------------
+
+   -- Forward declarations:
+
+   -- The following subprograms do the equivalent of their Wide_Text_IO counterparts,
+   -- but manage local buffering to allow splitting of long lines.
+   -- To avoid confusion, we always use explicit qualification when calling the
+   -- Wide_Text_IO operations. (Next_Line is not called New_Line since it is slightly
+   -- different).
+   -- ONLY these subprograms call Wide_Text_IO.
+   procedure Put       (Item : Wide_Character);
+   procedure Put       (Item : Wide_String);
+   procedure Set_Col   (To : in Character_Position);
+   function  Col       return Character_Position;
+   procedure Next_Line (Conditional : Boolean := False; Counting_Inserts : Boolean := In_Rewind_Span);
+
+   ---------
+   -- Col --
+   ---------
+
+   function Col return Character_Position is
+   begin
+      if Buffer = null then
+         return Character_Position (Ada.Wide_Text_IO.Col);
+      else
+         return Character_Position (Buffer_Inx + 1);
+      end if;
+   end Col;
+
+   ------------------
+   -- Is_Delimiter --
+   ------------------
+
+   Delimiter : constant array (Character) of Boolean :=  -- ARM 2.2 (3..11)
+     (Character'First .. ' ' |
+      '&' | ''' | '(' | ')' | '*' | '+' | ',' | '-' |
+      '.' | '/' | ':' | ';' | '<' | '=' | '>' | '|' => True,
+      others => False);
+
+   function  Is_Delimiter (C : Wide_Character) return Boolean is
+      use Ada.Characters.Handling;
+   begin
+      return Delimiter (To_Character (C, ' '));
+   end Is_Delimiter;
+
+   --------------------
+   -- Finish_Inserts --
+   --------------------
+
+   procedure Finish_Inserts is
+      -- If lines were inserted, provide the --CHANGED line if necessary.
+   begin
+      if In_Rewind_Span then
+         -- Everything is considered as inserted lines when inside the
+         -- rewind span. Do nothing until we're outside.
+         return;
+      end if;
+
+      if Insert_Count /= 0 then
+         Next_Line;
+         Global_Changes := True;
+         if Print_Changed_Lines then
+            Put ("--CHANGED:");
+            Put (Line_Number'Wide_Image (Insert_Count));
+            Put (" line(s) inserted");
+            Next_Line;
+         end if;
+         Set_Col (Col_At_Insert);
+         Insert_Count := 0;
+      end if;
+   end Finish_Inserts;
+
+   --------------------------
+   -- New_Line_And_Comment --
+   --------------------------
+
+   procedure New_Line_And_Comment (Old_Line : Asis.Text.Line; Conditional : Boolean := False) is
+      -- If Conditional = True, do not make a New_Line if the current (output) line is empty
+   begin
+      Next_Line (Conditional);
+      if There_Is_Substitution then
+         Global_Changes := True;
+         if Print_Changed_Lines then
+            Put ("--CHANGED:");
+            Put (Line_Image (Old_Line));
+            Next_Line;
+         end if;
+         There_Is_Substitution := False;
+      end if;
+   end New_Line_And_Comment;
+
+   ---------------
+   -- Next_Line --
+   ---------------
+
+   procedure Next_Line (Conditional : Boolean := False; Counting_Inserts : Boolean := In_Rewind_Span) is
+   begin
+      if not Conditional or else Col /= 1 then
+         if Buffer = null then
+            Ada.Wide_Text_IO.New_Line;
+         else
+            Ada.Wide_Text_IO.Put_Line (Buffer (1..Buffer_Inx));
+            Buffer_Inx := 0;
+            In_Comment := False;
+         end if;
+         Current_Line := Current_Line + 1;
+         if Counting_Inserts then
+            Insert_Count := Insert_Count + 1;
+         end if;
+      end if;
+   end Next_Line;
+
+   --------------------
+   -- Print_Comments --
+   --------------------
+
+   procedure Print_Comments (Image : Wide_String) is
+      type State is (String, Comment, Outside);
+      Current_State : State := Outside;
+   begin
+      for I in Image'Range loop
+         case Current_State is
+            when String =>
+               if Image (I) = '"' then
+                  Current_State := Outside;
+               end if;
+            when Comment =>
+               Put (Image (I));
+            when Outside =>
+               case Image (I) is
+                  when '"' =>
+                     Current_State := String;
+                  when '-' =>
+                     if I /= Image'Last and then Image (I+1) = '-' then
+                        Put ('-');
+                        Current_State := Comment;
+                     end if;
+                  when others =>
+                     null;
+               end case;
+         end case;
+      end loop;
+   end Print_Comments;
+
+   ---------
+   -- Put --
+   ---------
+
+   procedure Put (Item : Wide_Character) is
+      use Utilities;
+   begin
+      if Buffer = null then
+         Ada.Wide_Text_IO.Put (Item);
+         return;
+      end if;
+
+      if Buffer_Inx = Buffer'Last then
+         if Cut_Point = 0 then
+            User_Message ("Unable to cut long line");
+            Next_Line;
+            Put ("?Line cut? ");
+            return;
+         end if;
+
+         Buffer_Inx := Cut_Point;
+         Next_Line;
+
+         Buffer_Inx := Buffer'Last - Cut_Point;
+         Buffer (1.. Buffer_Inx) := Buffer (Cut_Point + 1 .. Buffer'Last);
+         Cut_Point := 0;
+      end if;
+
+      Buffer_Inx := Buffer_Inx + 1;
+      Buffer (Buffer_Inx) := Item;
+
+      -- For the moment, we allow to cut after exposed spaces and special characters
+      -- that do not require complicated checks for a compound delimiter, except that we
+      -- have to care about comments. We do not allow ' either (because of ''').
+      -- (OK, we are a bit lazy here :-)
+      if not In_Comment then
+         case Item is
+            when ' ' | '+' | ',' | ';' | '&' | '(' | ')' | '|' =>
+               -- We can always break after these characters
+               if not In_Quotes then
+                  Cut_Point := Buffer_Inx;
+               end if;
+            when '/' | ':' =>
+               -- We can always break before these characters
+               if not In_Quotes then
+                  Cut_Point := Buffer_Inx - 1;
+               end if;
+            when '"' =>
+               -- Since we do not allow to cut just before or after character strings,
+               -- it will properly handle the case of "This is a quote""".
+               In_Quotes := not In_Quotes;
+            when '-' =>
+               if not In_Quotes and then Buffer_Inx > 1 and then Buffer (Buffer_Inx - 1) = '-' then
+                  -- Comment
+                  Cut_Point  := Buffer_Inx - 2;
+                  In_Comment := True;
+               end if;
+            when others =>
+               null;
+         end case;
+      end if;
+   end Put;
+
+   ---------
+   -- Put --
+   ---------
+
+   procedure Put (Item : Wide_String) is
+   begin
+      for I in Item'Range loop
+         Put (Item (I));
+      end loop;
+   end Put;
+
+   -------------
+   -- Set_Col --
+   -------------
+
+   procedure Set_Col (To : in Character_Position) is
+   begin
+      if To < Col then
+         -- Unlike Text_IO, we do not allow this
+         raise Program_Error;
+      end if;
+      if Buffer = null then
+         Ada.Wide_Text_IO.Set_Col (Ada.Wide_Text_IO.Positive_Count(To));
+      else
+         Buffer (Buffer_Inx + 1 .. Natural (To) - 1) := (others => ' ');
+         Buffer_Inx := Natural (To) - 1;
+      end if;
+   end Set_Col;
+
+   ---------------------------------------------------------------------------------
+   -----------------------------  Exported operations  -----------------------------
+   ---------------------------------------------------------------------------------
+
+   -------------
+   -- Advance --
+   -------------
+
+   procedure Advance (The_Element : Element; Included : Boolean := True) is
+      -- Note that every line in the span of the skipped element must be
+      -- considered as "changed".
+      The_Span            : constant Span := Element_Span (The_Element);
+      Advance_Last_Line   : Line_Number;
+      Advance_Last_Column : Character_Position;
+   begin
+      -- Get rid of annoying special case
+      if Is_Nil (The_Span) then
+         return;
+      end if;
+
+      if Included then
+         Advance_Last_Line   := The_Span.Last_Line;
+         Advance_Last_Column := The_Span.Last_Column;
+      else
+         Advance_Last_Line   := The_Span.First_Line;
+         Advance_Last_Column := The_Span.First_Column - 1;
+      end if;
+
+      Finish_Inserts;
+
+      declare
+         The_Lines : constant Line_List := Lines (The_Element,
+                                                  First_Line => Last_Printed_Line,
+                                                  Last_Line  => Advance_Last_Line);
+      begin
+         There_Is_Substitution := True;
+         if The_Lines'Length = 1 then
+            -- Everything fits on same line as previous element
+            -- The following call to Print_Comment should not be necessary, as
+            -- comments are necessarily after the span of the element.
+            -- However, it is safer in the case of strange spans, and it is harmless to
+            -- call it anyway
+            Print_Comments (Line_Image (The_Lines (The_Lines'First))
+                          (Last_Printed_Column+1 .. Advance_Last_Column));
+         else
+            Print_Comments (Line_Image (The_Lines (The_Lines'First))
+                         (Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
+            New_Line_And_Comment (The_Lines (The_Lines'First));
+
+            if In_Rewind_Span and then Line_At_Rewind <= The_Lines'First then
+               -- we just exited the rewind span
+               In_Rewind_Span := False;
+               Finish_Inserts;
+            end if;
+
+            for I in Positive range The_Lines'First+1 .. The_Lines'Last-1 loop
+               There_Is_Substitution := True;
+               Print_Comments (Line_Image (The_Lines (I)));
+               New_Line_And_Comment (The_Lines (I), Conditional => True);
+
+               if In_Rewind_Span and then Line_At_Rewind <= I then
+                  -- we just exited the rewind span
+                  In_Rewind_Span := False;
+                  Finish_Inserts;
+               end if;
+            end loop;
+
+            There_Is_Substitution := True;
+            Print_Comments (Line_Image (The_Lines (The_Lines'Last))
+                          (1 .. Advance_Last_Column));
+         end if;
+      end;
+
+      Last_Printed_Line   := Advance_Last_Line;
+      Last_Printed_Column := Advance_Last_Column;
+   end Advance;
+
+   ----------------
+   -- Initialize --
+   ----------------
+
+   procedure Initialize (Set_Line_Length : Natural; Set_Print_Changed_Lines : Boolean) is
+      procedure Free is new Ada.Unchecked_Deallocation (Wide_String, Wide_String_Access);
+   begin
+      Print_Changed_Lines := Set_Print_Changed_Lines;
+
+      if Buffer /= null then
+         if Buffer'Length = Set_Line_Length then
+            -- No need to reallocate;
+            return;
+         end if;
+         Free (Buffer);
+      end if;
+
+      if Set_Line_Length /= 0 then
+         Buffer := new Wide_String (1..Set_Line_Length);
+      end if;
+   end Initialize;
+
+   -----------------
+   -- Output_Line --
+   -----------------
+
+   function Output_Line return Line_Number is
+   begin
+      return Current_Line;
+   end Output_Line;
+
+   -----------
+   -- Print --
+   -----------
+
+   procedure Print (Item : Wide_String) is
+   begin
+      -- Print of a null string has no effect:
+      if Item = "" then
+         return;
+      end if;
+
+      Finish_Inserts;
+      Put (Item);
+      There_Is_Substitution := True;
+   end Print;
+
+   ----------------
+   -- Print_Line --
+   ----------------
+
+   procedure Print_Line (Item : Wide_String; In_Col : Character_Position := 0) is
+   begin
+      if Insert_Count = 0 then
+         -- First insert
+         Col_At_Insert := Col;
+      end if;
+
+      if Last_Printed_Line /= 1 or Last_Printed_Column /= 0 then
+         -- Do not call Next_Line is nothing has been printed yet
+         Next_Line;
+      end if;
+
+      if In_Col /= 0 then
+         Set_Col (In_Col);
+      end if;
+      Put (Item);
+
+      Insert_Count := Insert_Count + 1;
+   end Print_Line;
+
+   ---------------------------
+   -- Print_Up_To (Element) --
+   ---------------------------
+
+   procedure Print_Up_To (The_Element : Element;
+                          Included    : Boolean;
+                          Changing    : Wide_String := "";
+                          Into        : Wide_String := "";
+                          Final       : Boolean     := False)
+   is
+      use Utilities;
+
+      The_Span    : constant Span := Element_Span (The_Element);
+      Last_Line   : Line_Number;
+      Last_Column : Character_Position;
+
+      procedure Print_Substituted (Item : Wide_String) is
+         I : Positive;
+      begin
+         -- First, get rid of trivial cases
+         if Item = "" then
+            return;
+         end if;
+
+         if Changing = "" or else Changing = Into then
+            Put (Item);
+            return;
+         end if;
+
+         -- Now, do the real stuff
+         I := Item'First;
+         loop
+            if I > Item'Last - Changing'Length + 1                                      -- Not enough remaining space
+               or else (I <= Item'Last-1 and then (Item (I) = '-' and Item(I+1) = '-')) -- Comment
+            then
+               -- Don't try to substitute further
+               Put (Item (I..Item'Last));
+               exit;
+            end if;
+
+            -- Do the substitution if Changing matches the upcomming string,
+            -- making sure it is a full identifier
+            -- (characters before and after are separators)
+            if Set_Casing (Changing, Upper_Case) = Set_Casing (Item (I .. I + Changing'Length - 1), Upper_Case)
+              and then (I = Item'First or else Is_Delimiter (Item (I - 1)))
+              and then (I+Changing'Length-1 = Item'Last or else Is_Delimiter (Item (I+Changing'Length)))
+            then
+               Put (Into);
+               I := I + Changing'Length;
+               There_Is_Substitution := True;
+            else
+               Put (Item (I));
+               I := I + 1;
+            end if;
+         end loop;
+      end Print_Substituted;
+
+   begin  -- Print_Up_To
+
+      -- Get rid of annoying special case
+      -- (Can happen with implicit declarations, for example)
+      if Is_Nil (The_Span) then
+         return;
+      end if;
+
+      if Included then
+         Last_Line   := The_Span.Last_Line;
+         Last_Column := The_Span.Last_Column;
+      else
+         Last_Line   := The_Span.First_Line;
+         Last_Column := The_Span.First_Column - 1;
+      end if;
+
+      if Final then
+         Assert (Included, "Final not included");
+         -- We must include possible comment lines after the end of the unit
+         Last_Line   := Compilation_Span (The_Element).Last_Line;
+         Last_Column := Compilation_Span (The_Element).Last_Column;
+         if Last_Column = 0 then
+            -- In this case, A4G sometimes return 0 instead of the Last of the last line
+            Last_Column := Line_Image (Lines (The_Element, Last_Line, Last_Line)(Last_Line))'Last;
+         end if;
+      end if;
+
+      -- KLUDGE for bug in A4G
+      -- If we have something like "V-1" (without space between "V" and "-"), the span
+      -- for Identifier V and Parameter_Association for V includes the "-".
+      -- This bug happens only for "-", if there is no space between "V" and "-".
+      -- Fix the span if an Identifier includes "-".
+      -- We cannot do the same for a Parameter_Association, since it can include any expression.
+      -- Currently, the translator makes sure not to call Print_Up_To with a Parameter_Association.
+      if Asis.Elements.Element_Kind (The_Element) = An_Expression and then
+        Asis.Elements.Expression_Kind (The_Element) = An_Identifier and then
+        Ada.Strings.Wide_Fixed.Index (Element_Image (The_Element), "-") /= 0
+      then
+         Last_Column :=  Ada.Strings.Wide_Fixed.Index (Element_Image (The_Element), "-") - 1;
+      end if;
+
+      -- Check that we do not move backward (null move is OK)
+      -- This is a very important check, as most of client's bugs are trapped here!
+      Assert (Last_Line > Last_Printed_Line or else (Last_Line = Last_Printed_Line and
+                                                     Last_Column >= Last_Printed_Column),
+              "Illegal span in Print_Up_To (" &
+              Line_Number'Wide_Image (Last_Printed_Line) & ',' &
+              Character_Position'Wide_Image (Last_Printed_Column) & ") (" &
+              Line_Number'Wide_Image (Last_Line) & ',' &
+              Character_Position'Wide_Image (Last_Column) & ')'
+             );
+
+      if Last_Line   = Last_Printed_Line   and
+         Last_Column = Last_Printed_Column and  -- Everything already printed
+         not Final    -- If final = True, the new_line (and commented original line)
+      then            -- must still be printed
+         return;
+      end if;
+
+      Finish_Inserts;
+
+      declare
+         The_Lines : constant Line_List := Lines (The_Element,
+                                                  First_Line => Last_Printed_Line,
+                                                  Last_Line  => Last_Line);
+      begin
+         if The_Lines'Length = 1 then
+            -- Everything fits on same line as previous element
+            Print_Substituted (Line_Image (The_Lines (The_Lines'First))
+                             (Last_Printed_Column+1 .. Last_Column));
+         else
+            Print_Substituted (Line_Image (The_Lines (The_Lines'First))
+                               (Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
+            New_Line_And_Comment (The_Lines (The_Lines'First));
+
+            if In_Rewind_Span and then Line_At_Rewind <= The_Lines'First then
+               -- we just exited the rewind span
+               In_Rewind_Span := False;
+               Finish_Inserts;
+            end if;
+
+            for I in Positive range The_Lines'First+1 .. The_Lines'Last-1 loop
+               Print_Substituted (Line_Image (The_Lines (I)));
+               New_Line_And_Comment (The_Lines (I));
+               if In_Rewind_Span and then Line_At_Rewind <= I then
+                  -- we just exited the rewind span
+                  In_Rewind_Span := False;
+                  Finish_Inserts;
+               end if;
+           end loop;
+
+            -- Last_Column seems unreliable in some cases.
+            -- Since it should never be outside the line range, taking the 'min prevents
+            -- some stupid Constraint_Error...
+            Print_Substituted (Line_Image (The_Lines (The_Lines'Last))
+                             (1 .. Character_Position'Min (Last_Column,
+                                                           Line_Image (The_Lines (The_Lines'Last))'Last)
+                             )
+                            );
+         end if;
+         if Final then
+            -- Case of the final line of a unit
+            -- Make sure we have a new line, and that the last CHANGED: is
+            -- issued if necessary
+            New_Line_And_Comment (The_Lines (The_Lines'Last));
+         end if;
+      end;
+
+      Last_Printed_Line   := Last_Line;
+      Last_Printed_Column := Last_Column;
+   end Print_Up_To;
+
+   --------------------------------
+   -- Print_Up_To (Element_List) --
+   --------------------------------
+
+   procedure Print_Up_To (The_List    : Element_List;
+                          Included    : Boolean;
+                          Changing    : Wide_String := "";
+                          Into        : Wide_String := "";
+                          Final       : Boolean     := False)
+   is
+      use Asis.Elements;
+   begin
+      if Is_Nil (The_List) then
+         return;
+      end if;
+
+      if Included then
+         Print_Up_To (The_List (The_List'Last), Included, Changing, Into, Final);
+      else
+         Print_Up_To (The_List (The_List'First), Included, Changing, Into, Final);
+      end if;
+   end Print_Up_To;
+
+   ------------
+   -- Rewind --
+   ------------
+
+   procedure Rewind (The_Element : Element; Included : Boolean := False) is
+      -- Note that every line in the span from where we are returning to where
+      -- we are currently must be considered as "changed".
+      use Utilities;
+
+      The_Span    : constant Span := Element_Span (The_Element);
+      Last_Line   : Line_Number;
+      Last_Column : Character_Position;
+   begin
+      -- Get rid of annoying special case
+      if Is_Nil (The_Span) then
+         return;
+      end if;
+
+      if Included then
+         Last_Line   := The_Span.First_Line;
+         Last_Column := The_Span.First_Column - 1;
+      else
+         Last_Line   := The_Span.Last_Line;
+         Last_Column := The_Span.Last_Column;
+      end if;
+
+      -- Rewind is not allowed to advance...
+      Assert (Last_Line < Last_Printed_Line or else (Last_Line = Last_Printed_Line and
+                                                     Last_Column <= Last_Printed_Column),
+              "Illegal span in Rewind (" &
+              Line_Number'Wide_Image (Last_Printed_Line) & ',' &
+              Character_Position'Wide_Image (Last_Printed_Column) & ") (" &
+              Line_Number'Wide_Image (Last_Line) & ',' &
+              Character_Position'Wide_Image (Last_Column) & ')'
+             );
+
+      if Insert_Count = 0 then
+         -- First insert
+         Col_At_Insert := Col;
+      end if;
+
+      if not In_Rewind_Span then
+         In_Rewind_Span := True;
+         Line_At_Rewind := Last_Printed_Line;
+      end if;
+      Last_Printed_Line   := Last_Line;
+      Last_Printed_Column := Last_Column;
+   end Rewind;
+
+   ------------
+   -- Finish --
+   ------------
+
+   procedure Finish (Had_Changes : out Boolean) is
+   begin
+      Had_Changes := Global_Changes;
+
+      -- Reset variables for next unit
+      Last_Printed_Line     := 1;
+      Last_Printed_Column   := 0;
+      There_Is_Substitution := False;
+      Global_Changes        := False;
+   end Finish;
+
+end Producer;
