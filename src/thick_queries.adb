@@ -1082,6 +1082,9 @@ package body Thick_Queries is
                      | A_Generic_Procedure_Declaration
                      | A_Generic_Function_Declaration
                      | A_Generic_Package_Declaration
+
+                     | A_Formal_Procedure_Declaration
+                     | A_Formal_Function_Declaration
                        =>
                      return Full_Name_Image (Names (Parent) (1), With_Profile)
                        & '.'
