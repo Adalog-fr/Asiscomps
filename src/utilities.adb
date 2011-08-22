@@ -541,7 +541,7 @@ package body Utilities is
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;
                     With_Source : Boolean      := False) is
-      use Asis.Text;
+      use Asis.Elements, Asis.Text;
    begin
       if Debug_Option then
          Raw_Trace ( "<<" & Message);
