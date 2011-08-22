@@ -99,6 +99,18 @@ package Thick_Queries is
    --  Appropriate Element_Kinds:
    --     Any element
 
+   function Ultimate_Origin (Element : in Asis.Element) return Asis.Unit_Origins;
+   -- Returns the Unit_Origin of the Unit where Element is declared.
+   -- If Element is an instance or Is_Part_Of_Instance, returns the Unit_Origin of the
+   -- corresponding generic or generic element
+   -- Appropriate Element_Kinds:
+   --    A_Declaration
+   --    A_Defining_Name
+   --    An_Expression
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component (checks the selector)
+
    function Definition_Compilation_Unit (Element : in Asis.Element) return Asis.Compilation_Unit;
    -- Returns the compilation unit in which Element is declared
    --

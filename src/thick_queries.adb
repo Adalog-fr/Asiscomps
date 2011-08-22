@@ -3076,6 +3076,35 @@ package body Thick_Queries is
       return Is_Part_Of_Generic (Enclosing_Element (Parent_Name));
    end Is_Part_Of_Generic;
 
+
+   ---------------------
+   -- Ultimate_Origin --
+   ---------------------
+
+   function Ultimate_Origin (Element : in Asis.Element) return Asis.Unit_Origins is
+      use Asis.Compilation_Units;
+      Decl : Asis.Declaration;
+   begin
+      case Element_Kind (Element) is
+         when A_Declaration =>
+            Decl := Element;
+         when A_Defining_Name =>
+            Decl := Enclosing_Element (Ultimate_Name (Element));
+         when An_Expression =>
+            Decl := A4G_Bugs.Corresponding_Name_Declaration (Ultimate_Name (Element));
+         when others =>
+            Impossible ("Inappropriate element in Ultimate_Origin", Element);
+      end case;
+      if Is_Part_Of_Instance (Decl) then
+         return Ultimate_Origin (Ultimate_Enclosing_Instantiation (Decl));
+      elsif Declaration_Kind (Decl) in A_Generic_Instantiation then
+         return Ultimate_Origin (Generic_Unit_Name (Decl));
+      else
+         return Unit_Origin (Enclosing_Compilation_Unit (Decl));
+      end if;
+   end Ultimate_Origin;
+
+
    ---------------------------------
    -- Definition_Compilation_Unit --
    ---------------------------------
