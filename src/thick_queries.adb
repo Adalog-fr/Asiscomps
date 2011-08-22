@@ -2515,7 +2515,6 @@ package body Thick_Queries is
          if Expression_Kind (Good_Mark) = A_Selected_Component then
             Good_Mark := Selector (Good_Mark);
          end if;
-
          Decl := A4G_Bugs.Corresponding_Name_Declaration (Good_Mark);
          if Declaration_Kind (Decl) = An_Incomplete_Type_Declaration then
             -- cannot take the Corresponding_First_Subtype of an incomplete type
@@ -2652,7 +2651,7 @@ package body Thick_Queries is
             if Definition_Kind (Def) = A_Type_Definition then
                -- This can only be an anonymous array => we have the definition
                return Def;
-            elsif Definition_Kind (Def) = An_Access_Definition then
+            elsif Definition_Kind (Def) = An_Access_Definition then   -- ASIS 2005
                -- Anonymous access type
                return Def;
             else
@@ -3442,7 +3441,16 @@ package body Thick_Queries is
                      Item := Slice_Range (Item);
                   when An_Explicit_Dereference =>
                      -- We must go to the declaration of the type referenced by the prefix
-                     Item := Type_Declaration_View (A4G_Bugs.Corresponding_Expression_Type (Prefix (Item)));
+                     Item := A4G_Bugs.Corresponding_Expression_Type (Prefix (Item));
+
+                     -- At this point, Item is not (yet) necessarily the declaration of an access type!
+                     -- it can be a private type whose full type is an access type, accessed from a place where
+                     -- the full definition is visible.
+                     if Declaration_Kind (Item) = A_Private_Type_Declaration then
+                        Item := Corresponding_Type_Declaration (Item);
+                     end if;
+
+                     Item := Type_Declaration_View (Item);
                      if Access_Type_Kind (Item) in An_Access_To_Procedure .. An_Access_To_Protected_Function then
                         return Nil_Element_List;
                      end if;
