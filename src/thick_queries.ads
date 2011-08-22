@@ -640,7 +640,7 @@ package Thick_Queries is
    -- Return True if The_Element is of an access type or of a formal access type.
    -- Return False in all other cases
 
-   type Expression_Usage_Kinds is (Untouched, Read, Write, Read_Write);
+   type Expression_Usage_Kinds is (Untouched, Read, Write, Read_Write, Unknown);
    function Expression_Usage_Kind (Expr : Asis.Expression) return Expression_Usage_Kinds;
    -- Returns Untouched if Expr is part of a renaming declaration or the prefix of an attribute
    -- Returns Write if Expr designates a variable which is the
@@ -649,6 +649,7 @@ package Thick_Queries is
    -- Returns Read_Write if Expr designates a variable which is
    --  an actual corresponding to an in out parameter in a procedure
    --  or entry call.
+   -- Returns Unknown when usage cannot be determined (parameter of a dispatching call)
    -- Returns Read in all other cases (including when Expr is not a variable)
    --
    -- Note that this function handles access types properly, i.e. in:

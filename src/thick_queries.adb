@@ -806,9 +806,8 @@ package body Thick_Queries is
                               Formal := Formal_Name (Elem, I);
                               if Is_Nil (Formal) then
                                  -- Call to a dispatching operation
-                                 -- We don't know the mode => pretend we do nothing
-                                 -- (consistent with the fact that dispatching calls are ignored)
-                                 return Untouched;
+                                 -- We don't know the mode => Unknown
+                                 return Unknown;
                               end if;
                               case Mode_Kind (Enclosing_Element (Formal)) is
                                  when Not_A_Mode =>
