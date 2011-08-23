@@ -331,12 +331,17 @@ package body Units_List is
             loop
                declare
                   Line : constant Wide_String := Trim_All (Read_Line);
+                  Stop : constant Natural     := Index (Line, " ");
                begin
                   if Line /= ""
                     and then Line (1) /= '#'
                     and then (Line'Length = 1 or else Line (1 .. 2) /= "--")
                   then
-                     Process_Unit_Spec (Line);
+                     if Stop = 0 then
+                        Process_Unit_Spec (Line);
+                     else
+                        Process_Unit_Spec (Line (Line'First .. Stop-1));
+                     end if;
                   end if;
                end;
             end loop;
