@@ -3778,7 +3778,7 @@ package body Thick_Queries is
       Decl      : Asis.Declaration;
       Good_Name : Asis.Expression := Simple_Name (Name);
    begin
-      case Element_Kind (Name) is
+      case Element_Kind (Good_Name) is
          when An_Expression =>
             case Expression_Kind (Good_Name) is
                when An_Indexed_Component =>
@@ -3791,20 +3791,65 @@ package body Thick_Queries is
                   Expr := Attribute_Clause_Expression (A_Component_Size_Attribute, Decl);
                   if Is_Nil (Expr) then
                      return "";
-                  else
-                     return Static_Expression_Value_Image (Expr);
                   end if;
+                  return Static_Expression_Value_Image (Expr);
+
                when A_Slice =>
                   -- Yes, taking Tab(1..5)'Size is allowed.
                   -- TBSL: Requires Discrete_Constraining_Lengths to be able to process a slice
                   -- Give up for the moment
                   return "";
+
+               when An_Attribute_Reference =>
+                  case A4G_Bugs.Attribute_Kind (Good_Name) is
+                     when A_Base_Attribute =>
+                        -- The prefix has to be scalar
+                        -- The base type is at least the first named subtype => go there
+                        Decl := Corresponding_First_Subtype
+                                   (A4G_Bugs.Corresponding_Name_Declaration
+                                      (Prefix (Good_Name)));
+                        case Scalar_Types (Type_Category (Decl)) is
+                           when An_Enumeration_Type =>
+                              -- Base type is the same as the type
+                              Good_Name := Names (Decl)(1);
+                           when Integer_Types =>
+                              -- Get the size for the type, and extend it to the nearest power of 2
+                              -- Not guaranteed by the language, but very likely in practice
+                              Good_Name := Names (Decl) (1);
+                              case Size_Value (Good_Name) is
+                                 when Not_Static =>
+                                    return "";
+                                 when 0 .. 8 =>
+                                    return " 8";
+                                 when 9 .. 16 =>
+                                    return " 16";
+                                 when 17 .. 32 =>
+                                    return " 32";
+                                 when 33 .. 64 =>
+                                    return " 64";
+                                 when 65 .. 128 =>
+                                    return " 128";
+                                 when others =>
+                                    Impossible ("Size of integer type > 128", Good_Name);
+                              end case;
+                           when Real_Types =>
+                              -- Hard to tell what the compiler does...
+                              -- Wait for ASIS 2012
+                              return "";
+                        end case;
+                     when A_Class_Attribute =>
+                        -- Always indefinite => implementation defined (13.3(48))
+                        -- Give up
+                        return "";
+                     when others =>
+                          Impossible ("Attribute not 'Base or 'Class", Good_Name);
+                  end case;
+
                when others =>
-                  null;
+                  Good_Name := Ultimate_Name (Good_Name);
+                  Decl      := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
             end case;
 
-            Good_Name := Ultimate_Name (Good_Name);
-            Decl      := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
          when A_Defining_Name =>
             Decl := Enclosing_Element (Good_Name);
          when others =>
@@ -3828,7 +3873,7 @@ package body Thick_Queries is
             -- Last chance: some predefined stuff whose size is known (but not necessarily represented
             -- properly with a size clause)
             declare
-               Pfx : constant Wide_String := To_Upper (Full_Name_Image (Name));
+               Pfx : constant Wide_String := To_Upper (Full_Name_Image (Good_Name));
             begin
                if Pfx = "STANDARD.BOOLEAN" then
                   return "1";
