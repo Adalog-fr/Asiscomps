@@ -4336,6 +4336,10 @@ package body Thick_Queries is
    -- Variables_Proximity --
    -------------------------
 
+   -- Algorithm:
+   -- Build an array of descriptors for each, each representing a "part" of the name (identifier,
+   -- indexing, selectors, dereferences, etc.), including implicit dereferences, then compare.
+   -- Note that anything left of the rightmost dereference is irrelevant.
    function Variables_Proximity (Left, Right : Asis.Element) return Proximity is
       use Asis.Expressions;
 
@@ -4350,7 +4354,7 @@ package body Thick_Queries is
                when Indexing =>
                   Indexers : Asis.Expression;
                when Dereference =>
-                  null;
+                  Designated_Type : Asis.Definition;
                when Call =>
                   null;
                when Not_Variable =>
@@ -4361,16 +4365,26 @@ package body Thick_Queries is
       type Name_Descriptor is array (Positive range <>) of Name_Part;
 
       function Descriptor (Name : Asis.Element; With_Deref : Boolean := False) return Name_Descriptor is
-         E                  : Asis.Element := Name;
-         Variable           : Asis.Definition;
-         Variable_Enclosing : Asis.Element;
+         E             : Asis.Element := Name;
+         Variable_Decl : Asis.Element;
 
          function Complete_For_Access (D : Name_Descriptor) return Name_Descriptor is
             -- Add a "Dereference" part if the *type* is an access type
             -- This allows explicit and implicit dereferences to match
+            The_Type : Asis.Definition;
+            The_Name : Asis.Expression;
+            Decl     : Asis.Declaration;
          begin
-            if With_Deref and then Is_Access_Expression (Name) then
-               return D & Name_Part'(The_Kind => Dereference);
+            if not With_Deref then
+               return D;
+            end if;
+
+            The_Type := Corresponding_Expression_Type_Definition (Name);
+            if        Definition_Kind  (The_Type) = An_Access_Definition   -- ASIS 2005
+              or else Type_Kind        (The_Type) = An_Access_Type_Definition
+              or else Formal_Type_Kind (The_Type) = A_Formal_Access_Type_Definition
+            then
+               return D & Name_Part'(Dereference, Asis.Definitions.Access_To_Object_Definition (The_Type));
             else
                return D;
             end if;
@@ -4387,12 +4401,11 @@ package body Thick_Queries is
                   -- Return the "true" definion of Variable, after following all renamings
                   -- But the renaming can be a complicated expression like:
                   -- A : T renames Rec.X.Y(3);
-                  Variable := Corresponding_Name_Definition (E);
-                  Variable_Enclosing := Enclosing_Element (Variable);
-                  if Declaration_Kind (Variable_Enclosing) not in A_Renaming_Declaration then
-                     return Complete_For_Access ((1 => (Identifier, Variable)));
+                  Variable_Decl := Corresponding_Name_Declaration (E);
+                  if Declaration_Kind (Variable_Decl) not in A_Renaming_Declaration then
+                     return Complete_For_Access ((1 => (Identifier, E)));
                   end if;
-                  E := A4G_Bugs.Renamed_Entity (Variable_Enclosing);
+                  E := A4G_Bugs.Renamed_Entity (Variable_Decl);
 
                when A_Selected_Component =>
                   case Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Selector (E))) is
@@ -4428,7 +4441,9 @@ package body Thick_Queries is
                   return Complete_For_Access ((1 => (The_Kind => Call)));
 
                when An_Explicit_Dereference =>
-                  return Complete_For_Access (Descriptor (Prefix (E)) &  Name_Part'(The_Kind => Dereference));
+                  return Complete_For_Access
+                    (Descriptor (Prefix (E))
+                     &  Name_Part'(Dereference, Corresponding_Expression_Type_Definition (E)));
 
                when A_Type_Conversion =>
                   E := Converted_Or_Qualified_Expression (E);
@@ -4445,8 +4460,52 @@ package body Thick_Queries is
          L_Rightmost_Deref : Natural := 1;
          R_Rightmost_Deref : Natural := 1;
          L_Inx, R_Inx : Positive;
-         Base_Proximity : Proximity;
-      begin
+         Base_Proximity    : Proximity;
+
+         function Compatible_Types (L, R : Asis.Definition) return Boolean is
+         -- Are L and R definitions for types in the same derivation family?
+            use Asis.Definitions;
+            L_Decl, R_Decl : Asis.Declaration;
+         begin
+            case Definition_Kind (L) is
+               when A_Subtype_Indication =>
+                  L_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (L));
+               when A_Component_Definition =>
+                  L_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication (L)));
+               when A_Type_Definition
+                  | A_Task_Definition
+                  | A_Protected_Definition
+                  | A_Private_Type_Definition
+                  | A_Tagged_Private_Type_Definition
+                  | A_Private_Extension_Definition
+                  | A_Formal_Type_Definition
+                  =>
+                  L_Decl := Enclosing_Element (L);
+               when others =>
+                  Impossible ("Bad kind in Compatible_Types for L", L);
+            end case;
+            case Definition_Kind (R) is
+               when A_Subtype_Indication =>
+                  R_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (R));
+               when A_Component_Definition =>
+                  R_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication (R)));
+               when A_Type_Definition
+                  | A_Task_Definition
+                  | A_Protected_Definition
+                  | A_Private_Type_Definition
+                  | A_Tagged_Private_Type_Definition
+                  | A_Private_Extension_Definition
+                  | A_Formal_Type_Definition
+                  =>
+                  R_Decl := Enclosing_Element (R);
+               when others =>
+                  Impossible ("Bad kind in Compatible_Types for R", R);
+            end case;
+
+            return Is_Equal (Ultimate_Type_Declaration (L_Decl), Ultimate_Type_Declaration (R_Decl));
+         end Compatible_Types;
+
+      begin   -- Descriptors_Proximity
 
          -- First, compare the "base" variable and eliminate expressions that are not variables
          for I in reverse L_Descr'Range loop
@@ -4475,31 +4534,59 @@ package body Thick_Queries is
          if L_Rightmost_Deref = 1 and R_Rightmost_Deref = 1 then
             -- No dereference on either side
             if (L_Descr (1).The_Kind = Identifier and R_Descr (1).The_Kind = Identifier)
-              and then not Is_Equal (L_Descr (1).Id_Name, R_Descr (1).Id_Name)
+              and then not Is_Equal (First_Defining_Name (L_Descr (1).Id_Name), First_Defining_Name (R_Descr (1).Id_Name))
             then
                return Different_Variables;
             elsif L_Descr (1).The_Kind = Call or R_Descr (1).The_Kind = Call then
                -- Function call without dereference => it is a value, not a name
                return Different_Variables;
-            else
-               Best_Conf := Certain;
             end if;
+            -- Here, the first element (on each side) is not a dereference;
+            -- It cannot be Not_A_Variable (eliminated above)
+            -- It cannot be a field or an indexing (since it is the first one)
+            -- It cannot be a function call (elsif above)
+            -- => It is an identifier, for the same variable
+
          elsif L_Rightmost_Deref /= 1 and R_Rightmost_Deref /= 1 then
             -- Dereferences on both sides
             Base_Proximity := Descriptors_Proximity (L_Descr (1 .. L_Rightmost_Deref - 1),
                                                      R_Descr (1 .. R_Rightmost_Deref - 1));
-            if Base_Proximity = Same_Variable then
-               Best_Conf := Certain;
-            else
-               Best_Conf := Unlikely;
+            if Base_Proximity /= Same_Variable then
+               if Compatible_Types (L_Descr (L_Rightmost_Deref).Designated_Type,
+                                    R_Descr (R_Rightmost_Deref).Designated_Type)
+               then
+                  return (Unlikely, Complete);
+               else
+                  return (Unlikely, Partial);
+               end if;
             end if;
+            -- Here, both sides are dereferences of same access variable => same target variable
+
+         elsif L_Rightmost_Deref /= 1 then
+            -- Dereference on left side only
+               if Compatible_Types (L_Descr (L_Rightmost_Deref).Designated_Type,
+                                    Corresponding_Expression_Type_Definition (R_Descr (1).Id_Name))
+               then
+                  return (Unlikely, Complete);
+               else
+                  return (Unlikely, Partial);
+               end if;
          else
-            Best_Conf := Unlikely;
+            -- Dereference on right side only
+            if Compatible_Types (Corresponding_Expression_Type_Definition (L_Descr (1).Id_Name),
+                                 R_Descr (R_Rightmost_Deref).Designated_Type)
+               then
+                  return (Unlikely, Complete);
+               else
+                  return (Unlikely, Partial);
+               end if;
          end if;
 
-         -- Compare the rest
-         L_Inx := L_Rightmost_Deref + 1;
-         R_Inx := R_Rightmost_Deref + 1;
+         -- Here, Left and Right are the same variable
+         -- Compare the rest to refine how much they overlap
+         Best_Conf := Certain;
+         L_Inx     := L_Rightmost_Deref + 1;
+         R_Inx     := R_Rightmost_Deref + 1;
          while L_Inx <= L_Descr'Last and R_Inx <= R_Descr'Last loop
             if L_Descr (L_Inx).The_Kind /= R_Descr (R_Inx).The_Kind then
                return Different_Variables;

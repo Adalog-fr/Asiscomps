@@ -548,7 +548,7 @@ package body Utilities is
 
          Trace_Elem (Element);
 
-         if With_Source and not Is_Nil (Element) Then
+         if With_Source and not Is_Nil (Element) then
             Raw_Trace (Element_Image (Element));
          end if;
 

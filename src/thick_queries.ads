@@ -625,7 +625,7 @@ package Thick_Queries is
    function Corresponding_Expression_Type_Definition (The_Element : Asis.Expression) return Asis.Definition;
    -- return the type definition of the type of The_Element
    -- Unlike Corresponding_Expression_Type, works if the the type of The_Element is
-   -- an anonymous type
+   -- an anonymous type and unwinds subtypes (but not derived types)
    -- This query is a candidate for ASIS05, and already provided by ASIS-for-GNAT,
    -- but we don't use it as long as it is not standard
 
