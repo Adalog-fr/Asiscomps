@@ -2500,6 +2500,12 @@ package body Thick_Queries is
                   Attribute := Base;
                when A_Class_Attribute =>
                   Attribute := Class;
+                  -- According to 3.9(14), T'Class'Class is allowed, and "is the same as" T'Class.
+                  -- They are even conformant (checked with Gnat).
+                  -- => Discard extra 'Class before they damage the rest of this algorithm
+                  while Attribute_Kind (Good_Mark) = A_Class_Attribute loop -- and especially, /= Not_An_Attribute
+                     Good_Mark := Prefix (Good_Mark);
+                  end loop;
                when others =>
                   -- Impossible
                   Impossible ("Attribute of Type_Profile = "
