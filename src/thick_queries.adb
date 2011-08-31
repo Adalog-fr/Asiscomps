@@ -1751,8 +1751,6 @@ package body Thick_Queries is
                   when A_Variable_Declaration
                      | A_Constant_Declaration
                      | A_Deferred_Constant_Declaration
-                     | A_Single_Protected_Declaration
-                     | A_Single_Task_Declaration
                      | A_Component_Declaration
                        =>
                      Decl := Object_Declaration_View (Decl);
@@ -1774,6 +1772,10 @@ package body Thick_Queries is
                   when A_Task_Type_Declaration
                      | A_Protected_Type_Declaration
                        =>
+                     return True;
+                  when A_Single_Protected_Declaration
+                     | A_Single_Task_Declaration
+                     =>
                      return True;
                   when others => -- Declaration_Kind
                      return False;
@@ -2503,7 +2505,7 @@ package body Thick_Queries is
                   -- According to 3.9(14), T'Class'Class is allowed, and "is the same as" T'Class.
                   -- They are even conformant (checked with Gnat).
                   -- => Discard extra 'Class before they damage the rest of this algorithm
-                  while Attribute_Kind (Good_Mark) = A_Class_Attribute loop -- and especially, /= Not_An_Attribute
+                  while A4G_Bugs.Attribute_Kind (Good_Mark) = A_Class_Attribute loop -- and especially, /= Not_An_Attribute
                      Good_Mark := Prefix (Good_Mark);
                   end loop;
                when others =>
@@ -4540,7 +4542,8 @@ package body Thick_Queries is
          if L_Rightmost_Deref = 1 and R_Rightmost_Deref = 1 then
             -- No dereference on either side
             if (L_Descr (1).The_Kind = Identifier and R_Descr (1).The_Kind = Identifier)
-              and then not Is_Equal (First_Defining_Name (L_Descr (1).Id_Name), First_Defining_Name (R_Descr (1).Id_Name))
+              and then not Is_Equal (First_Defining_Name (L_Descr (1).Id_Name),
+                                     First_Defining_Name (R_Descr (1).Id_Name))
             then
                return Different_Variables;
             elsif L_Descr (1).The_Kind = Call or R_Descr (1).The_Kind = Call then
