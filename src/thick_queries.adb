@@ -1517,11 +1517,19 @@ package body Thick_Queries is
    -- First_Subtype_Name --
    ------------------------
 
-   function First_Subtype_Name (The_Subtype : Asis.Expression) return Asis.Expression is
+   function First_Subtype_Name (The_Subtype : Asis.Element) return Asis.Expression is
       use Asis.Expressions;
-      ST   : Asis.Declaration := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (The_Subtype));
+      ST   : Asis.Declaration;
       Mark : Asis.Expression;
    begin
+      case Element_Kind (The_Subtype) is
+         when A_Defining_Name =>
+            ST := Enclosing_Element (The_Subtype);
+         when An_Expression =>
+            ST := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (The_Subtype));
+         when others =>
+            Impossible ("Wrong element kind in First_Subtype_Name", The_Subtype);
+      end case;
       if Declaration_Kind (ST) /= A_Subtype_Declaration then
          -- The_Subtype was already the first named subtype
          return The_Subtype;
@@ -2505,7 +2513,7 @@ package body Thick_Queries is
                   -- According to 3.9(14), T'Class'Class is allowed, and "is the same as" T'Class.
                   -- They are even conformant (checked with Gnat).
                   -- => Discard extra 'Class before they damage the rest of this algorithm
-                  while A4G_Bugs.Attribute_Kind (Good_Mark) = A_Class_Attribute loop -- and especially, /= Not_An_Attribute
+                  while A4G_Bugs.Attribute_Kind (Good_Mark) = A_Class_Attribute loop -- especially, /= Not_An_Attribute
                      Good_Mark := Prefix (Good_Mark);
                   end loop;
                when others =>

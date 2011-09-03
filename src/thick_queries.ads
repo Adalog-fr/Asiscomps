@@ -288,13 +288,16 @@ package Thick_Queries is
    -- Like Subtype_Mark, but returns the selector if the subtype mark is a selected component
    -- Moreover, it avoids the ambiguity between Asis.Subtype_Mark and Asis.Definitions.Subtype_Mark
 
-   function First_Subtype_Name (The_Subtype : Asis.Expression) return Asis.Expression;
+   function First_Subtype_Name (The_Subtype : Asis.Element) return Asis.Expression;
    -- Unwinds subtype declarations and returns the *name* of the first subtype denoted by The_Subtype,
    -- picked up from the last subtype declaration.
    -- Returns its argument if The_Subtype already denotes a first subtype.
    -- Unlike Corresponding_First_Subtype, this works in case of subtyping of a class wide type
    -- (returns the XXX'class)
    --
+   -- Appropriate Element_Kinds
+   --   A_Defining_Name
+   --   An_Expression
    -- Appropriate Expression_Kinds:
    --   An_Identifier
    --   A_Selected_Component (works on selector)
