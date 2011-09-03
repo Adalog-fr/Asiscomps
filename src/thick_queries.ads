@@ -531,6 +531,18 @@ package Thick_Queries is
    --    Root_Real and Universal_Real returns A_Floating_Point_Type (which is the best we can do)
    --    Universal_Fixed returns A_Fixed_Point type, of course
 
+   function Index_Subtypes_Names (Def : Asis.Type_Definition) return Asis.Element_List;
+   -- Return the list of defining names for the subtypes of an (constrained or unconstrained) array
+   -- definition.
+   -- Returns a nil element instead of a defining name in the case of e.g. array(1..10)
+   --
+   -- Appropriate type kinds:
+   --       An_Unconstrained_Array_Definition
+   --       A_Constrained_Array_Definition
+   -- Appropriate formal type kinds:
+   --       A_Formal_Unconstrained_Array_Definition
+   --       A_Formal_Constrained_Array_Definition
+
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
    -- Queries about names and expressions                                                         --

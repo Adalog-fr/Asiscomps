@@ -1263,6 +1263,69 @@ package body Thick_Queries is
    end Corresponding_Pragma_Set;
 
    --------------------------
+   -- Index_Subtypes_Names --
+   --------------------------
+
+   function Index_Subtypes_Names (Def : Asis.Type_Definition) return Asis.Element_List is
+      use Asis.Definitions, Asis.Expressions;
+   begin
+      if Type_Kind (Def) = A_Constrained_Array_Definition
+        or else Formal_Type_Kind (Def) = A_Formal_Constrained_Array_Definition
+      then
+         declare
+            Index_List : Asis.Element_List := Discrete_Subtype_Definitions (Def);
+            Expr_Type  : Asis.Declaration;
+         begin
+            for I in Index_List'Range loop
+               case Discrete_Range_Kind (Index_List (I)) is
+                  when Not_A_Discrete_Range =>
+                     Impossible ("Index_Subtype_Names: Not a discrete range", Index_List (I));
+                  when A_Discrete_Subtype_Indication =>
+                     Index_List (I) := Corresponding_Name_Definition (Subtype_Simple_Name (Index_List (I)));
+                  when A_Discrete_Range_Attribute_Reference =>
+                     Index_List (I) := Prefix (Range_Attribute (Index_List (I)));
+
+                     -- just in case of crazy things like T'Base'Base'Range:
+                     while Expression_Kind (Index_List (I)) = An_Attribute_Reference loop
+                        Index_List (I) := Prefix (Index_List (I));
+                     end loop;
+                     Index_List (I) := Corresponding_Name_Definition (Simple_Name (Index_List (I)));
+                  when A_Discrete_Simple_Expression_Range =>
+                     Expr_Type := A4G_Bugs.Corresponding_Expression_Type (Lower_Bound (Index_List (I)));
+                     if Names (Expr_Type) = Nil_Element_List then -- Lower bound is of a universal type
+                        Expr_Type := A4G_Bugs.Corresponding_Expression_Type (Upper_Bound (Index_List (I)));
+                        if Names (Expr_Type) = Nil_Element_List then -- Both bounds are of a universal type
+                           -- (Implicit Integer)
+                           Index_List (I) := Nil_Element;
+                        else
+                           Index_List (I) := Names (Expr_Type) (1);
+                        end if;
+                     else
+                        Index_List (I) := Names (Expr_Type) (1);
+                     end if;
+               end case;
+            end loop;
+            return Index_List;
+         end;
+
+      elsif Type_Kind (Def) = An_Unconstrained_Array_Definition
+        or else Formal_Type_Kind (Def) = A_Formal_Unconstrained_Array_Definition
+      then
+         declare
+            Index_List : Asis.Expression_List := Index_Subtype_Definitions (Def);
+         begin
+            for I in Index_List'Range loop
+               Index_List (I) := Corresponding_Name_Definition (Simple_Name (Index_List (I)));
+            end loop;
+            return Index_List;
+         end;
+
+      else
+         Impossible ("Not an array definition in Index_Subtypes_Names", Def);
+      end if;
+   end Index_Subtypes_Names;
+
+   --------------------------
    -- Is_Access_Expression --
    --------------------------
 
