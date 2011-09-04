@@ -224,7 +224,7 @@ package body Utilities is
    -- User_Log --
    --------------
 
-   procedure User_Log (Message : Wide_String; Stay_On_Line : Boolean := False) is
+   procedure User_Log (Message : Wide_String := ""; Stay_On_Line : Boolean := False) is
    begin
       if Verbose_Option then
         User_Message (Message, Stay_On_Line);
@@ -235,7 +235,7 @@ package body Utilities is
    -- User_Message --
    ------------------
 
-   procedure User_Message (Message : Wide_String; Stay_On_Line : Boolean := False) is
+   procedure User_Message (Message : Wide_String := ""; Stay_On_Line : Boolean := False) is
       use Ada.Wide_Text_IO;
       Old_Col : Count;
    begin

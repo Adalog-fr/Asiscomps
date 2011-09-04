@@ -61,8 +61,8 @@ package Utilities is
    --  Output
    --
 
-   procedure User_Message (Message : Wide_String; Stay_On_Line : Boolean := False);
-   procedure User_Log     (Message : Wide_String; Stay_On_Line : Boolean := False);
+   procedure User_Message (Message : Wide_String := ""; Stay_On_Line : Boolean := False);
+   procedure User_Log     (Message : Wide_String := ""; Stay_On_Line : Boolean := False);
    -- Output only if Verbose_Option
 
 
