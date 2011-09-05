@@ -1330,37 +1330,31 @@ package body Thick_Queries is
    --------------------------
 
    function Is_Access_Expression (The_Element : Asis.Expression) return Boolean is
-
-      The_Type : constant Asis.Definition := Ultimate_Expression_Type (The_Element);
+      The_Type : constant Asis.Declaration := A4G_Bugs.Corresponding_Expression_Type (The_Element);
       The_Name : Asis.Expression;
       Decl     : Asis.Declaration;
    begin
-      if Is_Nil (The_Type) then
-         -- This may mean that The_Element is of an anonymous access type (ASIS 95)
-         -- This can happen only if it is a (possibly selected) identifier.
-         The_Name := Simple_Name (The_Element);
-         if Expression_Kind (The_Name) /= An_Identifier then
-            return False;
-         end if;
+      if not Is_Nil (The_Type) then
+         return Is_Access_Subtype (The_Type);
+      end if;
 
-         Decl := A4G_Bugs.Corresponding_Name_Declaration (The_Name);
-         case Declaration_Kind (Decl) is
-            when A_Parameter_Specification
-               | A_Discriminant_Specification
-                 =>
-               return Trait_Kind (Decl) = An_Access_Definition_Trait;
-            when others =>
-               return False;
-         end case;
-
-      elsif     Definition_Kind  (The_Type) = An_Access_Definition   -- ASIS 2005
-        or else Type_Kind        (The_Type) = An_Access_Type_Definition
-        or else Formal_Type_Kind (The_Type) = A_Formal_Access_Type_Definition
-      then
-         return True;
-      else
+      -- Here The_Element may be of an anonymous access type (ASIS 95)
+      -- This can happen only if it is a (possibly selected) identifier.
+      The_Name := Simple_Name (The_Element);
+      if Expression_Kind (The_Name) /= An_Identifier then
          return False;
       end if;
+
+      Decl := A4G_Bugs.Corresponding_Name_Declaration (The_Name);
+      case Declaration_Kind (Decl) is
+         when A_Parameter_Specification
+            | A_Discriminant_Specification
+            =>
+            return Trait_Kind (Decl) = An_Access_Definition_Trait                              -- ASIS 95
+              or else Definition_Kind (Object_Declaration_View (Decl)) = An_Access_Definition; -- ASIS 2005
+         when others =>
+            return False;
+      end case;
    end Is_Access_Expression;
 
    -------------------
@@ -1633,16 +1627,45 @@ package body Thick_Queries is
    -- Is_Access_Subtype --
    -----------------------
 
-   function Is_Access_Subtype (The_Subtype : Asis.Declaration) return Boolean is
-      Good_Def : constant Asis.Definition := Type_Declaration_View (Ultimate_Type_Declaration (The_Subtype));
+   function Is_Access_Subtype (The_Subtype : Asis.Element) return Boolean is
+      Decl     : Asis.Declaration;
+      Good_Def : Asis.Definition;
    begin
-      if Type_Kind (Good_Def) = An_Access_Type_Definition then
-         return True;
-      elsif Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition then
-         return True;
-      else
-         return False;
-      end if;
+      case Element_Kind (The_Subtype) is
+         when A_Defining_Name =>
+              Decl := Enclosing_Element (The_Subtype);
+         when A_Definition =>
+            -- This may be a definition of an anonymous access or array type for which there is
+            -- no declaration
+            case Definition_Kind (The_Subtype) is
+               when An_Access_Definition => -- ASIS 2005
+               -- No declaration here, but cannot be a derived type
+                  return True;
+               when A_Task_Definition
+                  | A_Protected_Definition
+                  =>
+                  return False;
+               when A_Type_Definition =>
+                  if Type_Kind (The_Subtype) in An_Unconstrained_Array_Definition .. A_Constrained_Array_Definition then
+                     return False;
+                  end if;
+               when A_Formal_Type_Definition =>
+                  if Formal_Type_Kind (The_Subtype) in A_Formal_Unconstrained_Array_Definition .. A_Formal_Constrained_Array_Definition then
+                     return False;
+                  end if;
+               when others =>
+                  null;
+            end case;
+            Decl := Enclosing_Element (The_Subtype);
+         when A_Declaration =>
+            Decl := The_Subtype;
+         when others =>
+            Impossible ("Inappropriate element kind in Is_Access_Subtype", The_Subtype);
+      end case;
+
+      Good_Def  := Type_Declaration_View (Ultimate_Type_Declaration (Decl));
+      return    Type_Kind        (Good_Def) = An_Access_Type_Definition
+        or else Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition;
    end Is_Access_Subtype;
 
    ----------------------
@@ -4458,11 +4481,8 @@ package body Thick_Queries is
                return D;
             end if;
 
-            The_Type := Corresponding_Expression_Type_Definition (Name);
-            if        Definition_Kind  (The_Type) = An_Access_Definition   -- ASIS 2005
-              or else Type_Kind        (The_Type) = An_Access_Type_Definition
-              or else Formal_Type_Kind (The_Type) = A_Formal_Access_Type_Definition
-            then
+            The_Type := Corresponding_Expression_Type_Definition (E);
+            if  Is_Access_Subtype (The_Type) then
                return D & Name_Part'(Dereference, Asis.Definitions.Access_To_Object_Definition (The_Type));
             else
                return D;

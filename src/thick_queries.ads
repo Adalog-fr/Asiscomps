@@ -306,9 +306,14 @@ package Thick_Queries is
    --   An_Identifier
    --   An_Attribute_Reference
 
-   function Is_Access_Subtype (The_Subtype : Asis.Declaration) return Boolean;
+   function Is_Access_Subtype (The_Subtype : Asis.Element) return Boolean;
    -- Returns True if The_Subtype is a declaration of an access type or of a formal access type
    -- Returns False in all other cases
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Declaration
+   --    A_Definition
+   --    A_Defining_Name
 
    function Is_Array_Subtype (The_Subtype : Asis.Declaration) return Boolean;
    -- Returns True if The_Subtype is a declaration of an array type, or a name of an array type
