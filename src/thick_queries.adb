@@ -1650,7 +1650,9 @@ package body Thick_Queries is
                      return False;
                   end if;
                when A_Formal_Type_Definition =>
-                  if Formal_Type_Kind (The_Subtype) in A_Formal_Unconstrained_Array_Definition .. A_Formal_Constrained_Array_Definition then
+                  if Formal_Type_Kind (The_Subtype)
+                     in A_Formal_Unconstrained_Array_Definition .. A_Formal_Constrained_Array_Definition
+                  then
                      return False;
                   end if;
                when others =>
@@ -4483,6 +4485,13 @@ package body Thick_Queries is
 
             The_Type := Corresponding_Expression_Type_Definition (E);
             if  Is_Access_Subtype (The_Type) then
+               if Declaration_Kind (Enclosing_Element (The_Type))
+                  in An_Ordinary_Type_Declaration .. A_Subtype_Declaration
+               then
+                  -- All types and subtypes declarations
+                  -- unwind private types etc.
+                  The_Type := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (The_Type)));
+               end if;
                return D & Name_Part'(Dereference, Asis.Definitions.Access_To_Object_Definition (The_Type));
             else
                return D;
@@ -4614,6 +4623,10 @@ package body Thick_Queries is
                   exit;
                when Not_Variable =>
                   return Different_Variables;
+               when Call =>
+                  -- A function call with no dereference to its right
+                  -- This cannot be an object name, => it is a value
+                  return Different_Variables;
                when others =>
                   null;
             end case;
@@ -4624,6 +4637,10 @@ package body Thick_Queries is
                   R_Rightmost_Deref := I;
                   exit;
                when Not_Variable =>
+                  return Different_Variables;
+               when Call =>
+                  -- A function call with no dereference to its right
+                  -- This cannot be an object name, => it is a value
                   return Different_Variables;
                when others =>
                   null;
@@ -4664,18 +4681,18 @@ package body Thick_Queries is
 
          elsif L_Rightmost_Deref /= 1 then
             -- Dereference on left side only
-               if Compatible_Types (L_Descr (L_Rightmost_Deref).Designated_Type,
-                                    Corresponding_Expression_Type_Definition (R_Descr (1).Id_Name))
-               then
-                  return (Unlikely, Complete);
-               else
-                  return (Unlikely, Partial);
-               end if;
+            if Compatible_Types (L_Descr (L_Rightmost_Deref).Designated_Type,
+                                 Corresponding_Expression_Type_Definition (R_Descr (1).Id_Name))
+            then
+               return (Unlikely, Complete);
+            else
+               return (Unlikely, Partial);
+            end if;
          else
             -- Dereference on right side only
             if Compatible_Types (Corresponding_Expression_Type_Definition (L_Descr (1).Id_Name),
                                  R_Descr (R_Rightmost_Deref).Designated_Type)
-               then
+            then
                   return (Unlikely, Complete);
                else
                   return (Unlikely, Partial);
