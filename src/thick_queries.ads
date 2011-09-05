@@ -234,6 +234,13 @@ package Thick_Queries is
 
    function Extended_Name_Image (Name_Elem : Asis.Element) return Wide_String;
    -- Image of a Name or Defining_Name, given either as a simple name or as a Selected_Name
+   --  Appropriate Element_Kinds:
+   --    An_Expression
+   --    A_Defining_Name
+   --  Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component
+   --    An_Attribute_Reference
 
 
    function Full_Name_Image (The_Name     : in Asis.Element;

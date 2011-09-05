@@ -871,10 +871,15 @@ package body Thick_Queries is
          when An_Expression =>
             case Expression_Kind (Name_Elem) is
                when A_Selected_Component =>
-                  return Extended_Name_Image (Prefix (Name_Elem)) & '.'
+                  return Extended_Name_Image (Prefix (Name_Elem))
+                    & '.'
                     & A4G_Bugs.Name_Image (Selector (Name_Elem));
                when An_Identifier =>
                   return A4G_Bugs.Name_Image (Name_Elem);
+               when An_Attribute_Reference =>
+                  return Extended_Name_Image (Prefix (Name_Elem))
+                    & '''
+                    & Attribute_Name_Image (Name_Elem);
                when others =>
                   Impossible ("Not a name in Extended_Name_Image", Name_Elem);
             end case;
