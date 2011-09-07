@@ -4833,6 +4833,57 @@ package body Thick_Queries is
       end;
    end Same_Value;
 
+   ------------------
+   -- Static_Level --
+   ------------------
+
+   function Static_Level (Element : Asis.Element) return Asis.ASIS_Natural is
+      use Asis, Asis.Expressions;
+
+      Decl : Asis.Element;
+      Result : ASIS_Natural := 0;
+   begin
+      case Element_Kind (Element) is
+         when A_Declaration =>
+            Decl := Enclosing_Element (Element);
+         when An_Expression =>
+            Decl := Enclosing_Element (Corresponding_Name_Declaration (Simple_Name (Element)));
+         when others =>
+            Impossible ("Bad element kind in Static_Level", Element);
+      end case;
+
+      while not Is_Nil (Decl) loop
+         case Element_Kind (Decl) is
+            when A_Declaration =>
+               case Declaration_Kind (Decl) is
+                  when A_Task_Type_Declaration
+                     | A_Single_Task_Declaration
+                     | A_Procedure_Declaration
+                     | A_Function_Declaration
+                     | A_Procedure_Body_Declaration
+                     | A_Function_Body_Declaration
+                     | A_Task_Body_Declaration
+                     | An_Entry_Body_Declaration
+                     | A_Generic_Declaration
+                     =>
+                     Result := Result + 1;
+                  when others =>
+                     null;
+               end case;
+            when others =>
+               null;
+         end case;
+         Decl := Enclosing_Element (Decl);
+      end loop;
+
+      return Result;
+   end Static_Level;
+
+
+   ----------------------
+   -- Used_Identifiers --
+   ----------------------
+
    function Used_Identifiers (Name : Asis.Expression) return Asis.Expression_List is
       Decl : Asis.Declaration;
 

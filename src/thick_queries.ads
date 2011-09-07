@@ -79,6 +79,19 @@ package Thick_Queries is
    --  Appropriate Element_Kinds:
    --     Any element
 
+   Global_Level : constant Asis.ASIS_Natural := 0;
+   function Static_Level (Element : Asis.Element) return Asis.ASIS_Natural;
+   -- Returns the static scope nesting level of Element
+   -- Library units and entities declared in library packages have level 0 (global)
+   -- Subprograms and tasks add 1 to the level (not packages)
+   --  Appropriate Element_Kinds:
+   --    A_Declaration
+   --    A_Defining_Name
+   --    An_Expression
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component (checks the selector)
+
    function Ultimate_Enclosing_Instantiation (The_Element : Asis.Element) return Asis.Declaration;
    -- For an entity which Is_Part_Of_Instance:
    -- Return the "true" instantiation, i.e. the one written by the user, going up instantiations
