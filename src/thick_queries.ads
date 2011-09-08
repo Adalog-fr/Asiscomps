@@ -556,7 +556,7 @@ package Thick_Queries is
    --    Root_Real and Universal_Real returns A_Floating_Point_Type (which is the best we can do)
    --    Universal_Fixed returns A_Fixed_Point type, of course
 
-   function Index_Subtypes_Names (Def : Asis.Type_Definition) return Asis.Element_List;
+   function Index_Subtypes_Names (Type_Def : Asis.Type_Definition) return Asis.Element_List;
    -- Return the list of defining names for the subtypes of an (constrained or unconstrained) array
    -- definition.
    -- Returns a nil element instead of a defining name in the case of e.g. array(1..10)
@@ -668,6 +668,10 @@ package Thick_Queries is
    -- an anonymous type and unwinds subtypes (but not derived types)
    -- This query is a candidate for ASIS05, and already provided by ASIS-for-GNAT,
    -- but we don't use it as long as it is not standard
+   --
+   -- WARNING: When passed a slice, returns the definition of the sliced object, bounds
+   --          will be those of the sliced object, not the slice itself. But what else
+   --          can we do?
 
    function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition;
    -- return the type definition of the ultimate ancestor type of The_Element

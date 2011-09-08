@@ -1271,53 +1271,117 @@ package body Thick_Queries is
    -- Index_Subtypes_Names --
    --------------------------
 
-   function Index_Subtypes_Names (Def : Asis.Type_Definition) return Asis.Element_List is
+   function Index_Subtypes_Names (Type_Def : Asis.Type_Definition) return Asis.Element_List is
       use Asis.Definitions, Asis.Expressions;
-   begin
-      if Type_Kind (Def) = A_Constrained_Array_Definition
-        or else Formal_Type_Kind (Def) = A_Formal_Constrained_Array_Definition
+
+      function Range_Ultimate_Name (Range_Def : Asis.Definition) return Asis.Defining_Name is
+         Pfx  : Asis.Expression;
+         Decl : Asis.Declaration;
+         Def  : Asis.Definition;
+
+         function Range_Position return ASIS_Positive is
+            Range_Index : Asis.Expression_List := Attribute_Designator_Expressions (Range_Attribute (Range_Def));
+         begin
+            if Range_Index = Nil_Element_List then
+               return 1;
+            else
+               return ASIS_Positive'Wide_Value (Static_Expression_Value_Image (Range_Index (1)));
+            end if;
+         end Range_Position;
+
+      begin  -- Range_Ultimate_Name
+         case Discrete_Range_Kind (Range_Def) is
+            when Not_A_Discrete_Range =>
+               Impossible ("Index_Subtype_Names: Not a discrete range", Range_Def);
+
+            when A_Discrete_Subtype_Indication =>
+              return Corresponding_Name_Definition (Subtype_Simple_Name (Range_Def));
+
+            when A_Discrete_Range_Attribute_Reference =>
+              Pfx := Prefix (Range_Attribute (Range_Def));
+               -- just in case of crazy things like T'Base'Base'Range:
+               while Expression_Kind (Pfx) = An_Attribute_Reference loop
+                  Pfx := Prefix (Pfx);
+               end loop;
+               Pfx := Simple_Name (Pfx);
+
+               -- Here, Pfx is the good prefix simple name
+
+               Decl := Corresponding_Name_Declaration (Pfx);
+               loop
+                  case Declaration_Kind (Decl) is
+                     when  An_Ordinary_Type_Declaration
+                        | A_Subtype_Declaration
+                        | A_Formal_Type_Declaration
+                        =>
+                        Def := Type_Declaration_View (Ultimate_Type_Declaration (Decl));
+                        if Type_Kind (Def) in
+                             An_Unconstrained_Array_Definition .. A_Constrained_Array_Definition
+                          or else Formal_Type_Kind (Def) in
+                             A_Formal_Unconstrained_Array_Definition .. A_Formal_Constrained_Array_Definition
+                        then
+                           return Index_Subtypes_Names (Def) (Range_Position);
+                        else
+                           -- Not an array, must be T'Range where T is a discrete type, equivalent to T
+                           return Corresponding_Name_Definition (Pfx);
+                        end if;
+
+                     when A_Variable_Declaration
+                        | A_Constant_Declaration
+                        | A_Component_Declaration
+                        =>
+                        Def := Object_Declaration_View (Decl);
+                        if Definition_Kind (Def) = A_Type_Definition then -- anonymous array type
+                           return Index_Subtypes_Names (Def) (Range_Position);
+                        end if;
+
+                        Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Def));
+
+                     when A_Parameter_Specification
+                        | A_Formal_Object_Declaration
+                        | An_Object_Renaming_Declaration
+                        =>
+                        Decl := Declaration_Subtype_Mark (Decl);
+                     when others =>
+                        Impossible ("Range_Ultimate_Name: unexpected declaration", Decl);
+                  end case;
+               end loop;
+
+            when A_Discrete_Simple_Expression_Range =>
+               Decl := A4G_Bugs.Corresponding_Expression_Type (Lower_Bound (Range_Def));
+               if Names (Decl) /= Nil_Element_List then
+                  return Names (Decl) (1);
+               end if;
+
+               -- Lower bound is of a universal type, try upper bound
+               Decl := A4G_Bugs.Corresponding_Expression_Type (Upper_Bound (Range_Def));
+               if Names (Decl) /= Nil_Element_List then
+                     return Names (Decl) (1);
+               end if;
+
+               -- Both bounds are of a universal type (Implicit Integer)
+               return Nil_Element;
+         end case;
+      end Range_Ultimate_Name;
+
+   begin   -- Index_Subtypes_Names
+      if Type_Kind (Type_Def) = A_Constrained_Array_Definition
+        or else Formal_Type_Kind (Type_Def) = A_Formal_Constrained_Array_Definition
       then
          declare
-            Index_List : Asis.Element_List := Discrete_Subtype_Definitions (Def);
-            Expr_Type  : Asis.Declaration;
+            Index_List : Asis.Element_List := Discrete_Subtype_Definitions (Type_Def);
          begin
             for I in Index_List'Range loop
-               case Discrete_Range_Kind (Index_List (I)) is
-                  when Not_A_Discrete_Range =>
-                     Impossible ("Index_Subtype_Names: Not a discrete range", Index_List (I));
-                  when A_Discrete_Subtype_Indication =>
-                     Index_List (I) := Corresponding_Name_Definition (Subtype_Simple_Name (Index_List (I)));
-                  when A_Discrete_Range_Attribute_Reference =>
-                     Index_List (I) := Prefix (Range_Attribute (Index_List (I)));
-
-                     -- just in case of crazy things like T'Base'Base'Range:
-                     while Expression_Kind (Index_List (I)) = An_Attribute_Reference loop
-                        Index_List (I) := Prefix (Index_List (I));
-                     end loop;
-                     Index_List (I) := Corresponding_Name_Definition (Simple_Name (Index_List (I)));
-                  when A_Discrete_Simple_Expression_Range =>
-                     Expr_Type := A4G_Bugs.Corresponding_Expression_Type (Lower_Bound (Index_List (I)));
-                     if Names (Expr_Type) = Nil_Element_List then -- Lower bound is of a universal type
-                        Expr_Type := A4G_Bugs.Corresponding_Expression_Type (Upper_Bound (Index_List (I)));
-                        if Names (Expr_Type) = Nil_Element_List then -- Both bounds are of a universal type
-                           -- (Implicit Integer)
-                           Index_List (I) := Nil_Element;
-                        else
-                           Index_List (I) := Names (Expr_Type) (1);
-                        end if;
-                     else
-                        Index_List (I) := Names (Expr_Type) (1);
-                     end if;
-               end case;
+               Index_List (I) := Range_Ultimate_Name (Index_List (I));
             end loop;
             return Index_List;
          end;
 
-      elsif Type_Kind (Def) = An_Unconstrained_Array_Definition
-        or else Formal_Type_Kind (Def) = A_Formal_Unconstrained_Array_Definition
+      elsif Type_Kind (Type_Def) = An_Unconstrained_Array_Definition
+        or else Formal_Type_Kind (Type_Def) = A_Formal_Unconstrained_Array_Definition
       then
          declare
-            Index_List : Asis.Expression_List := Index_Subtype_Definitions (Def);
+            Index_List : Asis.Expression_List := Index_Subtype_Definitions (Type_Def);
          begin
             for I in Index_List'Range loop
                Index_List (I) := Corresponding_Name_Definition (Simple_Name (Index_List (I)));
@@ -1326,7 +1390,7 @@ package body Thick_Queries is
          end;
 
       else
-         Impossible ("Not an array definition in Index_Subtypes_Names", Def);
+         Impossible ("Index_Subtypes_Names: not an array definition", Type_Def);
       end if;
    end Index_Subtypes_Names;
 
@@ -2245,10 +2309,20 @@ package body Thick_Queries is
                      if not Follow_Derived then
                         return A_Derived_Type;
                      end if;
-                     Good_Elem := Corresponding_First_Subtype (A4G_Bugs.Corresponding_Name_Declaration
-                                                              (Subtype_Simple_Name
-                                                               (Parent_Subtype_Indication
-                                                                (Type_Declaration_View (Good_Elem)))));
+                     Good_Elem := Subtype_Simple_Name (Parent_Subtype_Indication
+                                                       (Type_Declaration_View (Good_Elem)));
+                     case A4G_Bugs.Attribute_Kind (Good_Elem) is
+                        when Not_An_Attribute =>
+                           null;
+                        when A_Class_Attribute =>
+                           return A_Tagged_Type;
+                        when A_Base_Attribute =>
+                           Good_Elem := Prefix (Good_Elem);
+                        when others =>
+                           Impossible ("Bad attribute in Type_Category", Good_Elem);
+                     end case;
+                     Good_Elem := Corresponding_First_Subtype
+                                   (A4G_Bugs.Corresponding_Name_Declaration (Good_Elem));
                   when An_Enumeration_Type_Definition =>
                      return An_Enumeration_Type;
                   when A_Signed_Integer_Type_Definition =>
@@ -2733,6 +2807,10 @@ package body Thick_Queries is
       Local_Elem : Asis.Element := A4G_Bugs.Corresponding_Expression_Type (The_Element);
       Def        : Asis.Definition;
    begin
+      if Declaration_Kind (Local_Elem) = A_Private_Type_Declaration then
+         -- We want at true definition, therefore we have to look through private types
+         Local_Elem := Corresponding_Type_Declaration (Local_Elem);
+      end if;
       if not Is_Nil (Local_Elem) then
          -- Normal case, we have a type declaration
          return Type_Declaration_View (Corresponding_First_Subtype (Local_Elem));
@@ -2744,6 +2822,10 @@ package body Thick_Queries is
             Local_Elem := Selector (The_Element);
          when An_Identifier =>
             Local_Elem := The_Element;
+         when A_Slice =>
+            -- Short of a better idea, take the definition from the sliced object
+            -- Note that the bounds will therefore not be the ones of the slice
+            Local_Elem  := Prefix (The_Element);
          when others =>
             return Nil_Element;
       end case;
@@ -2771,6 +2853,8 @@ package body Thick_Queries is
             | A_Single_Task_Declaration
               =>
             return Object_Declaration_View (Local_Elem);
+         when An_Object_Renaming_Declaration =>
+            return Corresponding_Expression_Type_Definition (A4G_Bugs.Renamed_Entity (Local_Elem));
          when others =>
             return Nil_Element;
       end case;
@@ -3682,6 +3766,7 @@ package body Thick_Queries is
             when Constraint_Error =>
                -- Not in range of Biggest_Int...
                Result (I) := Not_Static;
+               Modular_Type := False;
          end;
       end loop;
 
@@ -3721,7 +3806,6 @@ package body Thick_Queries is
             when Constraint_Error =>
                -- Not in range of Biggest_Int...
                Result (I) := Not_Static;
-               Modular_Type := False;
          end;
       end loop;
 
