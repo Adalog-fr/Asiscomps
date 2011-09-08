@@ -3645,6 +3645,7 @@ package body Thick_Queries is
    is
       Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Elem, Follow_Access);
       Result : Extended_Biggest_Int_List (Bounds'Range);
+      Modular_Type : Boolean := False;
    begin
       if Result'Length = 0 then
          return Nil_Extended_Biggest_Int_List;
@@ -3655,15 +3656,24 @@ package body Thick_Queries is
             case Element_Kind (Bounds (I)) is
                when An_Expression =>
                   Result (I) := Discrete_Static_Expression_Value (Bounds (I));
+                  if Modular_Type then
+                     -- The value returned for the upper bound by discrete_constraining_bounds is the mod expression
+                     -- => 1 more than the upper bound
+                     Result (I) := Result (I) - 1;
+                  end if;
+                  Modular_Type := False;
                when A_Defining_Name =>
                   -- Enumeration
                   Result (I) := Biggest_Int'Wide_Value (Position_Number_Image (Bounds (I)));
+                  Modular_Type := False;
                when Not_An_Element =>
                   if I rem 2 = 1 and then not Is_Nil (Bounds (I + 1)) then
                      -- Lower bound of modular type (not subtype)
-                     Result (I) := 0;
+                     Result (I)   := 0;
+                     Modular_Type := True;
                   else
                      Result (I) := Not_Static;
+                     Modular_Type := False;
                   end if;
                when others =>
                   Impossible ("Bad return from Discrete_Range_Bounds", Bounds (2));
@@ -3711,6 +3721,7 @@ package body Thick_Queries is
             when Constraint_Error =>
                -- Not in range of Biggest_Int...
                Result (I) := Not_Static;
+               Modular_Type := False;
          end;
       end loop;
 
@@ -4838,7 +4849,7 @@ package body Thick_Queries is
    ------------------
 
    function Static_Level (Element : Asis.Element) return Asis.ASIS_Natural is
-      use Asis, Asis.Expressions;
+      use Asis.Expressions;
 
       Decl : Asis.Element;
       Result : ASIS_Natural := 0;
