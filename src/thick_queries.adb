@@ -121,6 +121,51 @@ package body Thick_Queries is
       end if;
    end Biggest_Int_Img;
 
+   ---------------------------
+   -- Access_Target_Subtype --
+   ---------------------------
+
+   function Access_Target_Subtype (The_Subtype : Asis.Element) return Asis.Definition is
+      use Asis.Definitions, Asis.Expressions;
+
+      Good_Def : Asis.Definition;
+   begin
+      case Element_Kind (The_Subtype) is
+         when A_Defining_Name =>
+              Good_Def := Type_Declaration_View (Enclosing_Element (The_Subtype));
+         when A_Definition =>
+            Good_Def := The_Subtype;
+         when A_Declaration =>
+            Good_Def := Type_Declaration_View (The_Subtype);
+         when others =>
+            Impossible ("Inappropriate element kind in Access_Target_Subtype", The_Subtype);
+      end case;
+
+      case Definition_Kind (Good_Def) is
+         when An_Access_Definition => -- ASIS 2005
+            -- No declaration here, but cannot be a derived type
+            return Type_Declaration_View
+              (Corresponding_Name_Declaration
+                 (Anonymous_Access_To_Object_Subtype_Mark (Good_Def)));
+         when A_Type_Definition =>
+            if Type_Kind (Good_Def) = An_Access_Type_Definition then
+               return  Asis.Definitions.Access_To_Object_Definition  (Type_Declaration_View
+                                                                      (Ultimate_Type_Declaration
+                                                                       (Enclosing_Element (Good_Def))));
+            end if;
+         when A_Formal_Type_Definition =>
+            if Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition then
+               return  Asis.Definitions.Access_To_Object_Definition  (Type_Declaration_View
+                                                                      (Ultimate_Type_Declaration
+                                                                       (Enclosing_Element (Good_Def))));
+            end if;
+         when others =>
+            null;
+      end case;
+
+      return Nil_Element;
+   end Access_Target_Subtype;
+
    --------------------------
    -- Attribute_Name_Image --
    --------------------------
@@ -2125,7 +2170,7 @@ package body Thick_Queries is
             end loop;
             Decl := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
          when others =>
-            Impossible ("Bad parameter to Type_Size_Expression", Elem);
+            Impossible ("Attribute_Clause_Expression: Incorrect parameter", Elem);
       end case;
 
       if Declaration_Kind (Decl) = An_Ordinary_Type_Declaration then
