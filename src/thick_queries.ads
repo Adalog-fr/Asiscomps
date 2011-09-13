@@ -326,9 +326,9 @@ package Thick_Queries is
    --   An_Identifier
    --   An_Attribute_Reference
 
-   function Access_Target_Subtype (The_Subtype : Asis.Element) return Asis.Definition;
-   -- Returns the target definition if The_Subtype is a declaration of an access type (including anonymous ones)
-   -- or of a formal access type.
+   function Access_Target_Type (The_Subtype : Asis.Element) return Asis.Declaration;
+   -- Returns the declaration of the first subtype of the target of the access type if The_Subtype is
+   -- a declaration of an access type (including anonymous ones) or of a formal access type.
    -- Returns Nil_Element in all other cases
    --
    -- Appropriate Element_Kinds:

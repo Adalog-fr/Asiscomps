@@ -122,10 +122,10 @@ package body Thick_Queries is
    end Biggest_Int_Img;
 
    ---------------------------
-   -- Access_Target_Subtype --
+   -- Access_Target_Type --
    ---------------------------
 
-   function Access_Target_Subtype (The_Subtype : Asis.Element) return Asis.Definition is
+   function Access_Target_Type (The_Subtype : Asis.Element) return Asis.Declaration is
       use Asis.Definitions, Asis.Expressions;
 
       Good_Def : Asis.Definition;
@@ -144,27 +144,35 @@ package body Thick_Queries is
       case Definition_Kind (Good_Def) is
          when An_Access_Definition => -- ASIS 2005
             -- No declaration here, but cannot be a derived type
-            return Type_Declaration_View
-              (Corresponding_Name_Declaration
-                 (Anonymous_Access_To_Object_Subtype_Mark (Good_Def)));
+            return Corresponding_First_Subtype
+                   (Corresponding_Name_Declaration
+                    (Anonymous_Access_To_Object_Subtype_Mark (Good_Def)));
          when A_Type_Definition =>
             if Type_Kind (Good_Def) = An_Access_Type_Definition then
-               return  Asis.Definitions.Access_To_Object_Definition  (Type_Declaration_View
-                                                                      (Ultimate_Type_Declaration
-                                                                       (Enclosing_Element (Good_Def))));
+               return  Corresponding_First_Subtype
+                        (Corresponding_Name_Declaration
+                         (Subtype_Simple_Name
+                          (Asis.Definitions.Access_To_Object_Definition
+                           (Type_Declaration_View
+                            (Ultimate_Type_Declaration
+                             (Enclosing_Element (Good_Def)))))));
             end if;
          when A_Formal_Type_Definition =>
             if Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition then
-               return  Asis.Definitions.Access_To_Object_Definition  (Type_Declaration_View
-                                                                      (Ultimate_Type_Declaration
-                                                                       (Enclosing_Element (Good_Def))));
+               return  Corresponding_First_Subtype
+                        (Corresponding_Name_Declaration
+                         (Subtype_Simple_Name
+                          (Asis.Definitions.Access_To_Object_Definition
+                           (Type_Declaration_View
+                            (Ultimate_Type_Declaration
+                             (Enclosing_Element (Good_Def)))))));
             end if;
          when others =>
             null;
       end case;
 
       return Nil_Element;
-   end Access_Target_Subtype;
+   end Access_Target_Type;
 
    --------------------------
    -- Attribute_Name_Image --
