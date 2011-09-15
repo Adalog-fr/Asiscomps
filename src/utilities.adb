@@ -44,6 +44,10 @@ with  -- ASIS units
   Asis.Errors,
   Asis.Implementation,
   Asis.Text;
+
+with  -- GNAT
+  Gnat.Traceback.Symbolic;
+
 package body Utilities is
 
    -- Note that we delay opening the actual trace file until traces are
@@ -358,6 +362,21 @@ package body Utilities is
 
       return Result;
    end To_Title;
+
+
+   ---------------
+   -- Traceback --
+   ---------------
+
+   procedure Traceback (Exc : Ada.Exceptions.Exception_Occurrence) is
+      use Ada.Characters.Handling;
+      use Gnat.Traceback.Symbolic;
+   begin
+      Raw_Trace ("----------------");
+      Raw_Trace ("Stack traceback:");
+      Raw_Trace (To_Wide_String (Symbolic_Traceback (Exc)));
+   end Traceback;
+
 
    --------------
    -- Trim_All --

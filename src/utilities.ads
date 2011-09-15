@@ -145,6 +145,8 @@ package Utilities is
 
    procedure Asis_Exception_Messages;
 
+   procedure Traceback (Exc : Ada.Exceptions.Exception_Occurrence);
+
    --
    --  Safe open
    --
