@@ -329,6 +329,7 @@ package Thick_Queries is
    function Access_Target_Type (The_Subtype : Asis.Element) return Asis.Declaration;
    -- Returns the declaration of the first subtype of the target of the access type if The_Subtype is
    -- a declaration of an access type (including anonymous ones) or of a formal access type.
+   -- It's the really first subtype ;-), ignoring 'Base and 'Class attributes that can be in the way.
    -- Returns Nil_Element in all other cases
    --
    -- Appropriate Element_Kinds:
@@ -587,6 +588,10 @@ package Thick_Queries is
    function Simple_Name (The_Name : Asis.Expression) return Asis.Expression;
    -- Gets rid of selection, i.e. returns the selector of its argument if a selected_name,
    -- its argument otherwise.
+
+   function Strip_Attributes (Name : Asis.Expression) return Asis.Expression;
+   -- If Name is an Attribute_Reference, returns the first prefix which is not itself an Attribute_Reference.
+   -- Returns Name otherwise
 
    function Ultimate_Name (The_Name : Asis.Element; No_Component : Boolean := False) return Asis.Element;
    -- For a name defined by a renaming declaration: returns the name of the entity, which is not

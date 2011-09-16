@@ -49,6 +49,7 @@ with   -- ASIS units
   Asis.Declarations,
   Asis.Definitions,
   Asis.Elements,
+  Asis.Exceptions,
   Asis.Expressions,
   Asis.Statements,
   Asis.Text;
@@ -129,7 +130,8 @@ package body Thick_Queries is
       use Asis.Definitions, Asis.Expressions;
 
       Good_Def : Asis.Definition;
-   begin
+      Decl     : Asis.Declaration;
+   begin  -- Access_Target_Type
       case Element_Kind (The_Subtype) is
          when A_Defining_Name =>
               Good_Def := Type_Declaration_View (Enclosing_Element (The_Subtype));
@@ -146,26 +148,44 @@ package body Thick_Queries is
             -- No declaration here, but cannot be a derived type
             return Corresponding_First_Subtype
                    (Corresponding_Name_Declaration
-                    (Anonymous_Access_To_Object_Subtype_Mark (Good_Def)));
+                    (Simple_Name
+                     (Strip_Attributes
+                      (Anonymous_Access_To_Object_Subtype_Mark (Good_Def)))));
          when A_Type_Definition =>
             if Type_Kind (Good_Def) = An_Access_Type_Definition then
-               return  Corresponding_First_Subtype
-                        (Corresponding_Name_Declaration
-                         (Subtype_Simple_Name
-                          (Asis.Definitions.Access_To_Object_Definition
-                           (Type_Declaration_View
-                            (Ultimate_Type_Declaration
-                             (Enclosing_Element (Good_Def)))))));
+               Decl := Corresponding_Name_Declaration
+                         (Simple_Name
+                          (Strip_Attributes
+                           (Subtype_Simple_Name
+                            (Asis.Definitions.Access_To_Object_Definition
+                             (Type_Declaration_View
+                              (Ultimate_Type_Declaration
+                               (Enclosing_Element (Good_Def))))))));
+               case Declaration_Kind (Decl) is
+                  when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
+                     Decl := Corresponding_Type_Declaration (Decl);
+                  when others =>
+                     null;
+               end case;
+               return  Corresponding_First_Subtype (Decl);
             end if;
          when A_Formal_Type_Definition =>
             if Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition then
-               return  Corresponding_First_Subtype
-                        (Corresponding_Name_Declaration
-                         (Subtype_Simple_Name
-                          (Asis.Definitions.Access_To_Object_Definition
-                           (Type_Declaration_View
-                            (Ultimate_Type_Declaration
-                             (Enclosing_Element (Good_Def)))))));
+               Decl := Corresponding_Name_Declaration
+                         (Simple_Name
+                          (Strip_Attributes
+                           (Subtype_Simple_Name
+                            (Asis.Definitions.Access_To_Object_Definition
+                             (Type_Declaration_View
+                              (Ultimate_Type_Declaration
+                               (Enclosing_Element (Good_Def))))))));
+               case Declaration_Kind (Decl) is
+                  when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
+                     Decl := Corresponding_Type_Declaration (Decl);
+                  when others =>
+                     null;
+               end case;
+               return Corresponding_First_Subtype (Decl);
             end if;
          when others =>
             null;
@@ -1274,12 +1294,24 @@ package body Thick_Queries is
             begin
                for Pragma_Assoc in Pragma_Associations'Range loop
                   -- Check if the pragma has been set on Element
-                  if Is_Equal (Element_Definition,
-                               Corresponding_Name_Definition (Actual_Parameter
-                                                              (Pragma_Associations (Pragma_Assoc))))
-                  then
-                     Result (Pragma_Kind (Element_Pragmas (Pragma_Elt))) := True;
-                  end if;
+
+                  begin
+                     if Is_Equal (Element_Definition,
+                                  Corresponding_Name_Definition (Actual_Parameter
+                                                                 (Pragma_Associations (Pragma_Assoc))))
+                     then
+                        -- Corresponding_Name_Definition of predefined "special" identifiers, like the "C"
+                        -- in pragma convention (C, .. .) returns A_Nil_Element. Since this will differ from
+                        -- Element_Definition, there is no need to have a special case for it.
+                        -- KLUDGE TBSL
+                        -- Corresponding_Name_Definition raises an exception instead of returning a Nil element
+                        Result (Pragma_Kind (Element_Pragmas (Pragma_Elt))) := True;
+                     end if;
+                  exception
+                     when Asis.Exceptions.ASIS_Inappropriate_Element =>
+                        -- Anyway, this is a junk element
+                        null;
+                  end;
                end loop;
             end;
          end loop;
@@ -1333,7 +1365,7 @@ package body Thick_Queries is
          Def  : Asis.Definition;
 
          function Range_Position return ASIS_Positive is
-            Range_Index : Asis.Expression_List := Attribute_Designator_Expressions (Range_Attribute (Range_Def));
+            Range_Index : constant Asis.Expression_List := Attribute_Designator_Expressions (Range_Attribute (Range_Def));
          begin
             if Range_Index = Nil_Element_List then
                return 1;
@@ -1351,12 +1383,7 @@ package body Thick_Queries is
               return Corresponding_Name_Definition (Subtype_Simple_Name (Range_Def));
 
             when A_Discrete_Range_Attribute_Reference =>
-              Pfx := Prefix (Range_Attribute (Range_Def));
-               -- just in case of crazy things like T'Base'Base'Range:
-               while Expression_Kind (Pfx) = An_Attribute_Reference loop
-                  Pfx := Prefix (Pfx);
-               end loop;
-               Pfx := Simple_Name (Pfx);
+              Pfx := Simple_Name (Strip_Attributes (Prefix (Range_Attribute (Range_Def))));
 
                -- Here, Pfx is the good prefix simple name
 
@@ -2277,9 +2304,18 @@ package body Thick_Queries is
                when A_Variable_Declaration
                   | A_Constant_Declaration
                   | A_Deferred_Constant_Declaration
-                    =>
-                  Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                               (Object_Declaration_View (Elem)));
+                  =>
+                  Good_Elem := Object_Declaration_View (Elem);
+                  if Definition_Kind (Good_Elem) = A_Type_Definition then
+                     case Type_Kind (Good_Elem) is
+                        when A_Constrained_Array_Definition =>
+                           return An_Array_Type;
+                        when others =>
+                           -- Safety for Ada 2005 where other anonymous types are possible
+                           Impossible ("Type_Category: anonymous type not array", Good_Elem);
+                     end case;
+                  end if;
+                  Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name (Good_Elem));
                when A_Component_Declaration =>
                   Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
                                                                (Component_Subtype_Indication
@@ -4629,8 +4665,6 @@ package body Thick_Queries is
             -- Add a "Dereference" part if the *type* is an access type
             -- This allows explicit and implicit dereferences to match
             The_Type : Asis.Definition;
-            The_Name : Asis.Expression;
-            Decl     : Asis.Declaration;
          begin
             if not With_Deref then
                return D;
@@ -5026,6 +5060,21 @@ package body Thick_Queries is
 
       return Result;
    end Static_Level;
+
+
+   ----------------------
+   -- Strip_Attributes --
+   ----------------------
+
+   function Strip_Attributes (Name : Asis.Expression) return Asis.Expression is
+      use Asis.Expressions;
+      Result : Asis.Expression := Name;
+   begin
+      while Expression_Kind (Result) = An_Attribute_Reference loop
+         Result := Prefix (Result);
+      end loop;
+      return Result;
+   end Strip_Attributes;
 
 
    ----------------------
