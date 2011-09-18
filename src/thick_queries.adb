@@ -146,11 +146,18 @@ package body Thick_Queries is
       case Definition_Kind (Good_Def) is
          when An_Access_Definition => -- ASIS 2005
             -- No declaration here, but cannot be a derived type
-            return Corresponding_First_Subtype
-                   (Corresponding_Name_Declaration
+            -- But can be a private or incomplete type...
+            Decl := Corresponding_Name_Declaration
                     (Simple_Name
                      (Strip_Attributes
-                      (Anonymous_Access_To_Object_Subtype_Mark (Good_Def)))));
+                      (Anonymous_Access_To_Object_Subtype_Mark (Good_Def))));
+            case Declaration_Kind (Decl) is
+               when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
+                  Decl := Corresponding_Type_Declaration (Decl);
+               when others =>
+                  null;
+            end case;
+            return Corresponding_First_Subtype (Decl);
          when A_Type_Definition =>
             if Type_Kind (Good_Def) = An_Access_Type_Definition then
                Decl := Corresponding_Name_Declaration
@@ -4776,8 +4783,12 @@ package body Thick_Queries is
                   | A_Formal_Type_Definition
                   =>
                   L_Decl := Enclosing_Element (L);
+                  if Declaration_Kind (L_Decl) not in A_Type_Declaration then
+                     -- Definition was from an anonymous type, types are incompatible
+                     return False;
+                  end if;
                when others =>
-                  Impossible ("Bad kind in Compatible_Types for L", L);
+                  Impossible ("Compatible_Types: Bad kind for L", L);
             end case;
             case Definition_Kind (R) is
                when A_Subtype_Indication =>
@@ -4793,8 +4804,12 @@ package body Thick_Queries is
                   | A_Formal_Type_Definition
                   =>
                   R_Decl := Enclosing_Element (R);
+                  if Declaration_Kind (R_Decl) not in A_Type_Declaration then
+                     -- Definition was from an anonymous type, types are incompatible
+                     return False;
+                  end if;
                when others =>
-                  Impossible ("Bad kind in Compatible_Types for R", R);
+                  Impossible ("Compatible_Types: Bad kind for R", R);
             end case;
 
             return Is_Equal (Ultimate_Type_Declaration (L_Decl), Ultimate_Type_Declaration (R_Decl));
