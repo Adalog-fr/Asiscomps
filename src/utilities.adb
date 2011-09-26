@@ -46,7 +46,7 @@ with  -- ASIS units
   Asis.Text;
 
 with  -- GNAT
-  Gnat.Traceback.Symbolic;
+  GNAT.Traceback.Symbolic;
 
 package body Utilities is
 
@@ -368,14 +368,14 @@ package body Utilities is
    -- Traceback --
    ---------------
 
-   procedure Traceback (Exc : Ada.Exceptions.Exception_Occurrence) is
+   procedure Stack_Traceback (Exc : Ada.Exceptions.Exception_Occurrence) is
       use Ada.Characters.Handling;
-      use Gnat.Traceback.Symbolic;
+      use GNAT.Traceback.Symbolic;
    begin
       Raw_Trace ("----------------");
       Raw_Trace ("Stack traceback:");
       Raw_Trace (To_Wide_String (Symbolic_Traceback (Exc)));
-   end Traceback;
+   end Stack_Traceback;
 
 
    --------------

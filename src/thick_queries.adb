@@ -1372,7 +1372,8 @@ package body Thick_Queries is
          Def  : Asis.Definition;
 
          function Range_Position return ASIS_Positive is
-            Range_Index : constant Asis.Expression_List := Attribute_Designator_Expressions (Range_Attribute (Range_Def));
+            Range_Index : constant Asis.Expression_List := Attribute_Designator_Expressions
+                                                            (Range_Attribute (Range_Def));
          begin
             if Range_Index = Nil_Element_List then
                return 1;
