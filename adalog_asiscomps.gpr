@@ -9,7 +9,7 @@ project Adalog_Asiscomps is
    for Languages use ("Ada", "Adacontrol");
    type Fixes is
       ("1", "none");
-   Gnat_Fix : Fixes := external ("GNAT_FIX");
+   Gnat_Fix : Fixes := external ("GNAT_FIX", "none");
 
    package Ide is
       for Default_Switches ("adacontrol") use ("-f", "C:\donnees\profess\ada\programmes\semtools\common-src\verif.aru", "-S", "1", "-F", "gnat_short");
@@ -20,10 +20,10 @@ project Adalog_Asiscomps is
       case Gnat_Fix is
 
          when "1" =>
-            for Default_Switches ("ada") use ("-O2", "-gnatQ", "-gnatf", "-gnato", "-fstack-check", "-g");
+            for Default_Switches ("ada") use ("-gnatn", "-gnatQ", "-gnatf", "-gnato", "-fstack-check", "-g", "-gnatwcfkmruvz", "-gnatyabfhnM120", "-O2", "-gnat05", "-fno-tree-vrp");
 
          when "none" =>
-            for Default_Switches ("ada") use ("-O2", "-gnatQ", "-gnatf", "-gnato", "-fstack-check", "-g", "-gnatwc.cfkm.ou");
+            for Default_Switches ("ada") use ("-gnatn", "-gnatQ", "-gnatf", "-gnato", "-fstack-check", "-g", "-gnatwcfkmruvz", "-gnatyabfhnM120", "-O2", "-gnat05");
       end case;
    end Compiler;
 
