@@ -4072,10 +4072,11 @@ package body Thick_Queries is
    -- Size_Value_Image --
    ----------------------
 
-   function Size_Value_Image (Name : Asis.Expression) return Wide_String is
+   function Size_Value_Image (Name : Asis.Element) return Wide_String is
       use Asis.Clauses, Asis.Definitions, Asis.Expressions;
 
       Expr      : Asis.Expression;
+      Def       : Asis.Definition;
       Decl      : Asis.Declaration;
       Good_Name : Asis.Expression := Simple_Name (Name);
    begin
@@ -4143,16 +4144,19 @@ package body Thick_Queries is
                         -- Give up
                         return "";
                      when others =>
-                          Impossible ("Attribute not 'Base or 'Class", Good_Name);
+                          Impossible ("Size_Value_Image: Attribute not 'Base or 'Class", Good_Name);
                   end case;
 
                when others =>
                   Good_Name := Ultimate_Name (Good_Name);
+                  Def       := Corresponding_Name_Definition (Good_Name);
                   Decl      := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
             end case;
 
          when A_Defining_Name =>
             Decl := Enclosing_Element (Good_Name);
+            Def  := Good_Name;
+
          when others =>
             Impossible ("Size_Value_Image: wrong name", Name);
       end case;
@@ -4200,8 +4204,7 @@ package body Thick_Queries is
          when A_Component_Declaration =>
             -- Is this component sized by a component clause of the enclosing record?
             declare
-               Compo_Clause : constant Asis.Component_Clause := Corresponding_Component_Clause
-                                                                 (Corresponding_Name_Definition (Good_Name));
+               Compo_Clause : constant Asis.Component_Clause := Corresponding_Component_Clause (Def);
                R            : Asis.Discrete_Range;
                L            : Extended_Biggest_Natural;
                H            : Extended_Biggest_Int;

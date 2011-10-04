@@ -988,7 +988,7 @@ package Thick_Queries is
    -- Returns Not_Static for other cases
 
 
-   function Size_Value_Image (Name : Asis.Expression) return Wide_String;
+   function Size_Value_Image (Name : Asis.Element) return Wide_String;
    -- Name must be the name of a type or object
    --
    -- For a type:
