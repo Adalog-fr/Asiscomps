@@ -114,6 +114,7 @@ package Utilities is
    User_Error : exception;
    procedure Error (Message : Wide_String);
    pragma No_Return (Error);
+   -- Error raises User_Error;
 
    procedure Failure (Message : Wide_String);
    procedure Failure (Message : in Wide_String; Element : Asis.Element);

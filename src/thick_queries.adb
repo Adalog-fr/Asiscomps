@@ -1816,6 +1816,9 @@ package body Thick_Queries is
                   null;
             end case;
             Decl := Enclosing_Element (The_Subtype);
+            while Element_Kind (Decl) /= A_Declaration loop -- There might be several levels of nested definitions
+               Decl := Enclosing_Element (Decl);
+            end loop;
          when A_Declaration =>
             Decl := The_Subtype;
          when others =>
@@ -4673,8 +4676,10 @@ package body Thick_Queries is
          Variable_Decl : Asis.Element;
 
          function Complete_For_Access (D : Name_Descriptor) return Name_Descriptor is
-            -- Add a "Dereference" part if the *type* is an access type
-            -- This allows explicit and implicit dereferences to match
+         -- Add a "Dereference" part if the *type* is an access type
+         -- This allows explicit and implicit dereferences to match
+            use Asis.Definitions;
+
             The_Type : Asis.Definition;
          begin
             if not With_Deref then
@@ -4682,17 +4687,26 @@ package body Thick_Queries is
             end if;
 
             The_Type := Corresponding_Expression_Type_Definition (E);
-            if  Is_Access_Subtype (The_Type) then
+            if not Is_Access_Subtype (The_Type) then
+               return D;
+            end if;
+
+            if Definition_Kind (The_Type) = An_Access_Definition then --ASIS 2005
+               return D & Name_Part'(Dereference,
+                                     Type_Declaration_View
+                                      (Corresponding_Name_Declaration
+                                       (Simple_Name
+                                        (Strip_Attributes
+                                         (Anonymous_Access_To_Object_Subtype_Mark (The_Type))))));
+            else
                if Declaration_Kind (Enclosing_Element (The_Type))
                   in An_Ordinary_Type_Declaration .. A_Subtype_Declaration
                then
-                  -- All types and subtypes declarations
+                  -- All types and subtypes declarations (excludes ASIS95 handling of anonymous types)
                   -- unwind private types etc.
                   The_Type := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (The_Type)));
                end if;
                return D & Name_Part'(Dereference, Asis.Definitions.Access_To_Object_Definition (The_Type));
-            else
-               return D;
             end if;
          end Complete_For_Access;
 
@@ -4752,6 +4766,7 @@ package body Thick_Queries is
                      &  Name_Part'(Dereference, Corresponding_Expression_Type_Definition (E)));
 
                when A_Type_Conversion =>
+                  -- type conversions don't change variables, and have to be ignored for matching purpose
                   E := Converted_Or_Qualified_Expression (E);
 
                when others =>
@@ -4770,12 +4785,14 @@ package body Thick_Queries is
 
          function Compatible_Types (L, R : Asis.Definition) return Boolean is
          -- Are L and R definitions for types in the same derivation family?
+         -- We strip attributes here: T'Base and T'Class are the same as T, as far as
+         -- belonging to the same derivation family is concerned.
             use Asis.Definitions;
             L_Decl, R_Decl : Asis.Declaration;
          begin
             case Definition_Kind (L) is
                when A_Subtype_Indication =>
-                  L_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (L));
+                  L_Decl := Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Subtype_Simple_Name (L))));
                when A_Component_Definition =>
                   L_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication (L)));
                when A_Type_Definition
@@ -4791,12 +4808,40 @@ package body Thick_Queries is
                      -- Definition was from an anonymous type, types are incompatible
                      return False;
                   end if;
+               when An_Access_Definition =>
+                  -- 2005 Consider it compatible with any access type whose target is compatible
+                  if not Is_Access_Subtype (R) then
+                     return False;
+                  end if;
+                  L_Decl := Corresponding_Name_Declaration
+                             (Simple_Name
+                              (Strip_Attributes
+                               (Anonymous_Access_To_Object_Subtype_Mark (L))));
+
+                  if Definition_Kind (R) = An_Access_Definition then --ASIS 2005
+                     R_Decl := Corresponding_Name_Declaration
+                                (Simple_Name
+                                 (Strip_Attributes
+                                  (Anonymous_Access_To_Object_Subtype_Mark (R))));
+                  else
+                     -- At this point, R is the subtype indication that follows the word "access"
+                     -- Must go up one level before calling Access_To_Object_Definition
+                     R_Decl :=  Corresponding_Name_Declaration
+                                 (Simple_Name
+                                  (Strip_Attributes
+                                   (Subtype_Simple_Name
+                                    (Asis.Definitions.Access_To_Object_Definition
+                                     (Enclosing_Element (R))))));
+                  end if;
+
+                  -- Do it now to skip next case on Definition_Kind (R)
+                  return Is_Equal (Ultimate_Type_Declaration (L_Decl), Ultimate_Type_Declaration (R_Decl));
                when others =>
                   Impossible ("Compatible_Types: Bad kind for L", L);
             end case;
             case Definition_Kind (R) is
                when A_Subtype_Indication =>
-                  R_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (R));
+                  R_Decl := Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Subtype_Simple_Name (R))));
                when A_Component_Definition =>
                   R_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication (R)));
                when A_Type_Definition
@@ -4812,6 +4857,24 @@ package body Thick_Queries is
                      -- Definition was from an anonymous type, types are incompatible
                      return False;
                   end if;
+               when An_Access_Definition =>
+                  -- 2005 Consider it compatible with any access type whose target is compatible
+                  -- L cannot be an access definition, because it has been checked above
+                  if not Is_Access_Subtype (L) then
+                     return False;
+                  end if;
+                  R_Decl := Corresponding_Name_Declaration
+                             (Simple_Name
+                              (Strip_Attributes
+                               (Anonymous_Access_To_Object_Subtype_Mark (R))));
+
+                  -- At this point, L is the subtype indication that follows the word "access"
+                  -- Must go up one level before calling Access_To_Object_Definition
+                  L_Decl :=  Corresponding_Name_Declaration
+                              (Simple_Name
+                               (Strip_Attributes
+                                (Subtype_Simple_Name (Asis.Definitions.Access_To_Object_Definition
+                                 (Enclosing_Element (L))))));
                when others =>
                   Impossible ("Compatible_Types: Bad kind for R", R);
             end case;
