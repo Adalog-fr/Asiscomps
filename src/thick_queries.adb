@@ -1075,7 +1075,12 @@ package body Thick_Queries is
          end if;
       end if;
 
-      if Element_Kind (The_Name) = A_Defining_Name then
+      if Is_Nil (The_Name) then
+         -- TBSL 2005 Coming from an anonymous access to subprogram
+         -- We don't have a syntax for these yet on input, but we must do something
+         -- on output. Just use "null" as a stub.
+         return "null";
+      elsif Element_Kind (The_Name) = A_Defining_Name then
          Decl_Name := The_Name;
       else
          Decl_Name := Corresponding_Name_Definition (Simple_Name (The_Name));
@@ -1487,31 +1492,13 @@ package body Thick_Queries is
    --------------------------
 
    function Is_Access_Expression (The_Element : Asis.Expression) return Boolean is
-      The_Type : constant Asis.Declaration := A4G_Bugs.Corresponding_Expression_Type (The_Element);
-      The_Name : Asis.Expression;
-      Decl     : Asis.Declaration;
+      Def : constant Asis.Definition := Corresponding_Expression_Type_Definition (The_Element);
    begin
-      if not Is_Nil (The_Type) then
-         return Is_Access_Subtype (The_Type);
-      end if;
-
-      -- Here The_Element may be of an anonymous access type (ASIS 95)
-      -- This can happen only if it is a (possibly selected) identifier.
-      The_Name := Simple_Name (The_Element);
-      if Expression_Kind (The_Name) /= An_Identifier then
+      if Is_Nil (Def) then
+         -- something that has no type (package name...)
          return False;
       end if;
-
-      Decl := A4G_Bugs.Corresponding_Name_Declaration (The_Name);
-      case Declaration_Kind (Decl) is
-         when A_Parameter_Specification
-            | A_Discriminant_Specification
-            =>
-            return Trait_Kind (Decl) = An_Access_Definition_Trait                              -- ASIS 95
-              or else Definition_Kind (Object_Declaration_View (Decl)) = An_Access_Definition; -- ASIS 2005
-         when others =>
-            return False;
-      end case;
+      return Is_Access_Subtype (Def);
    end Is_Access_Expression;
 
    -------------------
@@ -1822,7 +1809,7 @@ package body Thick_Queries is
          when A_Declaration =>
             Decl := The_Subtype;
          when others =>
-            Impossible ("Inappropriate element kind in Is_Access_Subtype", The_Subtype);
+            Impossible ("Is_Access_Subtype: inappropriate element kind", The_Subtype);
       end case;
 
       Good_Def  := Type_Declaration_View (Ultimate_Type_Declaration (Decl));
@@ -2783,6 +2770,7 @@ package body Thick_Queries is
                   while A4G_Bugs.Attribute_Kind (Good_Mark) = A_Class_Attribute loop -- especially, /= Not_An_Attribute
                      Good_Mark := Prefix (Good_Mark);
                   end loop;
+                  Good_Mark := Simple_Name (Good_Mark);
                when others =>
                   -- Impossible
                   Impossible ("Attribute of Type_Profile = "
@@ -2903,10 +2891,35 @@ package body Thick_Queries is
    ----------------------------------------------
 
    function Corresponding_Expression_Type_Definition (The_Element : Asis.Expression) return Asis.Definition is
-      use Asis.Expressions;
+      use Asis.Definitions, Asis.Expressions;
       Local_Elem : Asis.Element := A4G_Bugs.Corresponding_Expression_Type (The_Element);
       Def        : Asis.Definition;
    begin
+      if Is_Nil (Local_Elem) then
+         -- Normally, we are called only with "true" expressions, which are supposed to have a type
+         -- However, The_Element can be the name of a protected type or a task type from its own body
+         -- designating the current instance. A4G returns Nil_Element for Corresponding_Expression_Type
+         -- in that case.
+         -- Incidentally, this will make Corresponding_Expression_Type_Definition work for any type,
+         -- but we don't confess it in the specification...
+         case Expression_Kind (The_Element) is
+            when A_Null_Literal =>
+               -- Let's get rid of this one ASAP while we're at it
+               return Nil_Element;
+            when An_Identifier | A_Selected_Component =>
+               -- Only these can be type names
+               declare
+                  Decl : constant Asis.Declaration := Corresponding_Name_Declaration (Simple_Name (The_Element));
+               begin
+                  if Declaration_Kind (Decl) in A_Type_Declaration then
+                     Local_Elem := Decl;
+                  end if;
+               end;
+            when others =>
+               null;
+         end case;
+      end if;
+
       if Declaration_Kind (Local_Elem) = A_Private_Type_Declaration then
          -- We want at true definition, therefore we have to look through private types
          Local_Elem := Corresponding_Type_Declaration (Local_Elem);
@@ -2926,6 +2939,12 @@ package body Thick_Queries is
             -- Short of a better idea, take the definition from the sliced object
             -- Note that the bounds will therefore not be the ones of the slice
             Local_Elem  := Prefix (The_Element);
+         when An_Indexed_Component =>
+            -- 2005 Joy! Now, array components can be of an anonymous (access) type.
+            return Component_Definition_View
+                    (Array_Component_Definition
+                     (Corresponding_Expression_Type_Definition
+                      (Prefix (The_Element))));
          when others =>
             return Nil_Element;
       end case;
@@ -4541,8 +4560,13 @@ package body Thick_Queries is
                               -- Enumeration
                               return Position_Number_Image (Bounds (2 * Dim - 1));
                            when Not_An_Element =>
-                              -- Modular type
-                              return " 0";
+                              -- Either a formal type or a modular type
+                              -- But in the case of a modular type, we know damn well that 'First = 0
+                              if Type_Category (Prefix (Expression)) = A_Modular_Type then
+                                 return " 0";
+                              else
+                                 return "";
+                              end if;
                            when others =>
                               Impossible ("Bad return from Discrete_Constraining_Bounds", Bounds (2 * Dim - 1));
                         end case;
@@ -4691,23 +4715,15 @@ package body Thick_Queries is
                return D;
             end if;
 
-            if Definition_Kind (The_Type) = An_Access_Definition then --ASIS 2005
-               return D & Name_Part'(Dereference,
-                                     Type_Declaration_View
-                                      (Corresponding_Name_Declaration
-                                       (Simple_Name
-                                        (Strip_Attributes
-                                         (Anonymous_Access_To_Object_Subtype_Mark (The_Type))))));
-            else
-               if Declaration_Kind (Enclosing_Element (The_Type))
-                  in An_Ordinary_Type_Declaration .. A_Subtype_Declaration
-               then
-                  -- All types and subtypes declarations (excludes ASIS95 handling of anonymous types)
-                  -- unwind private types etc.
-                  The_Type := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (The_Type)));
-               end if;
-               return D & Name_Part'(Dereference, Asis.Definitions.Access_To_Object_Definition (The_Type));
+            if Declaration_Kind (Enclosing_Element (The_Type))
+               in An_Ordinary_Type_Declaration .. A_Subtype_Declaration
+               -- All types and subtypes declarations (excludes ASIS95 handling of anonymous types)
+            then
+               -- unwind private types etc.
+               The_Type := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (The_Type)));
             end if;
+            return D & Name_Part'(Dereference,
+                                  Type_Declaration_View (Access_Target_Type (The_Type)));
          end Complete_For_Access;
 
       begin  -- Descriptor
@@ -4818,20 +4834,17 @@ package body Thick_Queries is
                               (Strip_Attributes
                                (Anonymous_Access_To_Object_Subtype_Mark (L))));
 
-                  if Definition_Kind (R) = An_Access_Definition then --ASIS 2005
+                  if Definition_Kind (R) = An_Access_Definition then -- 2005
                      R_Decl := Corresponding_Name_Declaration
                                 (Simple_Name
                                  (Strip_Attributes
                                   (Anonymous_Access_To_Object_Subtype_Mark (R))));
                   else
-                     -- At this point, R is the subtype indication that follows the word "access"
-                     -- Must go up one level before calling Access_To_Object_Definition
                      R_Decl :=  Corresponding_Name_Declaration
                                  (Simple_Name
                                   (Strip_Attributes
                                    (Subtype_Simple_Name
-                                    (Asis.Definitions.Access_To_Object_Definition
-                                     (Enclosing_Element (R))))));
+                                    (Asis.Definitions.Access_To_Object_Definition (R)))));
                   end if;
 
                   -- Do it now to skip next case on Definition_Kind (R)
@@ -4839,6 +4852,7 @@ package body Thick_Queries is
                when others =>
                   Impossible ("Compatible_Types: Bad kind for L", L);
             end case;
+
             case Definition_Kind (R) is
                when A_Subtype_Indication =>
                   R_Decl := Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Subtype_Simple_Name (R))));
@@ -4868,13 +4882,10 @@ package body Thick_Queries is
                               (Strip_Attributes
                                (Anonymous_Access_To_Object_Subtype_Mark (R))));
 
-                  -- At this point, L is the subtype indication that follows the word "access"
-                  -- Must go up one level before calling Access_To_Object_Definition
                   L_Decl :=  Corresponding_Name_Declaration
                               (Simple_Name
                                (Strip_Attributes
-                                (Subtype_Simple_Name (Asis.Definitions.Access_To_Object_Definition
-                                 (Enclosing_Element (L))))));
+                                (Subtype_Simple_Name (Asis.Definitions.Access_To_Object_Definition (L)))));
                when others =>
                   Impossible ("Compatible_Types: Bad kind for R", R);
             end case;
@@ -4963,9 +4974,9 @@ package body Thick_Queries is
                                  R_Descr (R_Rightmost_Deref).Designated_Type)
             then
                   return (Unlikely, Complete);
-               else
+            else
                   return (Unlikely, Partial);
-               end if;
+            end if;
          end if;
 
          -- Here, Left and Right are the same variable
