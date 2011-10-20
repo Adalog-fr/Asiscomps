@@ -1,3 +1,4 @@
+with Utilities; use Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -2931,10 +2932,16 @@ package body Thick_Queries is
                declare
                   Decl : constant Asis.Declaration := Corresponding_Name_Declaration (Simple_Name (The_Element));
                begin
-                  if Declaration_Kind (Decl) in A_Type_Declaration then
-                     Local_Elem := Decl;
-                  end if;
+                  case Declaration_Kind (Decl) is
+                     when A_Type_Declaration | A_Subtype_Declaration | A_Formal_Type_Declaration =>
+                        Local_Elem := Decl;
+                     when others =>
+                        null;
+                  end case;
                end;
+            when An_Attribute_Reference =>
+               -- At this point, can only be 'Base or 'Class, which we ignore for the purpose of the type definition
+               return Corresponding_Expression_Type_Definition (Strip_Attributes (The_Element));
             when others =>
                null;
          end case;
@@ -3022,10 +3029,24 @@ package body Thick_Queries is
    begin
       if Is_Nil (Local_Elem) then
          -- The_Element is a package, subprogram, task, anonymous access...
-         -- For array, task and protected, we can still go to the definition
-         return Corresponding_Expression_Type_Definition (The_Element);
+         -- For array, task and protected anonymous types, we can still go to the definition
+
+         Local_Elem := Corresponding_Expression_Type_Definition (The_Element);
+         if Is_Nil (Local_Elem) then
+            -- There is definitely no type in sight here (it's a label f.e.)
+            return Nil_Element;
+         end if;
+
+         case Declaration_Kind (Enclosing_Element (Local_Elem)) is
+            when A_Type_Declaration | A_Subtype_Declaration =>
+               -- Goddam! we were passed the name of a type
+               return Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (Local_Elem)));
+            when others =>
+               return Local_Elem;
+         end case;
       end if;
 
+      -- Regular case: The el
       -- Go to the full declaration if necessary (incomplete and private)
       if Declaration_Kind (Local_Elem) in
         An_Incomplete_Type_Declaration .. A_Private_Extension_Declaration
@@ -4734,7 +4755,6 @@ package body Thick_Queries is
          function Complete_For_Access (D : Name_Descriptor) return Name_Descriptor is
          -- Add a "Dereference" part if the *type* is an access type
          -- This allows explicit and implicit dereferences to match
-            use Asis.Definitions;
 
             The_Type : Asis.Definition;
          begin
