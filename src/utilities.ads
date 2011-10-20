@@ -136,10 +136,10 @@ package Utilities is
 
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;
-                    With_Source : Boolean      := False);
+                    With_Source : Boolean      := True);
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element_List;
-                    With_Source : Boolean           := False);
+                    With_Source : Boolean           := True);
 
    procedure Assert (Condition : Boolean; Message : Wide_String);
    procedure Assert (Condition : Boolean; Message : Wide_String; Element : Asis.Element);

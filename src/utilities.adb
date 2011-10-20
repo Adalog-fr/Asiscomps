@@ -559,7 +559,7 @@ package body Utilities is
 
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;
-                    With_Source : Boolean      := False) is
+                    With_Source : Boolean      := True) is
       use Asis.Elements, Asis.Text;
    begin
       if Debug_Option then
@@ -581,7 +581,7 @@ package body Utilities is
 
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element_List;
-                    With_Source : Boolean           := False) is
+                    With_Source : Boolean           := True) is
       use Asis.Text;
    begin
       if Debug_Option then
