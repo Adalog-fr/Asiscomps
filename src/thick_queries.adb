@@ -3046,7 +3046,7 @@ package body Thick_Queries is
          end case;
       end if;
 
-      -- Regular case: The el
+      -- Regular case: The element has a good ol' (named) type
       -- Go to the full declaration if necessary (incomplete and private)
       if Declaration_Kind (Local_Elem) in
         An_Incomplete_Type_Declaration .. A_Private_Extension_Declaration
