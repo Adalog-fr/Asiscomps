@@ -2973,6 +2973,9 @@ package body Thick_Queries is
                      (Corresponding_Expression_Type_Definition
                       (Prefix (The_Element))));
          when others =>
+            -- TBSL This unfortunately covers the case of an aggregate of an anonymous array type, like in:
+            --   Tab : array (1..10) of Integer := (1..10 => 0);
+            -- No way to solve this in sight...
             return Nil_Element;
       end case;
 
@@ -3860,6 +3863,7 @@ package body Thick_Queries is
                   when A_Variable_Declaration
                      | A_Constant_Declaration
                      | A_Component_Declaration
+                     | A_Return_Object_Declaration
                        =>
                      No_Unconstrained := True;
                      Item             := Object_Declaration_View (Item);
