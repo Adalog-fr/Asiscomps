@@ -2286,6 +2286,42 @@ package body Thick_Queries is
       return Nil_Element;  -- No record representation clause found
    end Corresponding_Component_Clause;
 
+   --------------------------------------
+   -- Corresponding_Enumeration_Clause --
+   --------------------------------------
+
+   function Corresponding_Enumeration_Clause (Enumeration_Value : in Asis.Defining_Name) return Asis.Association is
+      use Asis.Clauses, Asis.Expressions;
+
+      Parent_Decl : constant Asis.Declaration := Enclosing_Element
+                                                  (Enclosing_Element
+                                                   (Enclosing_Element (Enumeration_Value)));
+      Repr_List   : constant Asis.Representation_Clause_List := Corresponding_Representation_Clauses (Parent_Decl);
+   begin
+      for R in Repr_List'Range loop
+         if Representation_Clause_Kind (Repr_List (R)) = An_Enumeration_Representation_Clause then
+            declare
+               Assoc_List : constant Asis.Association_List := Array_Component_Associations
+                                                               (Representation_Clause_Expression (Repr_List (R)));
+            begin
+               for C in Assoc_List'Range loop
+                  for I in Array_Component_Choices (Assoc_List (C))'Range loop
+                     declare
+                        Enumeration_Literal : constant Expression := Array_Component_Choices (Assoc_List (C)) (I);
+                     begin
+                        if Is_Equal (Corresponding_Name_Definition (Enumeration_Literal), Enumeration_Value) then
+                           return Assoc_List (C);
+                        end if;
+                     end;
+                  end loop;
+               end loop;
+            end;
+            return Nil_Element;  -- Cannot have several record representation clauses
+         end if;
+      end loop;
+      return Nil_Element;  -- No record representation clause found
+   end Corresponding_Enumeration_Clause;
+
 
    -------------------
    -- Type_Category --

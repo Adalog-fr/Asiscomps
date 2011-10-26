@@ -505,6 +505,10 @@ package Thick_Queries is
    -- We use the defining_name rather than the component declaration here to avoid problems in
    -- case of declarations with several defining names.
 
+   function Corresponding_Enumeration_Clause (Enumeration_Value : in Asis.Defining_Name) return Asis.Association;
+   -- Returns the association Enumeration_Value => Representation for the given Enumeration_Value
+   -- Returns Nil_Element if ther is no applicable enumeration representation clause
+
 
    type Type_Categories is (Not_A_Type,
                             An_Enumeration_Type,
