@@ -4720,6 +4720,33 @@ package body Thick_Queries is
                         -- something else...
                         raise;
                   end;
+               when A_Length_Attribute =>
+                  declare
+                     Lengths   : constant Extended_Biggest_Natural_List
+                       := Discrete_Constraining_Lengths (Prefix (Expression), Follow_Access => True);
+                     Dim_Expr  : constant Asis.Expression_List := Attribute_Designator_Expressions (Expression);
+                     Dim       : Positive;
+                  begin
+                     if Is_Nil (Dim_Expr) then
+                        Dim := 1;
+                     else
+                        -- In the extremely unlikely case where the static expression Dim_Expr is
+                        -- too complicated for us to evaluate, the following will raise Constraint_Error,
+                        -- and thus we will return "", which is appropriate.
+                        Dim := Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
+                     end if;
+                     if Lengths (Dim) = Not_Static then
+                        return "";
+                     else
+                        return Extended_Biggest_Natural'Wide_Image (Lengths (Dim));
+                     end if;
+                  end;
+               when A_Modulus_Attribute =>
+                  declare
+                     Type_Definition : constant Definition := Ultimate_Expression_Type (Prefix (Expression));
+                  begin
+                     return Static_Expression_Value_Image (Definitions.Mod_Static_Expression (Type_Definition));
+                  end;
                when A_Size_Attribute =>
                   return Size_Value_Image (Simple_Name (Prefix (Expression)));
                when others =>
