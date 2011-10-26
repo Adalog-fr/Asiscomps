@@ -1,4 +1,3 @@
-with Utilities; use Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -2976,8 +2975,15 @@ package body Thick_Queries is
                   end case;
                end;
             when An_Attribute_Reference =>
-               -- At this point, can only be 'Base or 'Class, which we ignore for the purpose of the type definition
-               return Corresponding_Expression_Type_Definition (Strip_Attributes (The_Element));
+               case Attribute_Kind (The_Element) is
+                  when A_Base_Attribute | A_Class_Attribute =>
+                     -- We ignore 'Base or 'Class for the purpose of the type definition
+                     return Corresponding_Expression_Type_Definition (Strip_Attributes (The_Element));
+                  when others =>
+                     -- 'Read, 'Write and friends, because these are procedures
+                     -- (for attributes that are functions, Corresponding_Expression_Type is not Nil)
+                     return Nil_Element;
+               end case;
             when others =>
                null;
          end case;
@@ -3004,10 +3010,13 @@ package body Thick_Queries is
             Local_Elem  := Prefix (The_Element);
          when An_Indexed_Component =>
             -- 2005 Joy! Now, array components can be of an anonymous (access) type.
-            return Component_Definition_View
-                    (Array_Component_Definition
-                     (Corresponding_Expression_Type_Definition
-                      (Prefix (The_Element))));
+            Def := Corresponding_Expression_Type_Definition (Prefix (The_Element));
+            if Is_Nil (Def) then
+               -- This is the case if the indexing was for an entry family,
+               -- there is really no type in sight
+               return Nil_Element;
+            end if;
+            return Component_Definition_View (Array_Component_Definition (Def));
          when others =>
             -- TBSL This unfortunately covers the case of an aggregate of an anonymous array type, like in:
             --   Tab : array (1..10) of Integer := (1..10 => 0);
@@ -4055,6 +4064,8 @@ package body Thick_Queries is
                   | A_For_Loop_Statement
                     =>
                   return Loop_Statements (Element);
+               when An_Extended_Return_Statement =>
+                  return Extended_Return_Statements (Element);
                when others =>
                   Impossible ("Statements: invalid statement kind", Element);
             end case;
