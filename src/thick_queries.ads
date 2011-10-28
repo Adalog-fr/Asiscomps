@@ -327,8 +327,9 @@ package Thick_Queries is
    --   An_Attribute_Reference
 
    function Access_Target_Type (The_Subtype : Asis.Element) return Asis.Declaration;
-   -- Returns the declaration of the first subtype of the target of the access type if The_Subtype is
-   -- a declaration of an access type (including anonymous ones) or of a formal access type.
+   -- Returns the declaration of the first subtype of the target of the access type if The_Subtype
+   -- is a declaration of an access to object type (including anonymous ones) or of a formal access
+   -- to object type.
    -- It's the really first subtype ;-), ignoring 'Base and 'Class attributes that can be in the way.
    -- Returns Nil_Element in all other cases
    --
@@ -694,7 +695,7 @@ package Thick_Queries is
 
    function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition;
    -- return the type definition of the ultimate ancestor type of The_Element
-   -- (going up all subtype and derived type declaration).
+   -- (going up all subtype and derived type declaration, and through private and incomplete declarations).
 
 
    function Expression_Type_Kind (The_Element : Asis.Expression) return Asis.Type_Kinds;
