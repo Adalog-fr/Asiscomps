@@ -160,14 +160,18 @@ package body Thick_Queries is
             return Corresponding_First_Subtype (Decl);
          when A_Type_Definition =>
             if Type_Kind (Good_Def) = An_Access_Type_Definition then
+               Good_Def := (Type_Declaration_View
+                            (Ultimate_Type_Declaration
+                             (Enclosing_Element (Good_Def))));
+               if Access_Type_Kind (Good_Def) not in Asis.Access_To_Object_Definition then
+                  return Nil_Element;
+               end if;
                Decl := Corresponding_Name_Declaration
-                         (Simple_Name
-                          (Strip_Attributes
-                           (Subtype_Simple_Name
-                            (Asis.Definitions.Access_To_Object_Definition
-                             (Type_Declaration_View
-                              (Ultimate_Type_Declaration
-                               (Enclosing_Element (Good_Def))))))));
+                        (Simple_Name
+                         (Strip_Attributes
+                          (Subtype_Simple_Name
+                           (Asis.Definitions.Access_To_Object_Definition (Good_Def)))));
+
                case Declaration_Kind (Decl) is
                   when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
                      Decl := Corresponding_Type_Declaration (Decl);
@@ -2842,10 +2846,22 @@ package body Thick_Queries is
          if Declaration_Kind (Decl) in An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration then
             -- cannot take the Corresponding_First_Subtype of an incomplete type
             Decl := Corresponding_Type_Declaration (Decl);
+            if Is_Nil (Decl) then
+            -- TBSL 2005 Issue not settled with AdaCore
+            -- In some cases of incomplete declarations resulting from limited views,
+            -- Corresponding_Type_Declaration is unable to retrieve the full declaration and
+            -- returns Nil_Element. For the moment, let's take back the incomplete type, and
+            -- forget about the first subtype
+               Decl := A4G_Bugs.Corresponding_Name_Declaration (Good_Mark);
+            else
+               Decl := Corresponding_First_Subtype (Decl);
+            end if;
+         else
+            Decl := Corresponding_First_Subtype (Decl);
          end if;
          return (Is_Access => False,
                  Attribute => Attribute,
-                 Name      => Names (Corresponding_First_Subtype (Decl))(1));
+                 Name      => Names (Decl)(1));
       end Build_Entry;
 
       function Build_Profile (Parameters : Parameter_Specification_List) return Profile_Table is
@@ -2975,7 +2991,7 @@ package body Thick_Queries is
                   end case;
                end;
             when An_Attribute_Reference =>
-               case Attribute_Kind (The_Element) is
+               case A4G_Bugs.Attribute_Kind (The_Element) is
                   when A_Base_Attribute | A_Class_Attribute =>
                      -- We ignore 'Base or 'Class for the purpose of the type definition
                      return Corresponding_Expression_Type_Definition (Strip_Attributes (The_Element));
@@ -3647,10 +3663,10 @@ package body Thick_Queries is
       Item             : Asis.Element := Elem; -- This item will navigate until we find the appropriate definition
       Constraint       : Asis.Definition;
       No_Unconstrained : Boolean := False;
-      -- In the case of an unconstrained array type, we normally return the indices of the index type.
-      -- However, in the case of an object of an unconstrained type, the constraint is inherited from
-      -- the initial (or actual) value, and hence not available. No_Unconstrained is set to True
-      -- when moving from an object declaration to its type to prevent returning the indices of the
+      -- In the case of an unconstrained array type, we normally return the indices of the index type. However, in the
+      -- case of an object of an unconstrained type (including the returned object of a function call), the constraint
+      -- is inherited from the initial (or actual) value, and hence not available. No_Unconstrained is set to True when
+      -- moving from an object declaration (or function call) to its type to prevent returning the indices of the
       -- unconstrained type.
    begin  -- Discrete_Constraining_Bounds
       loop
@@ -3854,20 +3870,11 @@ package body Thick_Queries is
                      Item := Slice_Range (Item);
                   when An_Explicit_Dereference =>
                      -- We must go to the declaration of the type referenced by the prefix
-                     Item := A4G_Bugs.Corresponding_Expression_Type (Prefix (Item));
-
-                     -- At this point, Item is not (yet) necessarily the declaration of an access type!
-                     -- it can be a private type whose full type is an access type, accessed from a place where
-                     -- the full definition is visible.
-                     if Declaration_Kind (Item) = A_Private_Type_Declaration then
-                        Item := Corresponding_Type_Declaration (Item);
-                     end if;
-
-                     Item := Type_Declaration_View (Item);
-                     if Access_Type_Kind (Item) in An_Access_To_Procedure .. An_Access_To_Protected_Function then
+                     Item := Access_Target_Type (Corresponding_Expression_Type_Definition (Prefix (Item)));
+                     if Is_Nil (Item) then
+                        -- Access to SP...
                         return Nil_Element_List;
                      end if;
-                     Item := Asis.Definitions.Access_To_Object_Definition (Item);
                   when An_Attribute_Reference =>
                      -- We cannot get to the bounds of T'Base, and taking T instead would be misleading
                      -- There is no applicable constraints for 'Class
@@ -3876,7 +3883,8 @@ package body Thick_Queries is
                      return Nil_Element_List;
                   when A_Function_Call =>
                      -- The constraint is the one of the return type
-                     Item := A4G_Bugs.Corresponding_Expression_Type (Item);
+                     No_Unconstrained := True;
+                     Item             := A4G_Bugs.Corresponding_Expression_Type (Item);
                   when others =>
                      -- Assume it's a name, but it can be a type name, therefore
                      -- we cannot take directly Corresponding_Expression_Type
