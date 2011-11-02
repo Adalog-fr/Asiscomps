@@ -160,9 +160,7 @@ package body Thick_Queries is
             return Corresponding_First_Subtype (Decl);
          when A_Type_Definition =>
             if Type_Kind (Good_Def) = An_Access_Type_Definition then
-               Good_Def := (Type_Declaration_View
-                            (Ultimate_Type_Declaration
-                             (Enclosing_Element (Good_Def))));
+               Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (Good_Def)));
                if Access_Type_Kind (Good_Def) not in Asis.Access_To_Object_Definition then
                   return Nil_Element;
                end if;
