@@ -1057,9 +1057,9 @@ package body Thick_Queries is
          -- Adds profile to name if necessary
          Name_Image : constant Wide_String := Defining_Name_Image (N);
       begin
-         if With_Profile and then
+         if With_Profile
            -- A generic is not overloadable, therefore we don't add the profile
-           Declaration_Kind (Enclosing_Element (N)) not in A_Generic_Declaration
+           and then not Is_Generic_Unit (Enclosing_Element (N))
          then
             return Name_Image & Profile_Image (N, With_Profile => True);
          else
@@ -1560,6 +1560,8 @@ package body Thick_Queries is
                               & Expression_Kinds'Wide_Image (Expression_Kind (Element)),
                               Element);
             end  case;
+         when A_Statement =>
+            return Not_A_Callable;
          when others =>
             -- Impossible
             Impossible ("Is_Callable_Construct called on "
@@ -2760,13 +2762,15 @@ package body Thick_Queries is
    begin   -- Profile_Image
       if Element_Kind (The_Name) = A_Defining_Name then
          Decl_Name := Enclosing_Element (The_Name);
-      elsif Expression_Kind (The_Name) = A_Selected_Component then
-         Decl_Name := A4G_Bugs.Corresponding_Name_Declaration (Selector (The_Name));
+         while Element_Kind (Decl_Name) = A_Defining_Name loop
+            -- Case of a Defining_Expanded_Name
+            Decl_Name := Enclosing_Element (Decl_Name);
+         end loop;
       else
-         Decl_Name := A4G_Bugs.Corresponding_Name_Declaration (The_Name);
+         Decl_Name := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (The_Name));
       end if;
 
-      if  not Is_Callable_Construct (The_Name) then
+      if not Is_Callable_Construct (Decl_Name) then
          return "";
       end if;
 
