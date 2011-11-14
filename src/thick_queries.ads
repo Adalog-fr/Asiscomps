@@ -216,6 +216,13 @@ package Thick_Queries is
    --    An_Accept_Statement
    --    A_Block_Statement
 
+
+   -------------------------------------------------------------------------------------------------
+   --                                                                                             --
+   -- Queries about statements                                                                    --
+   --                                                                                             --
+   -------------------------------------------------------------------------------------------------
+
    function Last_Effective_Statement (Stats : Asis.Statement_List) return Asis.Statement;
    -- Returns the last statement from Stats, unless it is a block statement without exception handlers,
    -- in which case the last statement of the block is returned (recursively, of course).
@@ -223,6 +230,12 @@ package Thick_Queries is
    function Are_Null_Statements (Stats : Asis.Statement_List; Except_Labelled : Boolean := False) return Boolean;
    -- Checks whether Stats contain only null statement(s)
    -- If Except_Labelled is True, returns False also if there is a labelled statement
+
+   function First_Exiting_Statement (Stats : Asis.Statement_List; Include_Returns : Boolean := True)
+                                     return Asis.Statement;
+   -- Returns the (textually) first exit or goto statement that transfer control outside of Stats.
+   -- If Include_Returns is True, also possibly returns a return statement, an extended return statement,
+   -- or a requeue statement.
 
    function Is_Part_Of (Elem : Asis.Element; Inside : Asis.Element_List) return Boolean;
    -- returns true if Elem is textually within Inside

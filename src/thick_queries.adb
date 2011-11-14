@@ -51,6 +51,7 @@ with   -- ASIS units
   Asis.Elements,
   Asis.Exceptions,
   Asis.Expressions,
+  Asis.Iterator,
   Asis.Statements,
   Asis.Text;
 package body Thick_Queries is
@@ -4133,6 +4134,69 @@ package body Thick_Queries is
       end loop;
       return True;
    end Are_Null_Statements;
+
+
+   -----------------------------
+   -- First_Exiting_Statement --
+   -----------------------------
+
+   function First_Exiting_Statement (Stats : Asis.Statement_List; Include_Returns : Boolean := True)
+                                     return Asis.Statement
+   is
+      use Asis.Iterator;
+
+      procedure Pre_Operation  (Element :        Asis.Element;
+                                Control : in out Traverse_Control;
+                                State   : in out Asis.Statement);
+      procedure Post_Operation (Element :        Asis.Element;
+                                Control : in out Traverse_Control;
+                                State   : in out Asis.Statement) is null;
+      procedure Traverse is new Traverse_Element (Asis.Statement, Pre_Operation, Post_Operation);
+
+      procedure Pre_Operation (Element :        Asis.Element;
+                               Control : in out Traverse_Control;
+                               State   : in out Asis.Statement)
+      is
+      begin
+         if Element_Kind (Element) /= A_Statement then
+            return;
+         end if;
+
+         case Statement_Kind (Element) is
+            when An_Exit_Statement =>
+               if not Is_Part_Of (Corresponding_Loop_Exited (Element), Stats) then
+                  State   := Element;
+                  Control := Terminate_Immediately;
+               end if;
+            when A_Goto_Statement =>
+               if not Is_Part_Of (Corresponding_Destination_Statement (Element), Stats) then
+                  State   := Element;
+                  Control := Terminate_Immediately;
+               end if;
+            when A_Return_Statement
+               | An_Extended_Return_Statement
+               | A_Requeue_Statement
+               | A_Requeue_Statement_With_Abort
+               =>
+               if Include_Returns then
+                  State   := Element;
+                  Control := Terminate_Immediately;
+               end if;
+            when others =>
+               null;
+         end case;
+      end Pre_Operation;
+
+      Exiting_Stmt : Asis.Statement   := Nil_Element;
+      Control      : Traverse_Control := Continue;
+   begin
+      for S in Stats'Range loop
+         Traverse (Stats (S), Control, Exiting_Stmt);
+         exit when not Is_Nil (Exiting_Stmt);
+      end loop;
+      return Exiting_Stmt;
+   end First_Exiting_Statement;
+
 
    ----------------
    -- Is_Part_Of --
