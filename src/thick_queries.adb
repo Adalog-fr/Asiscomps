@@ -1050,9 +1050,23 @@ package body Thick_Queries is
                              With_Profile : in Boolean := False) return Wide_String is
       use Ada.Strings.Wide_Fixed, Asis.Expressions;
 
-      Parent          : Element;
-      Anonymous_Count : Natural;
-      Decl_Name       : Asis.Defining_Name;
+      Parent                   : Element;
+      Anonymous_Count          : Natural;
+      Extended_Return_Position : Natural;
+      Decl_Name                : Asis.Defining_Name;
+
+      function Anonymous_Subname return Wide_String is
+      -- Returns a chain of Anonymous_Count times "_anonymous_.", except that the one at
+      -- position Extended_Return_Position (from right to left) is replaced by "return."
+      begin
+         if Extended_Return_Position = 0 then
+            return Anonymous_Count * "_anonymous_.";
+         else
+            return (Anonymous_Count - Extended_Return_Position) * "_anonymous_."
+              & "return."
+              & (Extended_Return_Position-1) * "_anonymous_.";
+         end if;
+      end Anonymous_Subname;
 
       function Simple_Name_Image (N : Asis.Defining_Name) return Wide_String is
          -- Adds profile to name if necessary
@@ -1132,7 +1146,8 @@ package body Thick_Queries is
       -- If we encounter unnamed loops or blocks, we count them, but continue to go up. This
       -- allows generating a junk name that includes as many "_anonymous_." as unnamed statements
 
-      Anonymous_Count := 0;
+      Anonymous_Count          := 0;
+      Extended_Return_Position := 0;
       loop
          case Element_Kind (Parent) is
             when Not_An_Element =>
@@ -1180,7 +1195,7 @@ package body Thick_Queries is
                        =>
                      return Full_Name_Image (Names (Parent) (1), With_Profile)
                        & '.'
-                       & Anonymous_Count * "_anonymous_."
+                       & Anonymous_Subname
                        & Simple_Name_Image (Decl_Name);
                   when An_Ordinary_Type_Declaration =>
                      case Type_Kind (Type_Declaration_View (Parent)) is
@@ -1216,7 +1231,7 @@ package body Thick_Queries is
                      if not Is_Nil (Statement_Identifier (Parent)) then
                         return Full_Name_Image (Statement_Identifier (Parent), With_Profile)
                           & '.'
-                          & Anonymous_Count * "_anonymous_."
+                          & Anonymous_Subname
                           & Simple_Name_Image (Decl_Name);
                      end if;
 
@@ -1225,6 +1240,12 @@ package body Thick_Queries is
                      return Full_Name_Image (Names (A4G_Bugs.Corresponding_Entry (Parent))(1), With_Profile)
                        & '.'
                        & Simple_Name_Image (Decl_Name);
+                  when An_Extended_Return_Statement =>
+                     -- This is now (2005) a new kind of anonymous scope. Count it in Anonymous_Count, but keep
+                     -- its position in Extended_Return_Position to print "return." instead of "_anonymous_."
+                     -- Fortunately, extended returns cannot be nested!
+                     Anonymous_Count          := Anonymous_Count + 1;
+                     Extended_Return_Position := Anonymous_Count;
                   when others =>
                      null;
                end case;
@@ -4260,6 +4281,8 @@ package body Thick_Queries is
                   return Accept_Body_Exception_Handlers (Element);
                when A_Block_Statement =>
                   return Block_Exception_Handlers (Element);
+               when An_Extended_Return_Statement =>
+                  return Extended_Return_Exception_Handlers (Element);
                when others =>
                   Impossible ("Exception_Handlers: invalid statement kind", Element);
             end case;
