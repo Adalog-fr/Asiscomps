@@ -1,3 +1,4 @@
+with Utilities; use Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -261,7 +262,9 @@ package body Thick_Queries is
 
       loop
          case Declaration_Kind (Callee) is
-            when A_Procedure_Declaration .. A_Function_Declaration =>
+            when A_Procedure_Declaration
+               | A_Function_Declaration
+               =>
                -- Callee might be a declaration whose body is provided by renaming.
                -- This must be handled as renaming
                if Declaration_Kind (Corresponding_Body (Callee))
@@ -272,6 +275,10 @@ package body Thick_Queries is
                   exit;
                end if;
                Callee := Corresponding_Body (Callee);
+
+            when A_Null_Procedure_Declaration =>
+               -- nothing to fear here
+               return (Kind => A_Regular_Call, Declaration => Callee);
 
             when An_Enumeration_Literal_Specification =>
                return (Kind => An_Enumeration_Literal);
@@ -710,6 +717,7 @@ package body Thick_Queries is
             when A_Declaration =>
                case Declaration_Kind (My_Enclosing_Element) is
                   when A_Procedure_Declaration
+                    | A_Null_Procedure_Declaration
                     | A_Procedure_Body_Declaration
                     --
                     | A_Function_Declaration
@@ -1048,7 +1056,7 @@ package body Thick_Queries is
 
    function Full_Name_Image (The_Name     : in Asis.Element;
                              With_Profile : in Boolean := False) return Wide_String is
-      use Ada.Strings.Wide_Fixed, Asis.Expressions;
+      use Asis.Expressions;
 
       Parent                   : Element;
       Anonymous_Count          : Natural;
@@ -1058,6 +1066,7 @@ package body Thick_Queries is
       function Anonymous_Subname return Wide_String is
       -- Returns a chain of Anonymous_Count times "_anonymous_.", except that the one at
       -- position Extended_Return_Position (from right to left) is replaced by "return."
+         use Ada.Strings.Wide_Fixed;
       begin
          if Extended_Return_Position = 0 then
             return Anonymous_Count * "_anonymous_.";
@@ -1593,6 +1602,7 @@ package body Thick_Queries is
 
       case Declaration_Kind (The_Declaration) is
          when A_Procedure_Declaration
+            | A_Null_Procedure_Declaration
             | A_Procedure_Body_Declaration
             | A_Procedure_Renaming_Declaration
             | A_Procedure_Body_Stub
@@ -2743,8 +2753,6 @@ package body Thick_Queries is
    -------------------
 
    function Profile_Image (The_Name : Asis.Element; With_Profile : Boolean := True) return Wide_String is
-      use Asis.Expressions;
-
       Decl_Name : Asis.Defining_Name;
 
       function Entry_Name (The_Entry : Profile_Entry) return Wide_String is
@@ -3314,6 +3322,7 @@ package body Thick_Queries is
                return Matching_Name (Def, Other_Decl);
             end if;
          when A_Procedure_Declaration
+            | A_Null_Procedure_Declaration
             | A_Function_Declaration
             | An_Entry_Declaration
             | A_Package_Declaration
@@ -3351,6 +3360,7 @@ package body Thick_Queries is
                when A_Declaration =>
                   case Declaration_Kind (Other_Decl) is
                      when A_Procedure_Declaration
+                        | A_Null_Procedure_Declaration
                         | A_Function_Declaration
                         | A_Generic_Procedure_Declaration
                         | A_Generic_Function_Declaration
@@ -4210,7 +4220,7 @@ package body Thick_Queries is
 
       Exiting_Stmt : Asis.Statement   := Nil_Element;
       Control      : Traverse_Control := Continue;
-   begin
+   begin    -- First_Exiting_Statement
       for S in Stats'Range loop
          Traverse (Stats (S), Control, Exiting_Stmt);
          exit when not Is_Nil (Exiting_Stmt);
@@ -5361,6 +5371,7 @@ package body Thick_Queries is
                   when A_Task_Type_Declaration
                      | A_Single_Task_Declaration
                      | A_Procedure_Declaration
+                     | A_Null_Procedure_Declaration
                      | A_Function_Declaration
                      | A_Procedure_Body_Declaration
                      | A_Function_Body_Declaration
