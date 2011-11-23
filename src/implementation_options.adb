@@ -100,7 +100,7 @@ package body Implementation_Options is
 
    function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
 --      Default : constant Wide_String := "-ws -k";
-      Default : constant Wide_String := "-ws -k -asis05";  -- -asis05 required due to A4G bug [I623-035]
+      Default : constant Wide_String := "-ws -k -asis05";
    begin
       if Debug_Mode then
          return Default;
