@@ -2835,28 +2835,29 @@ package body Thick_Queries is
             return (Is_Access => False,
                     Attribute => None,
                     Name      => Nil_Element);
-         else
-            case Access_Definition_Kind (Mark) is
-               when Not_An_Access_Definition =>
-                  -- Normal case
-                  null;
-               when An_Anonymous_Access_To_Constant
-                  | An_Anonymous_Access_To_Variable
-                  =>
-                  -- Since Is_Access is set by the caller:
-                  return Build_Entry (Anonymous_Access_To_Object_Subtype_Mark (Mark));
-               when An_Anonymous_Access_To_Procedure
-                  | An_Anonymous_Access_To_Protected_Procedure
-                  | An_Anonymous_Access_To_Function
-                  | An_Anonymous_Access_To_Protected_Function
-                  =>
-                  -- We may get An_Anonymous_Access_To_Procedure (or siblings) for a return type.
-                  -- Same as above Is_Nil (Mark)
-                  return (Is_Access => False,
-                          Attribute => None,
-                          Name      => Nil_Element);
-            end case;
          end if;
+
+         case Access_Definition_Kind (Mark) is
+            when Not_An_Access_Definition =>
+               -- Normal case
+               null;
+            when An_Anonymous_Access_To_Constant
+               | An_Anonymous_Access_To_Variable
+               =>
+               -- Since Is_Access is set by the caller:
+               return Build_Entry (Anonymous_Access_To_Object_Subtype_Mark (Mark));
+            when An_Anonymous_Access_To_Procedure
+               | An_Anonymous_Access_To_Protected_Procedure
+               | An_Anonymous_Access_To_Function
+               | An_Anonymous_Access_To_Protected_Function
+               =>
+               -- We may get An_Anonymous_Access_To_Procedure (or siblings) for a return type.
+               -- Same as above Is_Nil (Mark)
+               return (Is_Access => False,
+                       Attribute => None,
+                       Name      => Nil_Element);
+         end case;
+
 
          if Expression_Kind (Mark) = An_Attribute_Reference then
             Good_Mark := Prefix (Mark);
@@ -4391,10 +4392,18 @@ package body Thick_Queries is
                           Impossible ("Size_Value_Image: Attribute not 'Base or 'Class", Good_Name);
                   end case;
 
-               when others =>
+               when An_Explicit_Dereference =>
+                  -- Size of dynamically allocated object cannot be specified
+                  --   => No hope to find out
+                  return "";
+
+               when An_Identifier =>
                   Good_Name := Ultimate_Name (Good_Name);
                   Def       := Corresponding_Name_Definition (Good_Name);
                   Decl      := A4G_Bugs.Corresponding_Name_Declaration (Good_Name);
+
+               when others =>
+                  Impossible ("Size_Value_Image: wrong expression", Name);
             end case;
 
          when A_Defining_Name =>
@@ -4402,7 +4411,7 @@ package body Thick_Queries is
             Def  := Good_Name;
 
          when others =>
-            Impossible ("Size_Value_Image: wrong name", Name);
+            Impossible ("Size_Value_Image: wrong element", Name);
       end case;
 
       -- Do we have a size clause (type or object)?
@@ -5479,7 +5488,6 @@ package body Thick_Queries is
                -- not when using the renamed entity
                return Nil_Element_List;
             when A_Type_Conversion =>
-               -- Allowed for tagged types TBSL
                return Expression_Used_Identifiers (Converted_Or_Qualified_Expression (Expr));
             when others =>
                Impossible ("Expression_Used_Identifiers: unexpected expression in renaming", Expr);
