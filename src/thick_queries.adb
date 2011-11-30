@@ -3475,10 +3475,7 @@ package body Thick_Queries is
    function Ultimate_Enclosing_Instantiation (The_Element : Asis.Element) return Asis.Declaration is
       Result : Asis.Declaration := Enclosing_Element (The_Element);
    begin
-      while (Declaration_Kind (Result) not in A_Generic_Instantiation
-             and Declaration_Kind (Result) not in A_Formal_Package_Declaration .. A_Formal_Package_Declaration_With_Box)
-        or else Is_Part_Of_Instance (Result)
-      loop
+      while Is_Part_Of_Instance (Result) loop
          Result := Enclosing_Element (Result);
       end loop;
 
