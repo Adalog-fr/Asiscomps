@@ -2366,6 +2366,24 @@ package body Thick_Queries is
       case Element_Kind (Elem) is
          when An_Expression =>
             Good_Elem := Corresponding_Expression_Type_Definition (Elem);
+            if Is_Nil (Good_Elem) then
+               -- Annoying special case: a task of the form "task type TT;" has no definition
+               case Expression_Kind (Elem) is
+                  when An_Identifier | A_Selected_Component =>
+                     -- Only these can be type names
+                     declare
+                        Decl : constant Asis.Declaration := Corresponding_Name_Declaration (Simple_Name (Elem));
+                     begin
+                        if Declaration_Kind (Decl) = A_Task_Type_Declaration then
+                           return A_Task_Type;
+                        else
+                           return Not_A_Type;
+                        end if;
+                     end;
+                  when others =>
+                     return Not_A_Type;
+               end case;
+            end if;
          when A_Declaration =>
             case Declaration_Kind (Elem) is
                when A_Variable_Declaration
@@ -3016,8 +3034,8 @@ package body Thick_Queries is
          -- However, The_Element can be the name of a protected type or a task type from its own body
          -- designating the current instance. A4G returns Nil_Element for Corresponding_Expression_Type
          -- in that case.
-         -- Incidentally, this will make Corresponding_Expression_Type_Definition work for any type,
-         -- but we don't confess it in the specification...
+         -- Incidentally, this will make Corresponding_Expression_Type_Definition work for any type
+         -- To be checked if replaced by the equivalent ASIS05 query
          case Expression_Kind (The_Element) is
             when A_Null_Literal =>
                -- Let's get rid of this one ASAP while we're at it
@@ -4095,10 +4113,10 @@ package body Thick_Queries is
          when A_Declaration =>
             case Declaration_Kind (Element) is
                when A_Function_Body_Declaration
-                 | A_Procedure_Body_Declaration
-                 | An_Entry_Body_Declaration
-                 | A_Package_Body_Declaration
-                 | A_Task_Body_Declaration
+                  | A_Procedure_Body_Declaration
+                  | An_Entry_Body_Declaration
+                  | A_Package_Body_Declaration
+                  | A_Task_Body_Declaration
                  =>
                   return Body_Statements (Element);
                when others =>

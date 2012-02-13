@@ -702,9 +702,11 @@ package Thick_Queries is
    -- This query is a candidate for ASIS05, and already provided by ASIS-for-GNAT,
    -- but we don't use it as long as it is not standard
    --
-   -- WARNING: When passed a slice, returns the definition of the sliced object, bounds
-   --          will be those of the sliced object, not the slice itself. But what else
-   --          can we do?
+   -- WARNING 1: When passed a slice, returns the definition of the sliced object, bounds
+   --            will be those of the sliced object, not the slice itself. But what else
+   --            can we do?
+   -- WARNING 2: This function works when passed a type name (not really an expression),
+   --            not sure if it will work with the ASIS05 query
 
    function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition;
    -- return the type definition of the ultimate ancestor type of The_Element
