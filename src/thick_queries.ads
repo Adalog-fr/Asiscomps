@@ -1045,8 +1045,8 @@ package Thick_Queries is
    function Discrete_Constraining_Bounds (Elem          : Asis.Element;
                                           Follow_Access : Boolean := False)
                                           return Asis.Element_List;
-   -- Elem must designate a type, a variable, a constant, a formal parameter,
-   -- or a generic formal object.
+   -- Elem must designate a type or subtype, a variable, a constant, a formal parameter,
+   -- a range, or a generic formal object.
    --
    -- Discrete or real type:
    -- Returns the expressions that constrain the values of a discrete or real type.

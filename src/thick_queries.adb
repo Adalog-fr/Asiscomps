@@ -5391,6 +5391,8 @@ package body Thick_Queries is
       Result : ASIS_Natural := 0;
    begin
       case Element_Kind (Element) is
+         when A_Defining_Name =>
+            Decl := Enclosing_Element (Enclosing_Element (Element));
          when A_Declaration =>
             Decl := Enclosing_Element (Element);
          when An_Expression =>
