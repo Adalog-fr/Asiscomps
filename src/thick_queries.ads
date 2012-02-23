@@ -863,6 +863,9 @@ package Thick_Queries is
    -- Appropriate Expression_Kinds:
    --    A_Function_Call
 
+   function All_Formals (Profile : Asis.Parameter_Specification_List) return Asis.Defining_Name_List;
+   -- Builds a list of all Defining_Name in the profile, "flattening" multiple declarations
+
 
    function Formal_Name (Call : Asis.Element; Actual : Asis.List_Index) return Asis.Defining_Name;
    -- Given a procedure, entry or function call, or a generic instantiation, returns the defining name

@@ -374,6 +374,30 @@ package body Thick_Queries is
    end Called_Profile;
 
    -----------------
+   -- All_Formals --
+   -----------------
+
+   function All_Formals (Profile : Asis.Parameter_Specification_List) return Defining_Name_List is
+      Result : Asis.Defining_Name_List (Profile'Range);
+   begin
+      for P in Profile'Range loop
+         declare
+            N : constant Asis.Defining_Name_List := Names (Profile (P));
+         begin
+            if N'Length = 1 then
+               Result (P) := N (1);
+            elsif P = Profile'Last then
+               return Result (1 .. P - 1) & N;
+            else
+               return Result (1 .. P - 1) & N & All_Formals (Profile (P + 1 .. Profile'Last));
+            end if;
+         end;
+      end loop;
+      return Result;
+   end All_Formals;
+
+
+   -----------------
    -- Formal_Name --
    -----------------
 
@@ -446,32 +470,14 @@ package body Thick_Queries is
    -----------------
 
    function Formal_Name (Assoc : Asis.Association) return Asis.Defining_Name is
-      Call_Or_Instantiation : constant Asis.Element := Enclosing_Element (Assoc);
+      Call_Or_Instantiation : constant Asis.Element          := Enclosing_Element (Assoc);
+      Assoc_List            : constant Asis.Association_List := Actual_Parameters (Call_Or_Instantiation);
    begin
-      case Declaration_Kind (Call_Or_Instantiation) is
-         when A_Generic_Instantiation
-           | A_Formal_Package_Declaration
-           =>
-            declare
-               Assoc_List : constant Asis.Association_List := Generic_Actual_Part (Call_Or_Instantiation);
-            begin
-               for I in Assoc_List'Range loop
-                  if Is_Equal (Assoc_List (I), Assoc) then
-                     return Formal_Name (Call_Or_Instantiation, I);
-                  end if;
-               end loop;
-            end;
-         when others =>
-            declare
-               Assoc_List : constant Asis.Association_List :=  Called_Profile (Call_Or_Instantiation);
-            begin
-               for I in Assoc_List'Range loop
-                  if Is_Equal (Assoc_List (I), Assoc) then
-                     return Formal_Name (Call_Or_Instantiation, I);
-                  end if;
-               end loop;
-            end;
-      end case;
+      for I in Assoc_List'Range loop
+         if Is_Equal (Assoc_List (I), Assoc) then
+            return Formal_Name (Call_Or_Instantiation, I);
+         end if;
+      end loop;
 
       -- Index must be found, by construction
       Impossible ("Association not found in association list", Assoc);
@@ -3410,6 +3416,8 @@ package body Thick_Queries is
                         end if;
                      when A_Procedure_Body_Declaration
                         | A_Function_Body_Declaration
+                        | A_Procedure_Renaming_Declaration
+                        | A_Function_Renaming_Declaration
                         | An_Entry_Body_Declaration
                           =>
                         --Beware: these can be proper bodies
