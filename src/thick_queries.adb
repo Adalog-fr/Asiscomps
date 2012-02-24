@@ -31,6 +31,7 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
+pragma Ada_05;
 
 --## Rule off Use_Img_Function ## This package should not depend on utilities
 
@@ -712,7 +713,7 @@ package body Thick_Queries is
          return Nil_Element;
       end if;
 
-      My_Enclosing_Element := Enclosing_Element(Element);
+      My_Enclosing_Element := Enclosing_Element (Element);
       loop
          case Element_Kind (My_Enclosing_Element) is
             when Not_An_Element =>
