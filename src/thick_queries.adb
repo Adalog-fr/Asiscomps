@@ -1906,10 +1906,17 @@ package body Thick_Queries is
          when A_Declaration =>
             ST := The_Subtype;
          when A_Definition =>
-            if Definition_Kind (The_Subtype) = An_Access_Definition then
-               -- 2005: an anonymous access type => not class wide
-               return False;
-            end if;
+            -- Get rid of easy cases
+            case Definition_Kind (The_Subtype) is
+               when An_Access_Definition =>
+                  -- 2005: an anonymous access type => not class wide
+                  return False;
+               when A_Type_Definition =>
+                  -- Plain type => not class wide
+                  return False;
+               when others =>
+                  null;
+            end case;
             Good_Name := Subtype_Simple_Name (The_Subtype);
             if Expression_Kind (Good_Name) = An_Attribute_Reference then
                return A4G_Bugs.Attribute_Kind (Good_Name) = A_Class_Attribute;

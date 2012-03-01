@@ -398,6 +398,7 @@ package Thick_Queries is
    --    A_Subtype_Declaration
    --
    -- Appropriate Definition_Kinds:
+   --    A_Type_Definition (always returns false)
    --    A_Subtype_Indication
    --
    -- Appropriate Expression_Kinds:
