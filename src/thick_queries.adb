@@ -3051,9 +3051,6 @@ package body Thick_Queries is
          -- Incidentally, this will make Corresponding_Expression_Type_Definition work for any type
          -- To be checked if replaced by the equivalent ASIS05 query
          case Expression_Kind (The_Element) is
-            when A_Null_Literal =>
-               -- Let's get rid of this one ASAP while we're at it
-               return Nil_Element;
             when An_Identifier | A_Selected_Component =>
                -- Only these can be type names
                declare
@@ -3091,32 +3088,66 @@ package body Thick_Queries is
       end if;
 
       -- No type declaration, see if we can retrieve the definition of an anonymous type
-      case Expression_Kind (The_Element) is
-         when A_Selected_Component =>
-            Local_Elem := Selector (The_Element);
-         when An_Identifier =>
-            Local_Elem := The_Element;
-         when A_Slice =>
-            -- Short of a better idea, take the definition from the sliced object
-            -- Note that the bounds will therefore not be the ones of the slice
-            Local_Elem  := Prefix (The_Element);
-         when An_Indexed_Component =>
-            -- 2005 Joy! Now, array components can be of an anonymous (access) type.
-            Def := Corresponding_Expression_Type_Definition (Prefix (The_Element));
-            if Is_Nil (Def) then
-               -- This is the case if the indexing was for an entry family,
-               -- there is really no type in sight
+      Local_Elem := The_Element;
+      loop
+         case Expression_Kind (Local_Elem) is
+            when A_Null_Literal
+               | An_Allocation_From_Subtype
+               | An_Allocation_From_Qualified_Expression
+               =>
+               -- Get the type from the expected type
+               Local_Elem := Enclosing_Element (Local_Elem);
+               if Statement_Kind (Local_Elem) = An_Assignment_Statement then
+                  Local_Elem := Assignment_Variable_Name (Local_Elem);
+               elsif Declaration_Kind (Local_Elem) = A_Parameter_Specification then
+                  -- The expression was the default expression of a parameter
+                  Local_Elem := Names (Local_Elem) (1);
+                  exit;
+               else
+                  case Association_Kind (Local_Elem) is
+                     --when A_Discriminant_Association =>
+                     --when A_Record_Component_Association =>
+                     --when An_Array_Component_Association =>
+                     when A_Parameter_Association | A_Generic_Association =>
+                        Local_Elem := Formal_Name (Local_Elem);
+                        exit;
+                     when others =>
+                        return Nil_Element;
+                        -- TBSL: as long as other associations are unimplemented
+                        --Impossible ("Corresponding_Expression_Type_Definition: unexpected association", Local_Elem);
+                  end case;
+               end if;
+            when A_Selected_Component =>
+               Local_Elem := Selector (Local_Elem);
+            when An_Identifier =>
+               exit;
+            when A_Slice =>
+               -- Short of a better idea, take the definition from the sliced object
+               -- Note that the bounds will therefore not be the ones of the slice
+               Local_Elem  := Prefix (Local_Elem);
+            when An_Indexed_Component =>
+               -- 2005 Joy! Now, array components can be of an anonymous (access) type.
+               Def := Corresponding_Expression_Type_Definition (Prefix (Local_Elem));
+               if Is_Nil (Def) then
+                  -- This is the case if the indexing was for an entry family,
+                  -- there is really no type in sight
+                  return Nil_Element;
+               end if;
+               return Component_Definition_View (Array_Component_Definition (Def));
+            when others =>
+               -- TBSL This unfortunately covers the case of an aggregate of an anonymous array type, like in:
+               --   Tab : array (1..10) of Integer := (1..10 => 0);
+               -- No way to solve this in sight...
                return Nil_Element;
-            end if;
-            return Component_Definition_View (Array_Component_Definition (Def));
-         when others =>
-            -- TBSL This unfortunately covers the case of an aggregate of an anonymous array type, like in:
-            --   Tab : array (1..10) of Integer := (1..10 => 0);
-            -- No way to solve this in sight...
-            return Nil_Element;
-      end case;
+         end case;
+      end loop;
 
-      Local_Elem := A4G_Bugs.Corresponding_Name_Declaration (Local_Elem);
+      if Element_Kind (Local_Elem) = A_Defining_Name then
+         Local_Elem := Enclosing_Element (Local_Elem);
+      else
+         Local_Elem := A4G_Bugs.Corresponding_Name_Declaration (Local_Elem);
+      end if;
+
       case Declaration_Kind (Local_Elem) is
          when A_Variable_Declaration
             | A_Constant_Declaration
@@ -3130,13 +3161,21 @@ package body Thick_Queries is
                   -- This can only be an anonymous array => we have the definition
                   return Def;
                when An_Access_Definition =>   -- ASIS 2005
-               -- Anonymous access type
+                 -- Anonymous access type
                   return Def;
                when others =>
                   return Type_Declaration_View
                            (A4G_Bugs.Corresponding_Name_Declaration
                              (Subtype_Simple_Name (Def)));
             end case;
+         when A_Formal_Object_Declaration =>
+            if Is_Nil (Declaration_Subtype_Mark (Local_Elem)) then
+               -- Must be an anonymous formal type
+               return Object_Declaration_View (Local_Elem);
+            else
+               return  Type_Declaration_View (A4G_Bugs.Corresponding_Name_Declaration
+                                              (Declaration_Subtype_Mark (Local_Elem)));
+            end if;
          when A_Component_Declaration =>
             Def := Component_Definition_View (Object_Declaration_View (Local_Elem));   -- ASIS 2005
             if Definition_Kind (Def) = An_Access_Definition then -- ASIS 2005
