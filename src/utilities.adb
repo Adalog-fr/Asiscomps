@@ -366,9 +366,9 @@ package body Utilities is
    end To_Title;
 
 
-   ---------------
-   -- Traceback --
-   ---------------
+   ---------------------
+   -- Stack_Traceback --
+   ---------------------
 
    procedure Stack_Traceback (Exc : Ada.Exceptions.Exception_Occurrence) is
       use Ada.Characters.Handling;

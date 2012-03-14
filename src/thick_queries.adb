@@ -471,12 +471,15 @@ package body Thick_Queries is
    -----------------
 
    function Formal_Name (Assoc : Asis.Association) return Asis.Defining_Name is
+      use Asis.Expressions;
       Call_Or_Instantiation : constant Asis.Element          := Enclosing_Element (Assoc);
-      Assoc_List            : constant Asis.Association_List := Actual_Parameters (Call_Or_Instantiation);
+      Assoc_List            : constant Asis.Association_List := Actual_Parameters (Call_Or_Instantiation,
+                                                                                   Normalized => True);
+      Actual                : constant Asis.Element          := Actual_Parameter (Assoc);
    begin
       for I in Assoc_List'Range loop
-         if Is_Equal (Assoc_List (I), Assoc) then
-            return Formal_Name (Call_Or_Instantiation, I);
+         if Is_Equal (Actual_Parameter (Assoc_List (I)), Actual) then
+            return Formal_Parameter (Assoc_List (I));
          end if;
       end loop;
 
