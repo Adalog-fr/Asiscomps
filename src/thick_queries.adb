@@ -477,6 +477,12 @@ package body Thick_Queries is
                                                                                    Normalized => True);
       Actual                : constant Asis.Element          := Actual_Parameter (Assoc);
    begin
+      if Assoc_List'Length = 0 then
+         -- This happens only if the association is from a call to a predefined operator
+         -- for which ASIS provides no implicit declaration
+         return Nil_Element;
+      end if;
+
       for I in Assoc_List'Range loop
          if Is_Equal (Actual_Parameter (Assoc_List (I)), Actual) then
             return Formal_Parameter (Assoc_List (I));
@@ -484,7 +490,7 @@ package body Thick_Queries is
       end loop;
 
       -- Index must be found, by construction
-      Impossible ("Association not found in association list", Assoc);
+      Impossible ("Formal_Name: Association not found in association list", Assoc);
    end Formal_Name;
 
    --------------------------
@@ -3082,7 +3088,7 @@ package body Thick_Queries is
       end if;
 
       if Declaration_Kind (Local_Elem) = A_Private_Type_Declaration then
-         -- We want at true definition, therefore we have to look through private types
+         -- We want a true definition, therefore we have to look through private types
          Local_Elem := Corresponding_Type_Declaration (Local_Elem);
       end if;
       if not Is_Nil (Local_Elem) then
@@ -3091,6 +3097,8 @@ package body Thick_Queries is
       end if;
 
       -- No type declaration, see if we can retrieve the definition of an anonymous type
+
+      -- Loop till we find an appropriate name
       Local_Elem := The_Element;
       loop
          case Expression_Kind (Local_Elem) is
@@ -3113,6 +3121,11 @@ package body Thick_Queries is
                      --when An_Array_Component_Association =>
                      when A_Parameter_Association | A_Generic_Association =>
                         Local_Elem := Formal_Name (Local_Elem);
+                        if Is_Nil (Local_Elem) then
+                           -- Too bad, the association is from a predefined operator
+                           -- without an implicit declaration => No formal name available
+                           return Nil_Element;
+                        end if;
                         exit;
                      when others =>
                         return Nil_Element;
