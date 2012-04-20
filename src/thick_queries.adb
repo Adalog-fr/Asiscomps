@@ -473,21 +473,30 @@ package body Thick_Queries is
    function Formal_Name (Assoc : Asis.Association) return Asis.Defining_Name is
       use Asis.Expressions;
       Call_Or_Instantiation : constant Asis.Element          := Enclosing_Element (Assoc);
-      Assoc_List            : constant Asis.Association_List := Actual_Parameters (Call_Or_Instantiation,
-                                                                                   Normalized => True);
-      Actual                : constant Asis.Element          := Actual_Parameter (Assoc);
    begin
-      if Assoc_List'Length = 0 then
-         -- This happens only if the association is from a call to a predefined operator
-         -- for which ASIS provides no implicit declaration
+      if Element_Kind (Call_Or_Instantiation) /= A_Declaration  -- Then it is a call
+        and then Expression_Kind (Called_Simple_Name (Call_Or_Instantiation)) = An_Attribute_Reference
+      then
+         -- Attributes have no names for formals
          return Nil_Element;
       end if;
 
-      for I in Assoc_List'Range loop
-         if Is_Equal (Actual_Parameter (Assoc_List (I)), Actual) then
-            return Formal_Parameter (Assoc_List (I));
+      declare
+         Assoc_List : constant Asis.Association_List := Actual_Parameters (Call_Or_Instantiation, Normalized => True);
+         Actual     : constant Asis.Element          := Actual_Parameter (Assoc);
+      begin
+         if Assoc_List'Length = 0 then
+            -- This happens only if the association is from a call to a predefined operator
+            -- for which ASIS provides no implicit declaration
+            return Nil_Element;
          end if;
-      end loop;
+
+         for I in Assoc_List'Range loop
+            if Is_Equal (Actual_Parameter (Assoc_List (I)), Actual) then
+               return Formal_Parameter (Assoc_List (I));
+            end if;
+         end loop;
+      end;
 
       -- Index must be found, by construction
       Impossible ("Formal_Name: Association not found in association list", Assoc);
