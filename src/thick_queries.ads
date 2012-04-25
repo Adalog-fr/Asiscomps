@@ -709,6 +709,11 @@ package Thick_Queries is
    -- WARNING 2: This function works when passed a type name (not really an expression),
    --            not sure if it will work with the ASIS05 query
 
+   function Corresponding_Components (The_Element : Asis.Element) return Asis.Record_Component_List;
+   -- If the element is (a defining name of) a variable or a component of a record type, returns the
+   -- corresponding components
+   -- Return Nil_Element_List otherwise
+
    function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition;
    -- return the type definition of the ultimate ancestor type of The_Element
    -- (going up all subtype and derived type declaration, and through private and incomplete declarations).

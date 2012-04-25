@@ -3223,6 +3223,62 @@ package body Thick_Queries is
 
    end Corresponding_Expression_Type_Definition;
 
+   ------------------------------
+   -- Corresponding_Components --
+   ------------------------------
+
+   function Corresponding_Components (The_Element : Asis.Element) return Asis.Record_Component_List is
+      use Asis.Definitions, Asis.Expressions;
+
+      Subtype_Indication : Asis.Subtype_Indication;
+      Name_Decl          : Asis.Declaration;
+   begin
+      case Element_Kind (The_Element) is
+         when A_Defining_Name =>
+            Name_Decl := Enclosing_Element (The_Element);
+         when An_Expression =>
+            if Expression_Kind (Simple_Name (The_Element)) /= An_Identifier then
+               return Nil_Element_List;
+            end if;
+            Name_Decl := Corresponding_Name_Declaration (Simple_Name (The_Element));
+         when others =>
+            return Nil_Element_List;
+      end case;
+
+      case Declaration_Kind (Name_Decl) is
+         when A_Discriminant_Specification
+            | A_Parameter_Specification
+            | A_Formal_Object_Declaration
+            | An_Object_Renaming_Declaration
+            =>
+            Subtype_Indication := Simple_Name (Declaration_Subtype_Mark (Name_Decl));
+         when A_Variable_Declaration
+            | A_Constant_Declaration
+            | A_Deferred_Constant_Declaration
+            | A_Component_Declaration
+            =>
+            Subtype_Indication := Object_Declaration_View (Name_Decl);
+            if Definition_Kind (Subtype_Indication) = A_Component_Definition then
+               Subtype_Indication := Component_Subtype_Indication (Subtype_Indication);
+            end if;
+            Subtype_Indication := Subtype_Simple_Name (Subtype_Indication);
+         when others =>
+            -- ?? Not appropriate (A_Single_Task_Declaration...)
+            return Nil_Element_List;
+      end case;
+
+      Subtype_Indication := Type_Declaration_View (Corresponding_Name_Declaration (Subtype_Indication));
+      case Type_Kind (Subtype_Indication) is
+         when A_Record_Type_Definition
+            | A_Derived_Record_Extension_Definition
+            | A_Tagged_Record_Type_Definition
+            =>
+            return Record_Components (Asis.Definitions.Record_Definition (Subtype_Indication));
+         when others =>
+            -- not a record
+            return  Nil_Element_List;
+      end case;
+   end Corresponding_Components;
 
    ------------------------------
    -- Ultimate_Expression_Type --
