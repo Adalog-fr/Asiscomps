@@ -190,7 +190,7 @@ package body Units_List is
                        Add_Stubs  : in     Boolean)
    is
       use Asis, Asis.Compilation_Units;
-      use Ada.Strings, Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps;
+      use Ada.Strings, Ada.Strings.Wide_Maps;
       use String_List;
 
       Ignored_Units : String_List.Queue;
@@ -304,7 +304,7 @@ package body Units_List is
       end Do_Process_Stub;
 
       procedure Process_Unit_Spec (Spec : Wide_String) is
-         use Ada.Characters.Handling;
+         use Ada.Characters.Handling, Ada.Strings.Wide_Fixed;
 
          procedure Process_Indirect_File (Name : String) is
             use Ada.Wide_Text_IO, Ada.Exceptions;
@@ -361,6 +361,18 @@ package body Units_List is
                Raise_Specification_Error ("Exception while processing " & Name & ": " & Exception_Name (Occur));
          end Process_Indirect_File;
 
+         procedure Add_With_Parent (Unit : Wide_String) is
+            -- Pre-condition: Unit is all upper-case
+            Inx   : Natural;
+         begin
+            -- Add parent if any before the unit
+            Inx := Index (Unit, ".", Going => Backward);
+            if Inx /= 0 then
+               Add_With_Parent (Unit (Unit'First .. Inx - 1));
+            end if;
+            Add (Unit);
+         end Add_With_Parent;
+
          Start : Positive;
          Stop  : Natural;
       begin  -- Process_Unit_Spec
@@ -395,8 +407,9 @@ package body Units_List is
             else
                Stop := Stop - 1;
             end if;
+
             if Start = Spec'First or else Spec (Start-1) = '+' then
-               Add (To_Upper (Spec (Start .. Stop)));
+               Add_With_Parent (To_Upper (Spec (Start .. Stop)));
             else
                Append (Ignored_Units, To_Upper (Spec (Start .. Stop)));
             end if;
@@ -407,19 +420,16 @@ package body Units_List is
 
       Unit_Found : Boolean := False;
    begin  -- Register
+      -- Build list of units
       Process_Unit_Spec (Unit_Spec);
 
-      --
       --  Process list of units
-      --
-
       Reset;
       while not Is_Exhausted loop
          declare
             This_Unit : constant Wide_String := Current_Unit;
             Spec_Decl : Asis.Compilation_Unit;
             Body_Decl : Asis.Compilation_Unit;
-            Inx       : Natural;
          begin
             if Must_Ignore (This_Unit) then
                Delete_Current;
@@ -444,12 +454,6 @@ package body Units_List is
                end if;
 
                if Recursive then
-                  -- Add parent if any
-                  Inx := Index (This_Unit, ".", Going => Backward);
-                  if Inx /= 0 then
-                     Add (This_Unit (This_Unit'First .. Inx-1));
-                  end if;
-
                   -- Analyze with clauses
                   Do_Process_With (Spec_Decl);
                   Do_Process_With (Body_Decl);
