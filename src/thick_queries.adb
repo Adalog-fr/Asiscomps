@@ -49,8 +49,10 @@ with   -- ASIS units
   Asis.Declarations,
   Asis.Definitions,
   Asis.Elements,
+  Asis.Errors,
   Asis.Exceptions,
   Asis.Expressions,
+  Asis.Implementation,
   Asis.Iterator,
   Asis.Statements,
   Asis.Text;
@@ -714,6 +716,7 @@ package body Thick_Queries is
       end if;
 
       My_Enclosing_Element := Enclosing_Element (Element);
+
       loop
          case Element_Kind (My_Enclosing_Element) is
             when Not_An_Element =>
@@ -791,6 +794,18 @@ package body Thick_Queries is
 
       return Result;
 
+   exception
+      when Asis.Exceptions.ASIS_Failed =>
+         declare
+            use Asis.Errors, Asis.Implementation;
+         begin
+            if Status = Not_Implemented_Error then
+               -- ASIS bug [L702-009]
+               -- Raised by Enclosing_Element in the case of a pragma which is not included in a unit
+               return Nil_Element;
+            end if;
+         end;
+         raise;
    end Enclosing_Program_Unit;
 
 
