@@ -6,10 +6,10 @@
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
 --  assistance and custom developments  in Ada and related software --
 --  engineering techniques.  For more info about our services:      --
---  ADALOG                   Tel: +33 1 41 24 31 40                 --
---  19-21 rue du 8 mai 1945  Fax: +33 1 41 24 07 36                 --
---  94110 ARCUEIL            E-m: info@adalog.fr                    --
---  FRANCE                   URL: http://www.adalog.fr              --
+--  ADALOG                          Tel: +33 1 45 29 21 52          --
+--  2 rue du Docteur Lombard        Fax: +33 1 45 29 25 00          --
+--  92441 ISSY LES MOULINEAUX CEDEX E-m: info@adalog.fr             --
+--  FRANCE                          URL: http://www.adalog.fr       --
 --                                                                  --
 --  This  unit is  free software;  you can  redistribute  it and/or --
 --  modify  it under  terms of  the GNU  General Public  License as --
@@ -471,10 +471,8 @@ package body Thick_Queries is
    -----------------
 
    function Formal_Name (Assoc : Asis.Association) return Asis.Defining_Name is
-      use Asis.Expressions;
       Call_Or_Instantiation : constant Asis.Element := Enclosing_Element (Assoc);
-      Assoc_List            : constant Asis.Association_List := Actual_Parameters (Call_Or_Instantiation, Normalized => False);
-      Actual                : constant Asis.Element          := Actual_Parameter (Assoc);
+      Assoc_List            : constant Asis.Association_List := Actual_Parameters (Call_Or_Instantiation);
    begin
       for I in Assoc_List'Range loop
          if Is_Equal (Assoc_List (I), Assoc) then
