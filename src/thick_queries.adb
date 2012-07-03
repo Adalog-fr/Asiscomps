@@ -4110,7 +4110,8 @@ package body Thick_Queries is
                   when A_Variable_Declaration
                      | A_Constant_Declaration
                      | A_Component_Declaration
-                     | A_Return_Object_Declaration
+                     | A_Return_Constant_Specification
+                     | A_Return_Variable_Specification
                        =>
                      No_Unconstrained := True;
                      Item             := Object_Declaration_View (Item);
