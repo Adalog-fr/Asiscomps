@@ -541,7 +541,7 @@ package Thick_Queries is
                             A_Task_Type,
                             A_Protected_Type);
    subtype Discrete_Types  is Type_Categories range An_Enumeration_Type   .. A_Modular_Type;
-   subtype Numeric_Types   is Type_Categories range A_Signed_Integer_type .. A_Modular_Type;
+   subtype Numeric_Types   is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
    subtype Scalar_Types    is Type_Categories range An_Enumeration_Type   .. A_Floating_Point_Type;
    subtype Integer_Types   is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
    subtype Real_Types      is Type_Categories range A_Fixed_Point_Type    .. A_Floating_Point_Type;
