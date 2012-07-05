@@ -33,7 +33,6 @@
 ----------------------------------------------------------------------
 pragma Ada_05;
 --## Rule off Use_Img_Function ## This package should not depend on utilities
-
 with   -- Standard Ada units
   Ada.Characters.Handling,
   Ada.Exceptions,
@@ -150,7 +149,7 @@ package body Thick_Queries is
          when An_Access_Definition => -- ASIS 2005
             -- No declaration here, but cannot be a derived type
             -- But can be a private or incomplete type...
-            Decl := Corresponding_Name_Declaration
+            Decl := A4G_Bugs.Corresponding_Name_Declaration
                     (Simple_Name
                      (Strip_Attributes
                       (Anonymous_Access_To_Object_Subtype_Mark (Good_Def))));
@@ -167,7 +166,7 @@ package body Thick_Queries is
                if Access_Type_Kind (Good_Def) not in Asis.Access_To_Object_Definition then
                   return Nil_Element;
                end if;
-               Decl := Corresponding_Name_Declaration
+               Decl := A4G_Bugs.Corresponding_Name_Declaration
                         (Simple_Name
                          (Strip_Attributes
                           (Subtype_Simple_Name
@@ -183,7 +182,7 @@ package body Thick_Queries is
             end if;
          when A_Formal_Type_Definition =>
             if Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition then
-               Decl := Corresponding_Name_Declaration
+               Decl := A4G_Bugs.Corresponding_Name_Declaration
                          (Simple_Name
                           (Strip_Attributes
                            (Subtype_Simple_Name
@@ -1454,7 +1453,7 @@ package body Thick_Queries is
 
                -- Here, Pfx is the good prefix simple name
 
-               Decl := Corresponding_Name_Declaration (Pfx);
+               Decl := A4G_Bugs.Corresponding_Name_Declaration (Pfx);
                loop
                   case Declaration_Kind (Decl) is
                      when  An_Ordinary_Type_Declaration
@@ -1482,7 +1481,7 @@ package body Thick_Queries is
                            return Index_Subtypes_Names (Def) (Range_Position);
                         end if;
 
-                        Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Def));
+                        Decl := A4G_Bugs.Corresponding_Name_Declaration (Subtype_Simple_Name (Def));
 
                      when A_Parameter_Specification
                         | A_Formal_Object_Declaration
@@ -1796,14 +1795,14 @@ package body Thick_Queries is
          Mark := Subtype_Simple_Name (Type_Declaration_View (ST));
          case Expression_Kind (Mark) is
             when An_Identifier =>
-               ST := Corresponding_Name_Declaration (Mark);
+               ST := A4G_Bugs.Corresponding_Name_Declaration (Mark);
                if Declaration_Kind (ST) /= A_Subtype_Declaration then
                   return Mark;
                end if;
             when An_Attribute_Reference =>
                case A4G_Bugs.Attribute_Kind (Mark) is
                   when A_Base_Attribute =>
-                     ST := Corresponding_Name_Declaration (Simple_Name (Prefix (Mark)));
+                     ST := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Prefix (Mark)));
                      if Declaration_Kind (ST) /= A_Subtype_Declaration then
                         return Prefix (Mark);
                      end if;
@@ -2401,7 +2400,8 @@ package body Thick_Queries is
                   when An_Identifier | A_Selected_Component =>
                      -- Only these can be type names
                      declare
-                        Decl : constant Asis.Declaration := Corresponding_Name_Declaration (Simple_Name (Elem));
+                        Decl : constant Asis.Declaration
+                          := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Elem));
                      begin
                         if Declaration_Kind (Decl) = A_Task_Type_Declaration then
                            return A_Task_Type;
@@ -2429,13 +2429,13 @@ package body Thick_Queries is
                            Impossible ("Type_Category: anonymous type not array", Good_Elem);
                      end case;
                   end if;
-                  Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name (Good_Elem));
+                  Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Subtype_Simple_Name (Good_Elem));
                when A_Component_Declaration =>
-                  Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
+                  Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Subtype_Simple_Name
                                                                (Component_Subtype_Indication
                                                                 (Object_Declaration_View (Elem))));
                when A_Discriminant_Specification =>
-                  Good_Elem := Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Elem)));
+                  Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Elem)));
                when An_Ordinary_Type_Declaration
                   | A_Task_Type_Declaration
                   | A_Protected_Type_Declaration
@@ -3069,7 +3069,8 @@ package body Thick_Queries is
             when An_Identifier | A_Selected_Component =>
                -- Only these can be type names
                declare
-                  Decl : constant Asis.Declaration := Corresponding_Name_Declaration (Simple_Name (The_Element));
+                  Decl : constant Asis.Declaration
+                    := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (The_Element));
                begin
                   case Declaration_Kind (Decl) is
                      when A_Type_Declaration | A_Subtype_Declaration | A_Formal_Type_Declaration =>
@@ -3237,7 +3238,7 @@ package body Thick_Queries is
             if Expression_Kind (Simple_Name (The_Element)) /= An_Identifier then
                return Nil_Element_List;
             end if;
-            Name_Decl := Corresponding_Name_Declaration (Simple_Name (The_Element));
+            Name_Decl := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (The_Element));
          when others =>
             return Nil_Element_List;
       end case;
@@ -3264,7 +3265,7 @@ package body Thick_Queries is
             return Nil_Element_List;
       end case;
 
-      Subtype_Indication := Type_Declaration_View (Corresponding_Name_Declaration (Subtype_Indication));
+      Subtype_Indication := Type_Declaration_View (A4G_Bugs.Corresponding_Name_Declaration (Subtype_Indication));
       case Type_Kind (Subtype_Indication) is
          when A_Record_Type_Definition
             | A_Derived_Record_Extension_Definition
@@ -5142,7 +5143,7 @@ package body Thick_Queries is
                   -- Return the "true" definion of Variable, after following all renamings
                   -- But the renaming can be a complicated expression like:
                   -- A : T renames Rec.X.Y(3);
-                  Variable_Decl := Corresponding_Name_Declaration (E);
+                  Variable_Decl := A4G_Bugs.Corresponding_Name_Declaration (E);
                   if Declaration_Kind (Variable_Decl) not in A_Renaming_Declaration then
                      return Complete_For_Access ((1 => (Identifier, E)));
                   end if;
@@ -5213,9 +5214,12 @@ package body Thick_Queries is
          begin
             case Definition_Kind (L) is
                when A_Subtype_Indication =>
-                  L_Decl := Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Subtype_Simple_Name (L))));
+                  L_Decl := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name
+                                                                     (Strip_Attributes
+                                                                      (Subtype_Simple_Name (L))));
                when A_Component_Definition =>
-                  L_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication (L)));
+                  L_Decl := A4G_Bugs.Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                                     (Component_Subtype_Indication (L)));
                when A_Type_Definition
                   | A_Task_Definition
                   | A_Protected_Definition
@@ -5234,18 +5238,18 @@ package body Thick_Queries is
                   if not Is_Access_Subtype (R) then
                      return False;
                   end if;
-                  L_Decl := Corresponding_Name_Declaration
+                  L_Decl := A4G_Bugs.Corresponding_Name_Declaration
                              (Simple_Name
                               (Strip_Attributes
                                (Anonymous_Access_To_Object_Subtype_Mark (L))));
 
                   if Definition_Kind (R) = An_Access_Definition then -- 2005
-                     R_Decl := Corresponding_Name_Declaration
+                     R_Decl := A4G_Bugs.Corresponding_Name_Declaration
                                 (Simple_Name
                                  (Strip_Attributes
                                   (Anonymous_Access_To_Object_Subtype_Mark (R))));
                   else
-                     R_Decl :=  Corresponding_Name_Declaration
+                     R_Decl :=  A4G_Bugs.Corresponding_Name_Declaration
                                  (Simple_Name
                                   (Strip_Attributes
                                    (Subtype_Simple_Name
@@ -5260,9 +5264,14 @@ package body Thick_Queries is
 
             case Definition_Kind (R) is
                when A_Subtype_Indication =>
-                  R_Decl := Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Subtype_Simple_Name (R))));
+                  R_Decl := A4G_Bugs.Corresponding_Name_Declaration
+                             (Simple_Name
+                              (Strip_Attributes
+                               (Subtype_Simple_Name (R))));
                when A_Component_Definition =>
-                  R_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Subtype_Indication (R)));
+                  R_Decl := A4G_Bugs.Corresponding_Name_Declaration
+                             (Subtype_Simple_Name
+                              (Component_Subtype_Indication (R)));
                when A_Type_Definition
                   | A_Task_Definition
                   | A_Protected_Definition
@@ -5282,12 +5291,12 @@ package body Thick_Queries is
                   if not Is_Access_Subtype (L) then
                      return False;
                   end if;
-                  R_Decl := Corresponding_Name_Declaration
+                  R_Decl := A4G_Bugs.Corresponding_Name_Declaration
                              (Simple_Name
                               (Strip_Attributes
                                (Anonymous_Access_To_Object_Subtype_Mark (R))));
 
-                  L_Decl :=  Corresponding_Name_Declaration
+                  L_Decl :=  A4G_Bugs.Corresponding_Name_Declaration
                               (Simple_Name
                                (Strip_Attributes
                                 (Subtype_Simple_Name (Asis.Definitions.Access_To_Object_Definition (L)))));
@@ -5529,7 +5538,7 @@ package body Thick_Queries is
          when A_Declaration =>
             Decl := Enclosing_Element (Element);
          when An_Expression =>
-            Decl := Enclosing_Element (Corresponding_Name_Declaration (Simple_Name (Element)));
+            Decl := Enclosing_Element (A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Element)));
          when others =>
             Impossible ("Bad element kind in Static_Level", Element);
       end case;
