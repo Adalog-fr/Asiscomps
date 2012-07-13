@@ -115,7 +115,9 @@ package Thick_Queries is
    function Ultimate_Origin (Element : in Asis.Element) return Asis.Unit_Origins;
    -- Returns the Unit_Origin of the Unit where Element is declared.
    -- If Element is an instance or Is_Part_Of_Instance, returns the Unit_Origin of the
-   -- corresponding generic or generic element
+   -- corresponding generic or generic element.
+   -- Follows renamings to avoid being fooled by (user) renaming of Standard units.
+   --
    -- Appropriate Element_Kinds:
    --    A_Declaration
    --    A_Defining_Name
@@ -541,7 +543,7 @@ package Thick_Queries is
                             A_Task_Type,
                             A_Protected_Type);
    subtype Discrete_Types  is Type_Categories range An_Enumeration_Type   .. A_Modular_Type;
-   subtype Numeric_Types   is Type_Categories range A_Signed_Integer_type .. A_Modular_Type;
+   subtype Numeric_Types   is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
    subtype Scalar_Types    is Type_Categories range An_Enumeration_Type   .. A_Floating_Point_Type;
    subtype Integer_Types   is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
    subtype Real_Types      is Type_Categories range A_Fixed_Point_Type    .. A_Floating_Point_Type;
