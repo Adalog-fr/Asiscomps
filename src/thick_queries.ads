@@ -115,7 +115,9 @@ package Thick_Queries is
    function Ultimate_Origin (Element : in Asis.Element) return Asis.Unit_Origins;
    -- Returns the Unit_Origin of the Unit where Element is declared.
    -- If Element is an instance or Is_Part_Of_Instance, returns the Unit_Origin of the
-   -- corresponding generic or generic element
+   -- corresponding generic or generic element.
+   -- Follows renamings to avoid being fooled by (user) renaming of Standard units.
+   --
    -- Appropriate Element_Kinds:
    --    A_Declaration
    --    A_Defining_Name

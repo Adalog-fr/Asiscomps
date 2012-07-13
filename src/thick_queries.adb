@@ -2157,7 +2157,6 @@ package body Thick_Queries is
                                        Follow_Predefined : Boolean := False)
                                        return Asis.Declaration
    is
-      use Asis.Compilation_Units;
       Decl : Asis.Declaration := The_Subtype;
    begin
       loop
@@ -2178,7 +2177,7 @@ package body Thick_Queries is
               | A_Private_Extension_Declaration
               =>
                if not Follow_Predefined
-                 and then Unit_Origin (Enclosing_Compilation_Unit (Decl)) = A_Predefined_Unit
+                 and then Ultimate_Origin (Decl) = A_Predefined_Unit
                then
                   -- Predefined element: stop here
                   return Decl;
@@ -3717,13 +3716,19 @@ package body Thick_Queries is
          when others =>
             Impossible ("Inappropriate element in Ultimate_Origin", Element);
       end case;
+
       if Is_Part_Of_Instance (Decl) then
          return Ultimate_Origin (Ultimate_Enclosing_Instantiation (Decl));
-      elsif Declaration_Kind (Decl) in A_Generic_Instantiation then
-         return Ultimate_Origin (Generic_Unit_Name (Decl));
-      else
-         return Unit_Origin (Enclosing_Compilation_Unit (Decl));
       end if;
+
+      case Declaration_Kind (Decl) is
+         when A_Generic_Instantiation =>
+            return Ultimate_Origin (Generic_Unit_Name (Decl));
+         when A_Renaming_Declaration =>
+            return Ultimate_Origin (A4G_Bugs.Renamed_Entity (Decl));
+         when others =>
+            return Unit_Origin (Enclosing_Compilation_Unit (Decl)); --## Rule line off Use_Ultimate_Origin
+      end case;
    end Ultimate_Origin;
 
 
