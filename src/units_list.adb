@@ -245,7 +245,9 @@ package body Units_List is
             declare
                Name_Def : constant Asis.Definition := Corresponding_Name_Definition (Unit_Name);
             begin
-               if Unit_Origin (Enclosing_Compilation_Unit (Name_Def)) = An_Application_Unit then
+               if Unit_Origin (Enclosing_Compilation_Unit         --## rule line off Use_Ultimate_Origin
+                               (Name_Def)) = An_Application_Unit  --   we want to keep library unit renamings
+               then
                   Add (Full_Name_Image (Name_Def));
                end if;
             end;
@@ -280,8 +282,8 @@ package body Units_List is
             return;
          end if;
 
-         if Unit_Origin (My_Unit) /= An_Application_Unit or else
-           Must_Ignore (To_Upper (Unit_Full_Name (My_Unit)))
+         if Unit_Origin (My_Unit) /= An_Application_Unit or else   --## rule line off Use_Ultimate_Origin
+           Must_Ignore (To_Upper (Unit_Full_Name (My_Unit)))       --   it's a unit here, and renamings have no stubs
          then
             return;
          end if;
