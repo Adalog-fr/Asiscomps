@@ -129,7 +129,7 @@ package body Thick_Queries is
    ---------------------------
 
    function Access_Target_Type (The_Subtype : Asis.Element) return Asis.Declaration is
-      use Asis.Definitions, Asis.Expressions;
+      use Asis.Definitions;
 
       Good_Def : Asis.Definition;
       Decl     : Asis.Declaration;
@@ -3225,7 +3225,7 @@ package body Thick_Queries is
    ------------------------------
 
    function Corresponding_Components (The_Element : Asis.Element) return Asis.Record_Component_List is
-      use Asis.Definitions, Asis.Expressions;
+      use Asis.Definitions;
 
       Subtype_Indication : Asis.Subtype_Indication;
       Name_Decl          : Asis.Declaration;
@@ -5532,8 +5532,6 @@ package body Thick_Queries is
    ------------------
 
    function Static_Level (Element : Asis.Element) return Asis.ASIS_Natural is
-      use Asis.Expressions;
-
       Decl : Asis.Element;
       Result : ASIS_Natural := 0;
    begin
