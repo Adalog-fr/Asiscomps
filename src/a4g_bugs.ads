@@ -51,13 +51,6 @@
 
 with
   Asis;
-with
-  Asis.Compilation_Units,
-  Asis.Declarations,
-  Asis.Definitions,
-  Asis.Elements,
-  Asis.Expressions,
-  Asis.Statements;
 package A4G_Bugs is
 
    --
@@ -74,8 +67,8 @@ package A4G_Bugs is
    -- Bug report  : [EA24-001]
    -- Gnat version: GAP 2005, GnatPro 5.02
    -- Fixed in    : GnatPro 5.04a1, GnatGPL 2006
-   function Unit_Class (Compilation_Unit : in Asis.Compilation_Unit) return Asis.Unit_Classes
-                        renames Asis.Compilation_Units.Unit_Class;
+   -- Removed from: AdaCtl 1.14b8
+   -- function Unit_Class (Compilation_Unit : in Asis.Compilation_Unit) return Asis.Unit_Classes;
 
    --
    -- From Asis.Declarations
@@ -85,16 +78,16 @@ package A4G_Bugs is
    -- Bug report  : [EA18-001]
    -- Gnat version: GAP 2005, GnatPro 5.02
    -- Fixed in    : GnatPro 6.1.0
-   function Corresponding_Last_Subtype (Declaration : in Asis.Declaration) return Asis.Declaration
-                                        renames Asis.Declarations.Corresponding_Last_Subtype;
+   -- Removed from: AdaCtl 1.14b8
+   -- function Corresponding_Last_Subtype (Declaration : in Asis.Declaration) return Asis.Declaration;
 
    -- Reason      : Renaming of attribute returns A_Function_Call (or A_Procedure_Call_Statement)
    --               instead of An_Attribute_Reference
    -- Bug report  : [FA26-004], 26/10/2006
    -- Gnat version: GNATPro 5.05w (20060603-34)
-   -- Fixed in    :
-   function Renamed_Entity (Declaration : in Asis.Declaration) return Asis.Expression
-                            renames Asis.Declarations.Renamed_Entity;
+   -- Fixed in    : GPL 2012 (and likely long before)
+   -- Removed from: AdaCtl 1.14b8
+   -- function Renamed_Entity (Declaration : in Asis.Declaration) return Asis.Expression;
 
 
    --
@@ -105,8 +98,8 @@ package A4G_Bugs is
    -- Bug report  : [F919-016]
    -- Gnat version: GnatPro 5.05w (20060910-34)
    -- Fixed in    : GnatPro 5.05w (200609-)
-   function Corresponding_Root_Type (Type_Definition : in Asis.Type_Definition) return Asis.Declaration
-                                     renames Asis.Definitions.Corresponding_Root_Type;
+   -- Removed from: AdaCtl 1.14b8
+   -- function Corresponding_Root_Type (Type_Definition : in Asis.Type_Definition) return Asis.Declaration;
 
 
    --
@@ -116,8 +109,8 @@ package A4G_Bugs is
    -- Reason      : Incorrect attribute returned
    -- Gnat version: 3.15p
    -- Fixed in    : GnatPro 5.02, GnatGPL 2006
-   function Attribute_Kind (Expression : in Asis.Expression) return Asis.Attribute_Kinds
-                            renames Asis.Elements.Attribute_Kind;
+   -- Removed from: AdaCtl 1.14b8
+   -- function Attribute_Kind (Expression : in Asis.Expression) return Asis.Attribute_Kinds;
 
 
    --
@@ -150,16 +143,16 @@ package A4G_Bugs is
    --             : A_Defining_Expanded_Name instead of a declaration
    -- Bug report  : [HB03-014]
    -- Gnat version: GnatPro 6.1.2, GnatGPL2008
-   -- Fixed in    :
-   function Corresponding_Name_Declaration (Reference : in Asis.Expression) return Asis.Element
-                                            renames Asis.Expressions.Corresponding_Name_Declaration;
+   -- Fixed in    : GPL2012 (and likely long before)
+   -- Removed from: AdaCtl 1.14b8
+   -- function Corresponding_Name_Declaration (Reference : in Asis.Expression) return Asis.Element;
 
    -- Reason      : ASIS failure in some cases (notably with generic formals)
    -- Bug report  : [G223-008]
    -- Gnat version: 6.0.x
    -- Fixed in    : 6.1.?
-   function Name_Image (Expression : Asis.Expression) return Asis.Program_Text
-                        renames Asis.Expressions.Name_Image;
+   -- Removed from: AdaCtl 1.14b8
+   -- function Name_Image (Expression : Asis.Expression) return Asis.Program_Text;
 
    --
    -- From Asis.Statements
@@ -169,15 +162,15 @@ package A4G_Bugs is
    -- Bug report  : [E317-007]
    -- Gnat version: GAP 1.1.0
    -- Fixed in    : GnatPro 5.02
-   function Corresponding_Called_Entity (Statement : in Asis.Statement) return Asis.Declaration
-                                         renames Asis.Statements.Corresponding_Called_Entity;
+   -- Removed from: AdaCtl 1.14b8
+   -- function Corresponding_Called_Entity (Statement : in Asis.Statement) return Asis.Declaration;
 
    -- Reason      : Bug when task body is separate
    -- Bug report  : [H415-017]
    -- Gnat version: GnatPro 6.1.1
-   -- Fixed in    :
-   function Corresponding_Entry (Statement : in Asis.Statement) return Asis.Declaration
-                                 renames Asis.Statements.Corresponding_Entry;
+   -- Fixed in    : GPL2012 (and likely long before)
+   -- Removed from: AdaCtl 1.14b8
+   -- function Corresponding_Entry (Statement : in Asis.Statement) return Asis.Declaration;
 
    ------------------------------------------------------------------------------------------------
    -- Trace identified bugs (in debug mode):
