@@ -47,7 +47,6 @@ with   -- ASIS components
   Asis.Expressions;
 
 with   -- Reusable components
-  A4G_Bugs,
   Linear_Queue,
   Thick_Queries,
   Utilities;

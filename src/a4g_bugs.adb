@@ -45,7 +45,7 @@ with   -- Adalog
   Utilities;   -- Only for Trace_Bug
 
 package body A4G_Bugs is
-   use Asis;
+   use Asis;   --## RULE LINE OFF Reduceable_Scope ## Can be moved just because we have only one function
 
    -----------------------------------
    -- Corresponding_Expression_Type --
