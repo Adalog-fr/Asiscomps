@@ -2528,7 +2528,7 @@ package body Thick_Queries is
                            Impossible ("Bad attribute in Type_Category", Good_Elem);
                      end case;
                      Good_Elem := Corresponding_First_Subtype
-                                   (Corresponding_Name_Declaration (Good_Elem));
+                                   (Corresponding_Name_Declaration (Simple_Name (Good_Elem)));
                   when An_Enumeration_Type_Definition =>
                      return An_Enumeration_Type;
                   when A_Signed_Integer_Type_Definition =>
