@@ -34,6 +34,7 @@
 
 with   -- Standard Ada units
   Ada.Characters.Handling,
+  Ada.Environment_Variables,
   Ada.Strings.Wide_Fixed,
   Ada.Strings.Wide_Unbounded,
   Ada.Strings.Wide_Maps.Wide_Constants;
@@ -46,6 +47,7 @@ with  -- ASIS units
   Asis.Text;
 
 with  -- GNAT
+  GNAT.OS_Lib,
   GNAT.Traceback.Symbolic;
 
 package body Utilities is
@@ -215,6 +217,32 @@ package body Utilities is
       Trace ("Failing element " & Span_Image (Element_Span (Element)), Element); --## rule line off no_trace
       Failure (Message);
    end Failure;
+
+   -------------------------
+   -- Locate_Regular_File --
+   -------------------------
+
+   function Locate_Regular_File (File_Name : Wide_String; Path_Variable : Wide_String) return Wide_String is
+      use Ada.Characters.Handling, Ada.Environment_Variables, GNAT.OS_Lib;
+      Result_Ptr  : String_Access;
+      String_Path : constant String := To_String (Path_Variable);
+   begin
+      if not Exists (String_Path) then
+         return "";
+      end if;
+
+      Result_Ptr := GNAT.OS_Lib.Locate_Regular_File (To_String (File_Name), Value (String_Path));
+      if Result_Ptr = null then
+         return "";
+      end if;
+
+      declare
+         Result : constant Wide_String := To_Wide_String (Result_Ptr.all);
+      begin
+         Free (Result_Ptr);
+         return Result;
+      end;
+   end Locate_Regular_File;
 
    -----------------
    -- Starts_With --
