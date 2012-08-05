@@ -2970,7 +2970,9 @@ package body Thick_Queries is
          Result     : Profile_Table (1 .. Names_1'Length + Parameters'Length -1);
          Result_Inx : Asis.List_Index;
       begin
-         Entry_1.Is_Access := Trait_Kind (Parameters (Parameters'First)) = An_Access_Definition_Trait;
+         Entry_1.Is_Access := Definition_Kind
+                               (Object_Declaration_View
+                                (Parameters (Parameters'First))) = An_Access_Definition;
          for I in Natural range 1 .. Names_1'Length loop
             Result (I) := Entry_1;
          end loop;
@@ -2986,7 +2988,9 @@ package body Thick_Queries is
 
                Result_Inx := Result_Inx + 1;
                Result (Result_Inx) := Build_Entry (Declaration_Subtype_Mark (Parameters (I)));
-               Result (Result_Inx).Is_Access := Trait_Kind (Parameters (I)) = An_Access_Definition_Trait;
+               Result (Result_Inx).Is_Access := Definition_Kind
+                                                 (Object_Declaration_View
+                                                  (Parameters (I))) = An_Access_Definition;
             end;
          end loop;
          return Result;
