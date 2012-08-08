@@ -161,4 +161,12 @@ package Utilities is
                         Name : String;
                         Mode : Open_Mode;
                         Overwrite_Option : Boolean);
+
+   function Locate_Regular_File (File_Name : Wide_String; Path_Variable : Wide_String) return Wide_String;
+   -- Like Gnat.OS_Lib.Locate_Regular_File, except that:
+   -- - Parameters and result are Wide_String
+   -- - The name of an OS variable is given
+   -- - It returns a Wide_String, no risk of memory leak
+   -- (and of course, this hides the dependency to Gnat.OS_Lib in the body).
+
 end Utilities;

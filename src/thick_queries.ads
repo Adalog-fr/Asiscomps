@@ -52,6 +52,19 @@ package Thick_Queries is
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
+   --  General types                                                                              --
+   --                                                                                             --
+   -------------------------------------------------------------------------------------------------
+
+   type Privacy_Policy is (Follow_Private, Follow_User_Private, Stop_At_Private);
+   -- Used to define the behaviour of some queries when they encounter a private type
+   -- - Follow_Private: Don't stop at private type, use the properties of the full type (privacy breaking)
+   -- - Stop_At_Private: Stop at private types, don't consider full types (non privacy breaking)
+   -- - Follow_User_Private: Like Follow_Private for user-defined private types, and like
+   --                        Stop_At_Private for language defined and implementation defined private types
+
+   -------------------------------------------------------------------------------------------------
+   --                                                                                             --
    -- Queries about program structure                                                             --
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
@@ -427,15 +440,14 @@ package Thick_Queries is
    --       A_Selected_Component (applies to selector)
 
 
-   function Ultimate_Type_Declaration (The_Subtype       : Asis.Declaration;
-                                       Follow_Predefined : Boolean := False)
+   function Ultimate_Type_Declaration (The_Subtype : Asis.Declaration;
+                                       Privacy     : Privacy_Policy := Follow_User_Private)
                                        return Asis.Declaration;
    -- Unwinds subtype declarations, derivations, private types and returns the real declaration
    -- that tells what the type really is!
    -- Note that for tagged types, derivations are also unwound up to the declaration that
    -- includes the word "tagged".
-   -- If Follow_Predefined is False, unwinding stops at private declarations in predefined units
-   -- (i.e. do not look into compiler's implementation)
+   -- Privacy defines behaviour when a private type is encountered during unwinding.
    -- Unwinding stops at formal types, even if they are derived formal types.
    --
    -- Appropriate Declaration_Kinds:
@@ -551,7 +563,7 @@ package Thick_Queries is
 
    function Type_Category (Elem               : in Asis.Element;
                            Follow_Derived     : in Boolean := False;
-                           Follow_Private     : in Boolean := False;
+                           Privacy            : in Privacy_Policy := Stop_At_Private;
                            Separate_Extension : in Boolean := False) return Type_Categories;
    -- For private and derived types:
    --    If Follow_Derived (resp. Follow_Private) is True, returns the category of the
