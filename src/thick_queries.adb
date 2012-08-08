@@ -2153,8 +2153,8 @@ package body Thick_Queries is
    -- Ultimate_Type_Declaration --
    -------------------------------
 
-   function Ultimate_Type_Declaration (The_Subtype       : Asis.Declaration;
-                                       Follow_Predefined : Boolean := False)
+   function Ultimate_Type_Declaration (The_Subtype : Asis.Declaration;
+                                       Privacy     : Privacy_Policy := Follow_User_Private)
                                        return Asis.Declaration
    is
       Decl : Asis.Declaration := The_Subtype;
@@ -2175,14 +2175,19 @@ package body Thick_Queries is
                return Decl;
             when A_Private_Type_Declaration
               | A_Private_Extension_Declaration
-              =>
-               if not Follow_Predefined
-                 and then Ultimate_Origin (Decl) = A_Predefined_Unit
-               then
-                  -- Predefined element: stop here
-                  return Decl;
-               end if;
-               Decl := Corresponding_Type_Declaration (Decl);
+               =>
+               case Privacy is
+                  when Follow_Private =>
+                     Decl := Corresponding_Type_Declaration (Decl);
+                  when Follow_User_Private =>
+                     if Ultimate_Origin (Decl) = An_Application_Unit then --## rule line off Simplifiable_statements
+                        Decl := Corresponding_Type_Declaration (Decl);
+                     else
+                        return Decl;
+                     end if;
+                  when Stop_At_Private =>
+                     return Decl;
+               end case;
             when An_Incomplete_Type_Declaration =>
                Decl := Corresponding_Type_Declaration (Decl);
             when A_Subtype_Declaration =>
@@ -2384,7 +2389,7 @@ package body Thick_Queries is
 
    function Type_Category (Elem               : in Asis.Element;
                            Follow_Derived     : in Boolean := False;
-                           Follow_Private     : in Boolean := False;
+                           Privacy            : in Privacy_Policy := Stop_At_Private;
                            Separate_Extension : in Boolean := False) return Type_Categories
    is
       use Asis.Definitions, Asis.Expressions;
@@ -2603,10 +2608,18 @@ package body Thick_Queries is
             when An_Incomplete_Type_Declaration =>
                Good_Elem := Corresponding_Type_Declaration (Good_Elem);
             when A_Private_Type_Declaration =>
-               if not Follow_Private then
-                  return A_Private_Type;
-               end if;
-               Good_Elem := Corresponding_Type_Declaration (Good_Elem);
+               case Privacy is
+                  when Follow_Private =>
+                     Good_Elem := Corresponding_Type_Declaration (Good_Elem);
+                  when Follow_User_Private =>
+                     if Ultimate_Origin (Good_Elem) = An_Application_Unit then --##rule line off Simplifiable_statements
+                        Good_Elem := Corresponding_Type_Declaration (Good_Elem);
+                     else
+                        return A_Private_Type;
+                     end if;
+                  when Stop_At_Private =>
+                     return A_Private_Type;
+               end case;
             when A_Private_Extension_Declaration =>
                if Separate_Extension then
                   return An_Extended_Tagged_Type;
