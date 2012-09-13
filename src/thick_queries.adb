@@ -3469,6 +3469,9 @@ package body Thick_Queries is
          Def := Name;
       else
          Def := Corresponding_Name_Definition (Simple_Name (Name));
+         if Is_Nil (Def) then  -- predefined stuff without a declaration...
+            return Nil_Element;
+         end if;
       end if;
 
       Decl := Enclosing_Element (Def);
