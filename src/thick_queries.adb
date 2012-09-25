@@ -3478,6 +3478,9 @@ package body Thick_Queries is
          Def := Name;
       else
          Def := Corresponding_Name_Definition (Simple_Name (Name));
+         if Is_Nil (Def) then  -- predefined stuff without a declaration...
+            return Nil_Element;
+         end if;
       end if;
 
       Decl := Enclosing_Element (Def);
@@ -3579,7 +3582,19 @@ package body Thick_Queries is
                            return Matching_Formal_Name (Def, Other_Decl);
                         end if;
                      when others =>
-                        Impossible ("First_Defining_Name: not a calllable entity", Other_Decl);
+                        Impossible ("First_Defining_Name: not a callable entity (1)", Other_Decl);
+                  end case;
+
+               when A_Definition =>
+                  case Definition_Kind (Other_Decl) is
+                     when A_Type_Definition
+                        | A_Formal_Type_Definition
+                        | An_Access_Definition
+                        =>
+                        -- access to subprogram
+                        return Def;
+                     when others =>
+                        Impossible ("First_Defining_Name: not a callable entity (2)", Other_Decl);
                   end case;
 
                when A_Statement =>
@@ -3591,7 +3606,7 @@ package body Thick_Queries is
                   end case;
 
                when others =>
-                  Impossible ("First_Defining_Name: not a calllable entity", Other_Decl);
+                  Impossible ("First_Defining_Name: not a callable entity (3)", Other_Decl);
             end case;
 
          when others =>
