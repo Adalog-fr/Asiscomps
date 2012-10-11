@@ -264,6 +264,7 @@ package body Thick_Queries is
          case Declaration_Kind (Callee) is
             when A_Procedure_Declaration
                | A_Function_Declaration
+               | An_Expression_Function_Declaration   -- Ada 2012
                =>
                -- Callee might be a declaration whose body is provided by renaming.
                -- This must be handled as renaming
@@ -276,7 +277,7 @@ package body Thick_Queries is
                end if;
                Callee := Corresponding_Body (Callee);
 
-            when A_Null_Procedure_Declaration =>
+            when A_Null_Procedure_Declaration =>   -- Ada 2005
                -- nothing to fear here
                return (Kind => A_Regular_Call, Declaration => Callee);
 
@@ -725,36 +726,37 @@ package body Thick_Queries is
             when A_Declaration =>
                case Declaration_Kind (My_Enclosing_Element) is
                   when A_Procedure_Declaration
-                    | A_Null_Procedure_Declaration
-                    | A_Procedure_Body_Declaration
-                    --
-                    | A_Function_Declaration
-                    | A_Function_Body_Declaration
-                    --
-                    | A_Package_Declaration
-                    | A_Package_Body_Declaration
-                    --
-                    | A_Task_Type_Declaration
-                    | A_Single_Task_Declaration
-                    | A_Task_Body_Declaration
-                    --
-                    | A_Protected_Type_Declaration
-                    | A_Single_Protected_Declaration
-                    | A_Protected_Body_Declaration
-                    --
-                    | An_Entry_Declaration
-                    | An_Entry_Body_Declaration
-                    --
-                    | A_Procedure_Body_Stub
-                    | A_Function_Body_Stub
-                    | A_Package_Body_Stub
-                    | A_Task_Body_Stub
-                    | A_Protected_Body_Stub
-                    --
-                    | A_Generic_Procedure_Declaration
-                    | A_Generic_Function_Declaration
-                    | A_Generic_Package_Declaration
-                    =>
+                     | A_Null_Procedure_Declaration   -- Ada 2005
+                     | A_Procedure_Body_Declaration
+                     --
+                     | A_Function_Declaration
+                     | An_Expression_Function_Declaration   -- Ada 2012
+                     | A_Function_Body_Declaration
+                     --
+                     | A_Package_Declaration
+                     | A_Package_Body_Declaration
+                     --
+                     | A_Task_Type_Declaration
+                     | A_Single_Task_Declaration
+                     | A_Task_Body_Declaration
+                     --
+                     | A_Protected_Type_Declaration
+                     | A_Single_Protected_Declaration
+                     | A_Protected_Body_Declaration
+                     --
+                     | An_Entry_Declaration
+                     | An_Entry_Body_Declaration
+                     --
+                     | A_Procedure_Body_Stub
+                     | A_Function_Body_Stub
+                     | A_Package_Body_Stub
+                     | A_Task_Body_Stub
+                     | A_Protected_Body_Stub
+                     --
+                     | A_Generic_Procedure_Declaration
+                     | A_Generic_Function_Declaration
+                     | A_Generic_Package_Declaration
+                     =>
                      Result := Names (My_Enclosing_Element) (1);
                      -- If Element was a defining name of a callable construct or task,
                      -- we are back to it. We must go one level higher.
@@ -1195,6 +1197,7 @@ package body Thick_Queries is
                   when A_Procedure_Declaration
                      | A_Null_Procedure_Declaration   --Ada 2005
                      | A_Function_Declaration
+                     | An_Expression_Function_Declaration --Ada 2012
                      | A_Package_Declaration
                      | A_Task_Type_Declaration
                      | A_Single_Task_Declaration
@@ -1616,7 +1619,7 @@ package body Thick_Queries is
 
       case Declaration_Kind (The_Declaration) is
          when A_Procedure_Declaration
-            | A_Null_Procedure_Declaration
+            | A_Null_Procedure_Declaration      --Ada 2005
             | A_Procedure_Instantiation
             | A_Procedure_Body_Declaration
             | A_Procedure_Renaming_Declaration
@@ -1627,6 +1630,7 @@ package body Thick_Queries is
 
          when A_Function_Declaration
             | A_Function_Instantiation
+            | An_Expression_Function_Declaration --Ada 2012
             | A_Function_Body_Declaration
             | A_Function_Renaming_Declaration
             | A_Function_Body_Stub
@@ -1660,6 +1664,7 @@ package body Thick_Queries is
    begin
       return Callable_Kind (Element) /= Not_A_Callable;
    end Is_Callable_Construct;
+
 
    ----------------------
    -- Is_Static_Object --
@@ -3018,12 +3023,14 @@ package body Thick_Queries is
       end if;
 
       case Declaration_Kind (Good_Declaration) is
-         when A_Function_Declaration |
-           A_Function_Body_Declaration |
-           A_Function_Renaming_Declaration |
-           A_Function_Body_Stub |
-           A_Generic_Function_Declaration |
-           A_Formal_Function_Declaration =>
+         when A_Function_Declaration
+            | An_Expression_Function_Declaration   -- Ada 2012
+            | A_Function_Body_Declaration
+            | A_Function_Renaming_Declaration
+            | A_Function_Body_Stub
+            | A_Generic_Function_Declaration
+            | A_Formal_Function_Declaration
+            =>
             declare
                Profile : constant Asis.Element := Result_Profile (Good_Declaration);
             begin
@@ -3174,6 +3181,15 @@ package body Thick_Queries is
                if Is_Nil (Def) then
                   -- This is the case if the indexing was for an entry family,
                   -- there is really no type in sight
+                  return Nil_Element;
+               end if;
+               if Type_Kind (Def)
+                    not in An_Unconstrained_Array_Definition .. A_Constrained_Array_Definition
+                 and then Formal_Type_Kind (Def)
+                    not in A_Formal_Unconstrained_Array_Definition .. A_Formal_Constrained_Array_Definition
+               then
+                  -- Ada 2012: the prefix maybe anything for which Constant_Indexing or Variable_Indexing is specified
+                  -- TBSL: give up for now
                   return Nil_Element;
                end if;
                return Component_Definition_View (Array_Component_Definition (Def));
@@ -3508,8 +3524,9 @@ package body Thick_Queries is
                return Matching_Name (Def, Other_Decl);
             end if;
          when A_Procedure_Declaration
-            | A_Null_Procedure_Declaration
+            | A_Null_Procedure_Declaration   -- Ada 2005
             | A_Function_Declaration
+            | An_Expression_Function_Declaration   -- Ada 2012
             | An_Entry_Declaration
             | A_Package_Declaration
             | A_Single_Task_Declaration
@@ -3546,8 +3563,9 @@ package body Thick_Queries is
                when A_Declaration =>
                   case Declaration_Kind (Other_Decl) is
                      when A_Procedure_Declaration
-                        | A_Null_Procedure_Declaration
+                        | A_Null_Procedure_Declaration   -- Ada 2005
                         | A_Function_Declaration
+                        | An_Expression_Function_Declaration   -- Ada 2012
                         | A_Generic_Procedure_Declaration
                         | A_Generic_Function_Declaration
                         | An_Entry_Declaration
@@ -5591,8 +5609,9 @@ package body Thick_Queries is
                   when A_Task_Type_Declaration
                      | A_Single_Task_Declaration
                      | A_Procedure_Declaration
-                     | A_Null_Procedure_Declaration
+                     | A_Null_Procedure_Declaration   -- Ada 2005
                      | A_Function_Declaration
+                     | An_Expression_Function_Declaration   -- Ada 2012
                      | A_Procedure_Body_Declaration
                      | A_Function_Body_Declaration
                      | A_Task_Body_Declaration
