@@ -38,20 +38,20 @@ with   -- Standard Ada units
   Ada.Strings.Wide_Maps,
   Ada.Strings.Wide_Fixed,
   Ada.Unchecked_Deallocation,
+  Ada.Wide_Characters.Handling,
   Ada.Wide_Text_IO;
 
 with   -- ASIS components
   Asis.Clauses,
   Asis.Compilation_Units,
   Asis.Elements,
-  Asis.Expressions;
+  Asis.Expressions,
+  Asis.Text;
 
 with   -- Reusable components
   Linear_Queue,
-  Thick_Queries,
-  Utilities;
+  Thick_Queries;
 package body Units_List is
-   use Utilities;
 
    ----------------------------------------------------------------
    --                 Internal elements                          --
@@ -92,6 +92,8 @@ package body Units_List is
    -- Otherwise, add to the tail.
    -- It is OK to add new units while iterating.
    procedure Add (Unit : Wide_String) is
+      use Ada.Wide_Characters.Handling;
+
       Upper_Unit : constant Wide_String := To_Upper (Unit);
       Current    : Link := Head;
    begin
@@ -120,6 +122,92 @@ package body Units_List is
          Previous := Current;
       end if;
    end Add;
+
+   --------------
+   -- Trim_All --
+   --------------
+
+   Delim_Image : constant Wide_String := Asis.Text.Delimiter_Image;
+   function Trim_All (Item : in Wide_String) return Wide_String is
+      -- This is a copy of the function in Utilities, to avoid a dependancy on utilities
+      Result    : Wide_String (1 .. Item'Length);
+      Last      : Natural  := 0;
+      Start     : Positive := Item'First;
+      Stop      : Natural  := Item'Last;
+      In_Quotes : Boolean := False;
+      In_Comment: Boolean := False;
+      Delim_Inx : Natural := 0;
+   begin
+      for I in Item'Range loop
+         if Item (I) > ' ' then
+            Start := I;
+            Last  := 1;
+            Result (1) := Item (I);
+            exit;
+         end if;
+      end loop;
+      if Last = 0 then
+         -- Nothing found
+         return "";
+      end if;
+
+      for I in reverse Item'Range loop
+         if Item (I) > ' ' then
+            Stop := I;
+            if Stop = Start then
+               -- Only one character
+               return Result (1 .. 1);
+            end if;
+            exit;
+         end if;
+      end loop;
+
+      -- Since we loop until Stop-1, it is safe to access Item (I+1)
+      for I in Positive range Start+1 .. Stop-1 loop
+         if In_Quotes then
+            Last          := Last + 1;
+            Result (Last) := Item (I);
+         elsif In_Comment then
+            if Delim_Inx = 0 then
+               if Item (I) = Delim_Image (Delim_Image'First) then
+                  Delim_Inx := Delim_Image'First;
+               end if;
+            elsif Item (I) /= Delim_Image (Delim_Inx) then
+               Delim_Inx := 0;
+            elsif Delim_Inx = Delim_Image'Last then
+               In_Comment := False;
+            end if;
+         else
+            case Item (I) is
+               when Wide_Character'First .. Wide_Character'Pred (' ') =>
+                  null;
+               when '"' =>
+                  In_Quotes     := not In_Quotes;
+                  Last          := Last + 1;
+                  Result (Last) := '"';
+               when '-' =>
+                  if Item (I+1) = '-' then
+                     In_Comment := True;
+                  else
+                     Last          := Last + 1;
+                     Result (Last) := Item (I);
+                  end if;
+               when ' ' =>
+                  if Item (I+1) /= ' ' then
+                     Last          := Last + 1;
+                     Result (Last) := ' ';
+                  end if;
+               when others =>
+                  Last          := Last + 1;
+                  Result (Last) := Item (I);
+            end case;
+         end if;
+      end loop;
+      Last          := Last + 1;
+      Result (Last) := Item (Stop);
+
+      return Result (1 .. Last);
+   end Trim_All;
 
 
    ----------------------------------------------------------------
@@ -274,6 +362,7 @@ package body Units_List is
       end Do_Process_With;
 
       procedure Do_Process_Stub (My_Unit : Compilation_Unit) is
+         use Ada.Wide_Characters.Handling;
       begin
          -- NB: A protected body can be a compilation unit if it is a subunit,
          --     but it cannot contain stubs.
@@ -288,7 +377,6 @@ package body Units_List is
          end if;
 
          declare
-            --            My_CU_List : constant Compilation_Unit_List := A4G_Bugs.Subunits (My_Unit);
             My_CU_List : constant Compilation_Unit_List := Asis.Compilation_Units.Subunits (My_Unit);
          begin
             for I in My_CU_List'Range loop
@@ -306,7 +394,7 @@ package body Units_List is
       end Do_Process_Stub;
 
       procedure Process_Unit_Spec (Spec : Wide_String) is
-         use Ada.Characters.Handling, Ada.Strings.Wide_Fixed;
+         use Ada.Characters.Handling, Ada.Wide_Characters.Handling, Ada.Strings.Wide_Fixed;
 
          procedure Process_Indirect_File (Name : String) is
             use Ada.Wide_Text_IO, Ada.Exceptions;
