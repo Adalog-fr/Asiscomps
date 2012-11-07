@@ -665,6 +665,8 @@ package Thick_Queries is
    --     of these: the defining name of the private or incomplete or deferred declaration.
    -- For a formal parameter of a body: the corresponding formal parameter of the spec if
    --     there is one, the one from the body otherwise.
+   -- For a formal parameter of a proper body: the corresponding formal parameter of the spec if
+   --     there is one, the one from the stub otherwise.
    --
    -- Appropriate Element_Kinds:
    --    A_Defining_Name
@@ -938,9 +940,15 @@ package Thick_Queries is
       end record;
    function Types_Profile (Declaration : in Asis.Declaration) return Profile_Descriptor;
    -- Given a callable entity declaration, returns a description of the profile
-   -- Result_Type is the result *type* for a function, Nil_Element for other callable entities
+   -- Result_Type.Name is the result *type* for a function, Nil_Element for other callable entities
    -- Formals are (in order of declaration) the *types* of the parameters.
    -- Multiple declarations are separated, i.e. "A,B : Integer" yields two entries in the table.
+   --
+   -- Appropriate Element_Kinds:
+   --   A_Declaration
+   --
+   -- Appropriate Declaration_Kinds:
+   --   Any (generic) callable entity declaration or body declaration
 
 
    function External_Call_Target (Call : Asis.Element) return Asis.Expression;

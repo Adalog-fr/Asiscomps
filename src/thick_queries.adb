@@ -379,6 +379,7 @@ package body Thick_Queries is
    -----------------
 
    function All_Formals (Profile : Asis.Parameter_Specification_List) return Defining_Name_List is
+      -- Written to avoid recursvity, unless multiple names are declared
       Result : Asis.Defining_Name_List (Profile'Range);
    begin
       for P in Profile'Range loop
@@ -3564,7 +3565,7 @@ package body Thick_Queries is
                         --Beware: these can be proper bodies
                         if Is_Subunit (Other_Decl) then
                            Other_Decl := Corresponding_Body_Stub (Other_Decl);
-                           Def  := Names (Decl) (1);
+                           Def        := Matching_Formal_Name (Def, Other_Decl);
                         end if;
                         Other_Decl := Corresponding_Declaration (Other_Decl);
                         if Is_Nil (Other_Decl) then
