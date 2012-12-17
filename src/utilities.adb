@@ -555,6 +555,16 @@ package body Utilities is
       end if;
    end Trace;
 
+   -----------
+   -- Trace --
+   -----------
+
+   function  Trace (Message : Wide_String) return Boolean is
+   begin
+      Trace (Message);
+      return True;
+   end Trace;
+
    ------------
    -- Trace  --
    ------------
