@@ -130,6 +130,7 @@ package Utilities is
    procedure Raw_Trace (Message : Wide_String);
 
    procedure Trace (Message : Wide_String);
+   function  Trace (Message : Wide_String) return Boolean;   -- Always returns True
    procedure Trace (Message : Wide_String; Value : Boolean);
    procedure Trace (Message : Wide_String; Value : Integer);
    procedure Trace (Message : Wide_String; Value : Ada.Exceptions.Exception_Occurrence);
