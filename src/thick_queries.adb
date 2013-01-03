@@ -835,6 +835,37 @@ package body Thick_Queries is
       use Thick_Queries;
       Elem     : Asis.Element := Enclosing_Element (Expr);
       Previous : Asis.Element := Expr;
+
+      function Callable_Usage_Kind (Callable, Enclosed : Asis.Expression) return Expression_Usage_Kinds is
+         Actuals : constant Asis.Association_List := Actual_Parameters (Callable);
+         Formal  : Asis.Defining_Name;
+      begin
+         -- Find the position
+         for I in Actuals'Range loop
+            if Is_Equal (Actuals (I), Enclosed) then
+               Formal := Formal_Name (Callable, I);
+               if Is_Nil (Formal) then
+                  -- Call to a dispatching operation
+                  -- We don't know the mode => Unknown
+                  return Unknown;
+               end if;
+               case Mode_Kind (Enclosing_Element (Formal)) is
+                  when Not_A_Mode =>
+                     Impossible ("Wrong mode in Usage_Kind", Formal_Name (Elem, I));
+                  when A_Default_In_Mode | An_In_Mode =>
+                     return Read;
+                  when An_Out_Mode =>
+                     return Write;
+                  when An_In_Out_Mode =>
+                     return Read_Write;
+               end case;
+            end if;
+         end loop;
+         -- If it is not a parameter, it must be part of the called name
+         -- (implicit dereference of an access to procedure or entry)
+         return Read;
+      end Callable_Usage_Kind;
+
    begin
       -- Protected objects can only be read, first get rid of that special case:
       if Definition_Kind (Ultimate_Expression_Type (Expr)) = A_Protected_Definition then
@@ -881,15 +912,20 @@ package body Thick_Queries is
                      Previous := Elem;
                      Elem     := Enclosing_Element (Elem);
 
-                  when An_Explicit_Dereference
-                    | A_Function_Call =>
+                  when An_Explicit_Dereference =>
                      -- Explicit dereference => the object is not modified
-                     -- Function call =>
-                     --   if it is in a parameter, it is read (functions have only "in" parameters!)
-                     --   if it is part of the function name, it is an implicit dereference if it is a variable,
-                     --   otherwise it is not a variable
                      return Read;
 
+                  when  A_Function_Call =>
+                     -- Function call => must handle like procedure call, now (2012) that we have
+                     -- [in] out parameters in functions!
+                     -- We cannot access the profile of predefined operators, but fortunately all
+                     -- operators must have parameters of mode in, so let's get rid of that first.
+                     if Expression_Kind (Called_Simple_Name (Elem)) = An_Operator_Symbol then
+                        return Read;
+                     else
+                        return Callable_Usage_Kind (Elem, Previous);
+                     end if;
                   when An_Attribute_Reference =>
                      -- This is not an access to the object itself
                      return Untouched;
@@ -908,37 +944,9 @@ package body Thick_Queries is
                         return Read;
                      end if;
                   when A_Procedure_Call_Statement
-                    | An_Entry_Call_Statement
-                    =>
-                     -- Find the position
-                     declare
-                        Actuals : constant Asis.Association_List := Call_Statement_Parameters (Elem);
-                        Formal  : Asis.Defining_Name;
-                     begin
-                        for I in Actuals'Range loop
-                           if Is_Equal (Actuals (I), Previous) then
-                              Formal := Formal_Name (Elem, I);
-                              if Is_Nil (Formal) then
-                                 -- Call to a dispatching operation
-                                 -- We don't know the mode => Unknown
-                                 return Unknown;
-                              end if;
-                              case Mode_Kind (Enclosing_Element (Formal)) is
-                                 when Not_A_Mode =>
-                                    Impossible ("Wrong mode in Usage_Kind", Formal_Name (Elem, I));
-                                 when A_Default_In_Mode | An_In_Mode =>
-                                    return Read;
-                                 when An_Out_Mode =>
-                                    return Write;
-                                 when An_In_Out_Mode =>
-                                    return Read_Write;
-                              end case;
-                           end if;
-                        end loop;
-                        -- If it is not a parameter, it must be part of the called name
-                        -- (implicit dereference of an access to procedure or entry)
-                        return Read;
-                     end;
+                     | An_Entry_Call_Statement
+                     =>
+                     return Callable_Usage_Kind (Elem, Previous);
 
                   when others =>
                      return Read;
