@@ -831,8 +831,9 @@ package body Thick_Queries is
    function Expression_Usage_Kind (Expr : Asis.Expression) return Expression_Usage_Kinds is
       use Asis.Clauses, Asis.Expressions;
       use Thick_Queries;
-      Elem     : Asis.Element := Enclosing_Element (Expr);
-      Previous : Asis.Element := Expr;
+      Elem     : Asis.Element := Expr;
+      Previous : Asis.Element;
+
    begin
       -- Protected objects can only be read, first get rid of that special case:
       if Definition_Kind (Ultimate_Expression_Type (Expr)) = A_Protected_Definition then
@@ -841,6 +842,41 @@ package body Thick_Queries is
 
       -- Go up the expression until we find something that allows us to make a decision
       loop
+         Previous := Elem;
+         Elem     := Enclosing_Element (Elem);
+
+         -- If Previous is a literal, a constant, or an in parameter, it can only be read
+         -- unless it is the prefix of an attribute, where it is untouched
+         case Expression_Kind (Previous) is
+            when An_Integer_Literal
+               | A_Real_Literal
+               | A_String_Literal
+               =>
+               return Read;
+            when An_Identifier =>
+               case Declaration_Kind (Corresponding_Name_Declaration (Previous)) is
+                  when A_Constant_Declaration =>
+                     if Expression_Kind (Elem) = An_Attribute_Reference then
+                        return Untouched;
+                     else
+                        return Read;
+                     end if;
+                  when A_Parameter_Specification =>
+                     if Mode_Kind (Corresponding_Name_Declaration (Previous)) in A_Default_In_Mode .. An_In_Mode then
+                        if Expression_Kind (Elem) = An_Attribute_Reference then
+                           return Untouched;
+                        else
+                           return Read;
+                        end if;
+                     end if;
+                  when others =>
+                     null;
+               end case;
+            when others =>
+               null;
+         end case;
+
+         -- See enclosing context
          case Element_Kind (Elem) is
             when An_Expression =>
                case Expression_Kind (Elem) is
@@ -850,8 +886,6 @@ package body Thick_Queries is
                         -- => it is actually a Read of the variable
                         return Read;
                      end if;
-                     Previous := Elem;
-                     Elem     := Enclosing_Element (Elem);
 
                   when An_Identifier =>
                      Impossible ("enclosing element is an identifier", Elem);
@@ -870,14 +904,11 @@ package body Thick_Queries is
                         -- => it is actually a Read of the variable
                         return Read;
                      end if;
-                     Previous := Elem;
-                     Elem     := Enclosing_Element (Elem);
 
                   when A_Type_Conversion
                     | A_Qualified_Expression
-                    =>
-                     Previous := Elem;
-                     Elem     := Enclosing_Element (Elem);
+                     =>
+                     null;  -- Go up
 
                   when An_Explicit_Dereference
                     | A_Function_Call =>
@@ -943,8 +974,7 @@ package body Thick_Queries is
                end case;
 
             when An_Association =>
-               Previous := Elem;
-               Elem     := Enclosing_Element (Elem);
+               null;  -- Go up
 
             when A_Declaration =>
                case Declaration_Kind (Elem) is
