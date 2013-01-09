@@ -436,7 +436,7 @@ package body Units_List is
             if Must_Ignore (This_Unit) then
                Delete_Current;
             else
-               -- TBSL: Temporary fix for problem with System
+               -- Temporary fix for problem with System
                -- Make sure at least one unit is open before accessing anything else
                if not Unit_Found or Add_Stubs or Recursive then
                   Body_Decl  := Compilation_Unit_Body (This_Unit, My_Context.all);

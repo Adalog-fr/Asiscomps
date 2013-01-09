@@ -834,7 +834,7 @@ package body Thick_Queries is
       Elem     : Asis.Element := Expr;
       Previous : Asis.Element;
 
-   begin
+   begin  -- Expression_Usage_Kind
       -- Protected objects can only be read, first get rid of that special case:
       if Definition_Kind (Ultimate_Expression_Type (Expr)) = A_Protected_Definition then
          return Read;
@@ -1396,15 +1396,12 @@ package body Thick_Queries is
                                   Corresponding_Name_Definition (Actual_Parameter
                                                                  (Pragma_Associations (Pragma_Assoc))))
                      then
-                        -- Corresponding_Name_Definition of predefined "special" identifiers, like the "C"
-                        -- in pragma convention (C, .. .) returns A_Nil_Element. Since this will differ from
-                        -- Element_Definition, there is no need to have a special case for it.
-                        -- KLUDGE TBSL
-                        -- Corresponding_Name_Definition raises an exception instead of returning a Nil element
                         Result (Pragma_Kind (Element_Pragmas (Pragma_Elt))) := True;
                      end if;
                   exception
                      when Asis.Exceptions.ASIS_Inappropriate_Element =>
+                        -- Raised by Corresponding_Name_Definition of predefined "special" identifiers, like the "C"
+                        -- in pragma convention (C, .. .).
                         -- Anyway, this is a junk element
                         null;
                   end;
