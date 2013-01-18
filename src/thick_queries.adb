@@ -1361,7 +1361,7 @@ package body Thick_Queries is
    function Corresponding_Pragma_Set (Element : in Asis.Element) return Pragma_Set is
       use Asis.Definitions, Asis.Expressions;
 
-      Element_Definition  : Asis.Definition;
+      Elem_Def_Name  : Asis.Defining_Name;
    begin
       if Is_Nil (Element) then
          return (others => False);
@@ -1369,16 +1369,17 @@ package body Thick_Queries is
 
       case Element_Kind (Element) is
          when A_Defining_Name =>
-            Element_Definition  := Element;
+            Elem_Def_Name  := Element;
 
          when An_Expression =>
             case Expression_Kind (Element) is
                when An_Identifier =>
-                  Element_Definition  := Corresponding_Name_Definition (Element);
+                  Elem_Def_Name  := Corresponding_Name_Definition (Element);
                when A_Selected_Component =>
-                  Element_Definition  := Corresponding_Name_Definition (Prefix (Element));
-                  -- Expression is neither An_Identifier, nor A_Selected_Component
+                  Elem_Def_Name  := Corresponding_Name_Definition (Prefix (Element));
                when others =>
+                  -- Expression is neither An_Identifier, nor A_Selected_Component
+                  -- Includes An_Attribute_Reference (T'Class)
                   return (others => False);
             end case;
 
@@ -1389,8 +1390,9 @@ package body Thick_Queries is
 
       declare
          Element_Pragmas : constant Asis.Pragma_Element_List := Corresponding_Pragmas (Enclosing_Element
-                                                                                       (Element_Definition));
-         Result : Pragma_Set := (others => False);
+                                                                                       (Elem_Def_Name));
+         Type_Name       : Asis.Expression;
+         Result          : Pragma_Set := (others => False);
       begin
          for Pragma_Elt in Element_Pragmas'Range loop
             -- Retrieve the associations composing the current pragma
@@ -1400,9 +1402,8 @@ package body Thick_Queries is
             begin
                for Pragma_Assoc in Pragma_Associations'Range loop
                   -- Check if the pragma has been set on Element
-
                   begin
-                     if Is_Equal (Element_Definition,
+                     if Is_Equal (Elem_Def_Name,
                                   Corresponding_Name_Definition (Actual_Parameter
                                                                  (Pragma_Associations (Pragma_Assoc))))
                      then
@@ -1419,8 +1420,8 @@ package body Thick_Queries is
             end;
          end loop;
 
-         -- For variables and constants, check pragmas inherited from the type
-         case Declaration_Kind (Enclosing_Element (Element_Definition)) is
+         case Declaration_Kind (Enclosing_Element (Elem_Def_Name)) is
+            -- For variables and constants, add pragmas inherited from the type
             when A_Variable_Declaration                   -- Name : [aliased] Type          [:= Value];
               | A_Constant_Declaration                    -- Name : [aliased] constant Type  := Value;
               | A_Deferred_Constant_Declaration           -- Name : [aliased] constant Type; + see private part
@@ -1431,23 +1432,51 @@ package body Thick_Queries is
                begin
                   case Definition_Kind (Element_Type_Definition) is
                      when A_Component_Definition =>
-                        Result := Result or Corresponding_Pragma_Set (Names
-                                                                      (Corresponding_First_Subtype
-                                                                       (Corresponding_Name_Declaration
-                                                                        (Subtype_Simple_Name
-                                                                         (Component_Subtype_Indication
-                                                                          (Element_Type_Definition)))))(1));
+                        Type_Name := Subtype_Simple_Name (Component_Subtype_Indication (Element_Type_Definition));
+                        if Expression_Kind (Type_Name) /= An_Attribute_Reference then
+                           Result := Result or Corresponding_Pragma_Set (Names
+                                                                         (Corresponding_First_Subtype
+                                                                          (Corresponding_Name_Declaration
+                                                                           (Type_Name)))(1));
+                        end if;
                      when A_Subtype_Indication =>
-                        Result := Result or Corresponding_Pragma_Set (Names
-                                                                      (Corresponding_First_Subtype
-                                                                       (Corresponding_Name_Declaration
-                                                                        (Subtype_Simple_Name
-                                                                         (Element_Type_Definition))))(1));
+                        Type_Name := Subtype_Simple_Name (Element_Type_Definition);
+                        if Expression_Kind (Type_Name) /= An_Attribute_Reference then
+                           Result := Result or Corresponding_Pragma_Set (Names
+                                                                         (Corresponding_First_Subtype
+                                                                          (Corresponding_Name_Declaration
+                                                                           (Type_Name)))(1));
+                        end if;
 
                      when others =>
                         null;
                   end case;
                end;
+
+            -- For a subtype, check pragmas for the parent type
+            when A_Subtype_Declaration =>
+               Result := Result or Corresponding_Pragma_Set (Subtype_Simple_Name
+                                                             (Type_Declaration_View
+                                                              (Enclosing_Element (Elem_Def_Name))));
+
+            -- For a derived type, check pragmas for the parent type
+            when An_Ordinary_Type_Declaration =>
+               declare
+                  Element_Type_Definition : constant Asis.Definition := Type_Declaration_View (Enclosing_Element
+                                                                                               (Elem_Def_Name));
+               begin
+                  case Type_Kind (Element_Type_Definition) is
+                     when A_Derived_Type_Definition
+                        | A_Derived_Record_Extension_Definition
+                        =>
+                        Result := Result or Corresponding_Pragma_Set (Subtype_Simple_Name
+                                                                      (Parent_Subtype_Indication
+                                                                       (Element_Type_Definition)));
+                     when others =>
+                        null;
+                  end case;
+               end;
+
             when others =>
                null;
          end case;
@@ -2477,11 +2506,21 @@ package body Thick_Queries is
                            Impossible ("Type_Category: anonymous type not array", Good_Elem);
                      end case;
                   end if;
-                  Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name (Good_Elem));
+                  Good_Elem := Subtype_Simple_Name (Good_Elem);
+                  case Attribute_Kind (Good_Elem) is
+                     when Not_An_Attribute =>
+                        Good_Elem := Corresponding_Name_Declaration (Good_Elem);
+                     when A_Class_Attribute =>
+                        return A_Tagged_Type;
+                     when A_Base_Attribute =>
+                        Good_Elem := Corresponding_Name_Declaration (Prefix (Good_Elem));
+                     when others =>
+                        Impossible ("Type category: attribute should be type", Good_Elem);
+                  end case;
                when A_Component_Declaration =>
                   Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                               (Component_Subtype_Indication
-                                                                (Object_Declaration_View (Elem))));
+                                                                        (Component_Subtype_Indication
+                                                                         (Object_Declaration_View (Elem))));
                when A_Discriminant_Specification =>
                   Good_Elem := Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Elem)));
                when An_Ordinary_Type_Declaration
