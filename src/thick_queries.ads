@@ -775,6 +775,7 @@ package Thick_Queries is
    function Corresponding_Pragma_Set (Element : in Asis.Element) return Pragma_Set;
    -- Returns the set of pragmas that apply to the corresponding name or defining name
    -- (including, for an object, those inherited from its type).
+   -- Pragmas that apply to T'Class are not included to the set for T (due to ASIS weakness)
    -- Note that unlike Corresponding_Pragmas, this query makes sure that the pragma applies
    -- really to the given element in the case of a multiple declaration.
    --
