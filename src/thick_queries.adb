@@ -2490,11 +2490,21 @@ package body Thick_Queries is
                            Impossible ("Type_Category: anonymous type not array", Good_Elem);
                      end case;
                   end if;
-                  Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Subtype_Simple_Name (Good_Elem));
+                  Good_Elem := Subtype_Simple_Name (Good_Elem);
+                  case Attribute_Kind (Good_Elem) is
+                     when Not_An_Attribute =>
+                        Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Good_Elem);
+                     when A_Class_Attribute =>
+                        return A_Tagged_Type;
+                     when A_Base_Attribute =>
+                        Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Prefix (Good_Elem));
+                     when others =>
+                        Impossible ("Type category: attribute should be type", Good_Elem);
+                  end case;
                when A_Component_Declaration =>
                   Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                               (Component_Subtype_Indication
-                                                                (Object_Declaration_View (Elem))));
+                                                                        (Component_Subtype_Indication
+                                                                         (Object_Declaration_View (Elem))));
                when A_Discriminant_Specification =>
                   Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Elem)));
                when An_Ordinary_Type_Declaration
