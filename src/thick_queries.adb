@@ -1025,7 +1025,7 @@ package body Thick_Queries is
                   return Extended_Name_Image (Prefix (Name_Elem))
                     & '.'
                     & Name_Image (Selector (Name_Elem));
-               when An_Identifier =>
+               when An_Identifier | An_Operator_Symbol | An_Enumeration_Literal =>
                   return Name_Image (Name_Elem);
                when An_Attribute_Reference =>
                   return Extended_Name_Image (Prefix (Name_Elem))
@@ -1036,6 +1036,8 @@ package body Thick_Queries is
             end case;
          when A_Defining_Name =>
             return Defining_Name_Image (Name_Elem);
+         when A_Pragma =>
+            return Pragma_Name_Image (Name_Elem);
          when others =>
             Impossible ("Not a name in Extended_Name_Image", Name_Elem);
       end case;
@@ -3573,7 +3575,12 @@ package body Thick_Queries is
          end if;
       end if;
 
+      -- Get declaration, but skip expanded defining names
       Decl := Enclosing_Element (Def);
+      while Element_Kind (Decl) = A_Defining_Name loop
+         Decl := Enclosing_Element (Decl);
+      end loop;
+
       if Is_Subunit (Decl) then
          Decl := Corresponding_Body_Stub (Decl);
          Def  := Names (Decl)(1);
