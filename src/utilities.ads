@@ -150,7 +150,7 @@ package Utilities is
    procedure Stack_Traceback (Exc : Ada.Exceptions.Exception_Occurrence);
 
    --
-   --  Safe open
+   --  File facilities
    --
    Overwrite_Error : exception;
 
@@ -169,5 +169,11 @@ package Utilities is
    -- - The name of an OS variable is given
    -- - It returns a Wide_String, no risk of memory leak
    -- (and of course, this hides the dependency to Gnat.OS_Lib in the body).
+
+   function Clean_File_Name (File_Name : Wide_String) return Wide_String;
+   -- Cleans up File_Name from artifacts due to the (dubious!) processing of parameters
+   -- by the environment:
+   -- - if File_Name is surrounded by '"', remove them
+   -- - replace all "\ " by " "
 
 end Utilities;
