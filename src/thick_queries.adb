@@ -854,7 +854,7 @@ package body Thick_Queries is
                =>
                return Read;
             when An_Identifier =>
-               case Declaration_Kind (Corresponding_Name_Declaration (Previous)) is
+               case Declaration_Kind (A4G_Bugs.Corresponding_Name_Declaration (Previous)) is
                   when A_Constant_Declaration =>
                      if Expression_Kind (Elem) = An_Attribute_Reference then
                         return Untouched;
@@ -862,7 +862,9 @@ package body Thick_Queries is
                         return Read;
                      end if;
                   when A_Parameter_Specification =>
-                     if Mode_Kind (Corresponding_Name_Declaration (Previous)) in A_Default_In_Mode .. An_In_Mode then
+                     if Mode_Kind (A4G_Bugs.Corresponding_Name_Declaration (Previous))
+                        in A_Default_In_Mode .. An_In_Mode
+                     then
                         if Expression_Kind (Elem) = An_Attribute_Reference then
                            return Untouched;
                         else
@@ -2493,7 +2495,7 @@ package body Thick_Queries is
                      end case;
                   end if;
                   Good_Elem := Subtype_Simple_Name (Good_Elem);
-                  case Attribute_Kind (Good_Elem) is
+                  case A4G_Bugs.Attribute_Kind (Good_Elem) is
                      when Not_An_Attribute =>
                         Good_Elem := A4G_Bugs.Corresponding_Name_Declaration (Good_Elem);
                      when A_Class_Attribute =>
