@@ -158,6 +158,38 @@ package body Utilities is
       end if;
    end Choose;
 
+
+   ---------------------
+   -- Clean_File_Name --
+   ---------------------
+
+   function Clean_File_Name (File_Name : Wide_String) return Wide_String is
+      Result   : Wide_String (1 .. File_Name'Length);
+      In_First : Positive := File_Name'First;
+      In_Last  : Positive := File_Name'Last;
+      Out_Inx  : Natural  := Result'First - 1;
+   begin
+      if File_Name (File_Name'First) = '"' and File_Name (File_Name'Last) = '"' then
+         In_First := File_Name'First + 1;
+         In_Last  := File_Name'Last  - 1;
+      end if;
+
+      for In_Inx in Positive range In_First .. In_Last loop
+         case File_Name (In_Inx) is
+            when '\' =>
+               if In_Inx = In_Last or else File_Name (In_Inx + 1) /= ' ' then
+                  Out_Inx := Out_Inx + 1;
+                  Result (Out_Inx) := '\';
+               end if;
+            when others =>
+               Out_Inx := Out_Inx + 1;
+               Result (Out_Inx) := File_Name (In_Inx);
+         end case;
+      end loop;
+
+      return Result (Result'First .. Out_Inx);
+   end Clean_File_Name;
+
    ------------
    -- Choose --
    ------------

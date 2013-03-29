@@ -894,7 +894,9 @@ package body Thick_Queries is
                         return Read;
                      end if;
                   when A_Parameter_Specification =>
-                     if Mode_Kind (Corresponding_Name_Declaration (Previous)) in A_Default_In_Mode .. An_In_Mode then
+                     if Mode_Kind (Corresponding_Name_Declaration (Previous))
+                        in A_Default_In_Mode .. An_In_Mode
+                     then
                         if Expression_Kind (Elem) = An_Attribute_Reference then
                            return Untouched;
                         else

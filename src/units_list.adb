@@ -50,7 +50,8 @@ with   -- ASIS components
 
 with   -- Reusable components
   Linear_Queue,
-  Thick_Queries;
+  Thick_Queries,
+  Utilities;
 package body Units_List is
 
    ----------------------------------------------------------------
@@ -475,7 +476,7 @@ package body Units_List is
                Raise_Specification_Error ("Missing file name after @");
             end if;
 
-            Process_Indirect_File (To_String (Spec (Spec'First + 1 .. Spec'Last)));
+            Process_Indirect_File (To_String (Utilities.Clean_File_Name (Spec (Spec'First + 1 .. Spec'Last))));
             return;
          end if;
 
