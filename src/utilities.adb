@@ -250,6 +250,16 @@ package body Utilities is
       Failure (Message);
    end Failure;
 
+   -------------
+   -- Failure --
+   -------------
+
+   procedure Failure (Message : in Wide_String; Occur   : Ada.Exceptions.Exception_Occurrence) is
+   begin
+      Trace ("Failing element ", Occur); --## rule line off no_trace
+      Failure (Message);
+   end Failure;
+
    -------------------------
    -- Locate_Regular_File --
    -------------------------

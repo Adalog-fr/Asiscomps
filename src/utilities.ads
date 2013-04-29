@@ -118,6 +118,7 @@ package Utilities is
 
    procedure Failure (Message : Wide_String);
    procedure Failure (Message : in Wide_String; Element : Asis.Element);
+   procedure Failure (Message : in Wide_String; Occur   : Ada.Exceptions.Exception_Occurrence);
    pragma No_Return (Failure);
    -- Failure raises Program_Error
 
