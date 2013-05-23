@@ -1558,7 +1558,7 @@ package body Thick_Queries is
                         | A_Formal_Object_Declaration
                         | An_Object_Renaming_Declaration
                         =>
-                        Decl := A4G_Bugs.Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Decl)));
+                        Decl := Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Decl)));
                      when others =>
                         Impossible ("Range_Ultimate_Name: unexpected declaration", Decl);
                   end case;
