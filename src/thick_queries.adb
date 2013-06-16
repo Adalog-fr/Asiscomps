@@ -3063,18 +3063,18 @@ package body Thick_Queries is
          Names_1    : constant Name_List := Names (Parameters (Parameters'First));
          Entry_1    : Profile_Entry := Build_Entry (Declaration_Subtype_Mark
                                                       (Parameters (Parameters'First)));
-         Result     : Profile_Table (1 .. Names_1'Length + Parameters'Length -1);
+         Result     : Profile_Table (List_Index range 1 .. Names_1'Length + Parameters'Length -1);
          Result_Inx : Asis.List_Index;
       begin
          Entry_1.Is_Access := Definition_Kind
                                (Object_Declaration_View
                                 (Parameters (Parameters'First))) = An_Access_Definition;
-         for I in Natural range 1 .. Names_1'Length loop
+         for I in List_Index range 1 .. Names_1'Length loop
             Result (I) := Entry_1;
          end loop;
 
          Result_Inx := Names_1'Length;
-         for I in Natural range Parameters'First + 1 .. Parameters'Last loop
+         for I in List_Index range Parameters'First + 1 .. Parameters'Last loop
             declare
                Names_Rest : constant Name_List := Names (Parameters (I));
             begin
@@ -3925,7 +3925,7 @@ package body Thick_Queries is
       function Range_Attribute_Bounds (Attr : Asis.Expression) return Asis.Expression_List is
          Bounds   : constant Asis.Expression_List := Discrete_Constraining_Bounds (Prefix (Attr), Follow_Access);
          Dim_Expr : constant Asis.Expression_List := Attribute_Designator_Expressions (Attr);
-         Dim      : Positive;
+         Dim      : List_Index;
       begin
          if Bounds'Length = 0 then
             return (1..2 => Nil_Element);
@@ -3937,7 +3937,7 @@ package body Thick_Queries is
             -- In the extremely unlikely case where the static expression Dim_Expr is
             -- too complicated for us to evaluate, the following will raise Constraint_Error,
             -- and thus we will return "", which is appropriate.
-            Dim := Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
+            Dim := List_Index'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
          end if;
 
          -- Do not use a slice below, to ensure 'First = 1
@@ -5064,7 +5064,7 @@ package body Thick_Queries is
                         Bounds   : constant Asis.Expression_List
                           := Discrete_Constraining_Bounds (Prefix (Expression), Follow_Access => True);
                         Dim_Expr : constant Asis.Expression_List := Attribute_Designator_Expressions (Expression);
-                        Dim      : Positive;
+                        Dim      : ASIS_Positive;
                      begin
                         if Is_Nil (Dim_Expr) then
                            Dim := 1;
@@ -5072,7 +5072,7 @@ package body Thick_Queries is
                            -- In the extremely unlikely case where the static expression Dim_Expr is
                            -- too complicated for us to evaluate, the following will raise Constraint_Error,
                            -- and thus we will return "", which is appropriate.
-                           Dim := Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
+                           Dim := ASIS_Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
                         end if;
 
                         case Element_Kind (Bounds (2 * Dim - 1)) is
@@ -5112,7 +5112,7 @@ package body Thick_Queries is
                         Bounds   : constant Asis.Expression_List
                           := Discrete_Constraining_Bounds (Prefix (Expression), Follow_Access => True);
                         Dim_Expr : constant Asis.Expression_List := Attribute_Designator_Expressions (Expression);
-                        Dim      : Positive;
+                        Dim      : ASIS_Positive;
                      begin
                         if Is_Nil (Dim_Expr) then
                            Dim := 1;
@@ -5120,7 +5120,7 @@ package body Thick_Queries is
                            -- In the extremely unlikely case where the static expression Dim_Expr is
                            -- too complicated for us to evaluate, the following will raise Constraint_Error,
                            -- and thus we will return "", which is appropriate.
-                           Dim := Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
+                           Dim := ASIS_Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
                         end if;
 
                         case Element_Kind (Bounds (2 * Dim - 1)) is
@@ -5154,7 +5154,7 @@ package body Thick_Queries is
                      Lengths   : constant Extended_Biggest_Natural_List
                        := Discrete_Constraining_Lengths (Prefix (Expression), Follow_Access => True);
                      Dim_Expr  : constant Asis.Expression_List := Attribute_Designator_Expressions (Expression);
-                     Dim       : Positive;
+                     Dim       : ASIS_Positive;
                   begin
                      if Is_Nil (Dim_Expr) then
                         Dim := 1;
@@ -5162,7 +5162,7 @@ package body Thick_Queries is
                         -- In the extremely unlikely case where the static expression Dim_Expr is
                         -- too complicated for us to evaluate, the following will raise Constraint_Error,
                         -- and thus we will return "", which is appropriate.
-                        Dim := Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
+                        Dim := ASIS_Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
                      end if;
                      if Lengths (Dim) = Not_Static then
                         return "";

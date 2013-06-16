@@ -98,6 +98,10 @@ package Utilities is
    -- Like Integer'Wide_Image, without the !*#!! initial space.
    -- (avoids depending on the Gnat specific attribute 'Img)
 
+   function ASIS_Integer_Img (Item : in Asis.ASIS_Integer) return Wide_String;
+   -- Same thing for ASIS_Integer (which is the type of Line_Number and Column_Position)
+   -- Depending on ASIS implementation, this may be the same as Integer (ASIS-for-Gnat) or not (Gela)
+
    function Choose (Preferred : in Wide_String;
                     Otherwise : in Wide_String) return Wide_String;
    --  Returns Preferred if it is not "", Otherwise otherwise

@@ -65,6 +65,7 @@ package body Utilities is
    procedure Trace_Elem (Element : Asis.Element) is
       use Ada.Wide_Text_IO;
       use Asis, Asis.Compilation_Units, Asis.Elements, Asis.Text;
+
       S : constant Span := Element_Span (Element);
    begin
       Put (Current_Trace.all, Element_Kinds'Wide_Image (Element_Kind (Element)));
@@ -104,9 +105,9 @@ package body Utilities is
          Put (Current_Trace.all, " at ");
          Put (Current_Trace.all, Text_Name (Enclosing_Compilation_Unit (Element)));
          Put (Current_Trace.all, ':');
-         Put (Current_Trace.all, Integer_Img (S.First_Line));
+         Put (Current_Trace.all, ASIS_Integer_Img (S.First_Line));
          Put (Current_Trace.all, ':');
-         Put (Current_Trace.all, Integer_Img (S.First_Column));
+         Put (Current_Trace.all, ASIS_Integer_Img (S.First_Column));
       end if;
       New_Line (Current_Trace.all);
    end Trace_Elem;
@@ -549,6 +550,22 @@ package body Utilities is
          return Slide (Result (2 .. Result'Last));
       end if;
    end Integer_Img;
+
+   ----------------------
+   -- ASIS_Integer_Img --
+   ----------------------
+
+   function ASIS_Integer_Img (Item : in Asis.ASIS_Integer) return Wide_String is
+      use Asis;
+      Result : constant Wide_String := Asis.ASIS_Integer'Wide_Image (Item); --## Rule line OFF Use_Img_Function
+      subtype Slide is Wide_String (1 .. Result'Length - 1);
+   begin
+      if Item < 0 then
+         return Result;
+      else
+         return Slide (Result (2 .. Result'Last));
+      end if;
+   end ASIS_Integer_Img;
 
    ---------------
    -- Set_Trace --

@@ -989,10 +989,10 @@ package Thick_Queries is
    -- Like Biggest_Int'Wide_Image, without the !*#!! initial space.
    -- (avoids depending on the Gnat specific attribute 'Img)
 
-   type Extended_Biggest_Int_List is array (Positive range <>) of Extended_Biggest_Int;
+   type Extended_Biggest_Int_List is array (Asis.List_Index range <>) of Extended_Biggest_Int;
    Nil_Extended_Biggest_Int_List : constant Extended_Biggest_Int_List (1 .. 0) := (others => 0);
 
-   type Extended_Biggest_Natural_List is array (Positive range <>) of Extended_Biggest_Natural;
+   type Extended_Biggest_Natural_List is array (Asis.List_Index range <>) of Extended_Biggest_Natural;
    Nil_Extended_Biggest_Natural_List : constant Extended_Biggest_Natural_List (1 .. 0) := (others => 0);
 
    type Biggest_Float is digits System.Max_Digits; -- The same for floatting point numbers
