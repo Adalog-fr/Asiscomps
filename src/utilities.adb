@@ -95,11 +95,6 @@ package body Utilities is
                Put (Current_Trace.all, Clause_Kinds'Wide_Image (Clause_Kind (Element)));
             when An_Exception_Handler =>
                null;
-            when others =>
-               -- In GPL-2011 (and before), corresponds to GNAT extensions: An_Expression_Path
-               -- Now (since at least 7.0.0), An_Expression_Path is just a new Path_Kind of a regular path
-               -- Kept for compatibility with older versions
-               Put (Current_Trace.all, "(non-standard)");
          end case;
 
          Put (Current_Trace.all, " at ");
