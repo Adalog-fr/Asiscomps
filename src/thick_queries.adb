@@ -124,6 +124,27 @@ package body Thick_Queries is
       end if;
    end Biggest_Int_Img;
 
+   ---------
+   -- "=" --
+   ---------
+
+   function "=" (Left, Right : Extended_Biggest_Int_List) return Boolean is
+      R : Asis.List_Index;
+   begin
+      if Left'Length /= Right'Length then
+         return False;
+      end if;
+
+      R := Right'First;
+      for L in Left'Range loop
+         if Left (L) = Not_Static or else Right (R) = Not_Static or else Left (L) /= Right (R) then
+            return  False;
+         end if;
+         R := R + 1;
+      end loop;
+      return True;
+   end "=";
+
    ---------------------------
    -- Access_Target_Type --
    ---------------------------
@@ -3910,6 +3931,82 @@ package body Thick_Queries is
    end Actual_Parameters;
 
 
+   -----------------------------
+   -- Constraining_Definition --
+   -----------------------------
+
+   function Constraining_Definition (E : Asis.Element) return Asis.Definition is
+      use Asis.Definitions, Asis.Expressions;
+      Current : Asis.Element := E;
+   begin
+      loop
+         case Element_Kind (Current) is
+            when A_Defining_Name =>
+               Current := Enclosing_Element (Current);
+            when A_Declaration =>
+               case Declaration_Kind (Current) is
+                  when A_Type_Declaration
+                     | A_Subtype_Declaration
+                     =>
+                     Current := Type_Declaration_View (Current);
+                  when A_Variable_Declaration
+                     | A_Constant_Declaration
+                     | A_Deferred_Constant_Declaration
+                     | A_Component_Declaration
+                     | A_Discriminant_Specification
+                     | A_Parameter_Specification
+                     | A_Single_Task_Declaration
+                     | A_Single_Protected_Declaration
+                     =>
+                     Current := Object_Declaration_View (Current);
+                  when A_Function_Declaration
+                     | A_Function_Body_Declaration
+                     | A_Function_Body_Stub
+                     | A_Function_Renaming_Declaration
+                     | A_Generic_Function_Declaration
+                     | A_Formal_Function_Declaration
+                     =>
+                     Current := Result_Profile (Current);
+                  when others =>
+                     return Nil_Element;
+               end case;
+            when A_Definition =>
+               case Definition_Kind (Current) is
+                  when A_Subtype_Indication =>
+                     if not Is_Nil (Subtype_Constraint (Current)) then
+                        return Current;
+                     end if;
+                     Current := Subtype_Simple_Name (Current);
+                  when A_Component_Definition =>
+                     Current := Component_Subtype_Indication (Current);
+                  when A_Type_Definition
+                     | A_Constraint
+                     | A_Discrete_Range
+                     =>
+                     return Current;
+                  when others =>
+                     return Nil_Element;
+               end case;
+            when An_Expression =>
+               case Expression_Kind (Current) is
+                  when A_Qualified_Expression | A_Type_Conversion =>
+                     Current := Converted_Or_Qualified_Subtype_Mark (Current);
+                  when An_Attribute_Reference =>
+                     return Nil_Element; --TBSL T'Base might or might not match T ...
+                  when A_Selected_Component =>
+                     Current := Selector (Current);
+                  when An_Identifier =>
+                     Current := Corresponding_Name_Declaration (Current);
+                  when others =>
+                     Current := A4G_Bugs.Corresponding_Expression_Type (Current);
+               end case;
+            when others =>
+               return Nil_Element;
+         end case;
+      end loop;
+   end Constraining_Definition;
+
+
    ----------------------------------
    -- Discrete_Constraining_Bounds --
    ----------------------------------
@@ -4380,6 +4477,28 @@ package body Thick_Queries is
       return Result;
    end Discrete_Constraining_Lengths;
 
+   ---------------------------
+   -- Are_Matching_Subtypes --
+   ---------------------------
+
+   function Are_Matching_Subtypes (Left, Right : Asis.Element) return Boolean is
+      Left_Def  : constant Asis.Definition := Constraining_Definition (Left);
+      Right_Def : constant Asis.Definition := Constraining_Definition (Right);
+   begin   -- Are_Matching_Subtypes
+      if Is_Nil (Left_Def) or Is_Nil (Right_Def) then
+         return False;
+      end if;
+
+      if Is_Equal (Left_Def, Right_Def) then
+         return True;
+      end if;
+
+      if Discrete_Constraining_Values (Left_Def) = Discrete_Constraining_Values (Right_Def) then
+         return True;
+      end if;
+
+      return False;
+   end Are_Matching_Subtypes;
 
    ----------------
    -- Statements --

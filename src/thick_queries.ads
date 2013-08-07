@@ -991,6 +991,8 @@ package Thick_Queries is
 
    type Extended_Biggest_Int_List is array (Asis.List_Index range <>) of Extended_Biggest_Int;
    Nil_Extended_Biggest_Int_List : constant Extended_Biggest_Int_List (1 .. 0) := (others => 0);
+   function "=" (Left, Right : Extended_Biggest_Int_List) return Boolean;
+   -- Like the regular "=", except that it returns false if there is a Not_Static in either parameter
 
    type Extended_Biggest_Natural_List is array (Asis.List_Index range <>) of Extended_Biggest_Natural;
    Nil_Extended_Biggest_Natural_List : constant Extended_Biggest_Natural_List (1 .. 0) := (others => 0);
@@ -1075,6 +1077,18 @@ package Thick_Queries is
    -- Like Size_Value_Image, but returns the actual value.
    -- Returns Not_Static if Size_Value_Image is ""
 
+
+   function Constraining_Definition (E : Asis.Element) return Asis.Definition;
+   -- Like Corresponding_Last_Constraint, except that it does not unwind subtypes at least once,
+   -- accepts pretty much anything on input, and returns the first definition that imposes a constraint.
+   --
+   -- Appropriate Element_Kinds:
+   --   An_Expression
+   --   A_Declaration
+   --   A_Definition
+   --   A_Defining_Name
+
+
    function Discrete_Constraining_Bounds (Elem          : Asis.Element;
                                           Follow_Access : Boolean := False)
                                           return Asis.Element_List;
@@ -1149,7 +1163,7 @@ package Thick_Queries is
                                           return Extended_Biggest_Int_List;
    -- Like Discrete_Constraining_Bounds, but returns the actual values of the bounds
    -- if statically determinable.
-   -- Returns Not_Static (-1) if not statically determinable
+   -- Returns Not_Static if not statically determinable
 
 
    function Discrete_Constraining_Lengths (Elem          : Asis.Element;
@@ -1158,6 +1172,24 @@ package Thick_Queries is
    -- Like Discrete_Constraining_Bounds, but returns the number of values in the range instead of
    -- the bounds if statically determinable
    -- Returns Not_Static (-1) if not statically determinable
+
+   function Are_Matching_Subtypes (Left, Right : Asis.Element) return Boolean;
+   -- Determines if Left and Right are statically matching subtypes, as defined in 4.9.1
+   -- Implemented for the moment: only the case of two subtypes comming from the same elaboration
+   --
+   -- If Left or Right is the name of an object, operates on its Corresponding_Expression_Type.
+   -- Otherwise, Left and Right are expected to be (sub)type names.
+   --
+   -- Appropriate Element_Kinds:
+   --   An_Expression
+   --   A_Defining_Name
+   --   A_Declaration
+   --   A_Definition
+   -- Appropriate Expression_Kind:
+   --   An_Identifier
+   --   A_Selected_Component (operates on the selector)
+   --
+   -- Returns False for any unexpected (or yet unimplemented) element
 
 
    type Result_Confidence is (Unlikely, Possible, Certain);
