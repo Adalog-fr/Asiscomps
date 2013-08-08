@@ -1038,7 +1038,9 @@ package body Thick_Queries is
    -- Extended_Name_Image --
    -------------------------
 
-   function Extended_Name_Image (Name_Elem : Asis.Element) return Wide_String is
+   function Extended_Name_Image (Name_Elem               : Asis.Element;
+                                 Silent_If_Inappropriate : Boolean := False) return Wide_String
+   is
       use Asis.Expressions;
    begin
       case Element_Kind (Name_Elem) is
@@ -1055,6 +1057,9 @@ package body Thick_Queries is
                     & '''
                     & Attribute_Name_Image (Name_Elem);
                when others =>
+                  if Silent_If_Inappropriate then
+                     return "";
+                  end if;
                   Impossible ("Not a name in Extended_Name_Image", Name_Elem);
             end case;
          when A_Defining_Name =>
@@ -1062,6 +1067,9 @@ package body Thick_Queries is
          when A_Pragma =>
             return Pragma_Name_Image (Name_Elem);
          when others =>
+            if Silent_If_Inappropriate then
+               return "";
+            end if;
             Impossible ("Not a name in Extended_Name_Image", Name_Elem);
       end case;
    end Extended_Name_Image;

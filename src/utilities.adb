@@ -50,6 +50,8 @@ with  -- GNAT
   GNAT.OS_Lib,
   GNAT.Traceback.Symbolic;
 
+with  -- Adalog
+   Thick_Queries;
 package body Utilities is
 
    -- Note that we delay opening the actual trace file until traces are
@@ -655,6 +657,7 @@ package body Utilities is
                     Element     : Asis.Element;
                     With_Source : Boolean      := True) is
       use Asis.Elements, Asis.Text;
+      use  Thick_Queries;
    begin
       if Debug_Option then
          Raw_Trace ( "<<" & Message);
@@ -662,7 +665,13 @@ package body Utilities is
          Trace_Elem (Element);
 
          if With_Source and not Is_Nil (Element) then
-            Raw_Trace (Element_Image (Element));
+            if Is_Part_Of_Implicit (Element) then
+               Raw_Trace ("(implicit) " & Extended_Name_Image (Element, Silent_If_Inappropriate => True));
+            elsif Is_Part_Of_Instance (Element) then
+               Raw_Trace ("(from instance) " & Extended_Name_Image (Element, Silent_If_Inappropriate => True));
+            else
+               Raw_Trace (Element_Image (Element));
+            end if;
          end if;
 
          Raw_Trace(">>");

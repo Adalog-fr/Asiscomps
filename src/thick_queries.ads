@@ -273,8 +273,11 @@ package Thick_Queries is
    --    An_Attribute_Reference
 
 
-   function Extended_Name_Image (Name_Elem : Asis.Element) return Wide_String;
+   function Extended_Name_Image (Name_Elem               : Asis.Element;
+                                 Silent_If_Inappropriate : Boolean := False) return Wide_String;
    -- Image of a Name, Defining_Name, or pragma given either as a simple name or as a Selected_Name
+   -- If Silent_If_Inappropriate is True, returns "" for inappropriate elements instead of raising an exception
+   --
    --  Appropriate Element_Kinds:
    --    An_Expression
    --    A_Defining_Name
