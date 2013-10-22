@@ -2293,7 +2293,9 @@ package body Thick_Queries is
                   when Stop_At_Private =>
                      return Decl;
                end case;
-            when An_Incomplete_Type_Declaration =>
+            when An_Incomplete_Type_Declaration
+               | A_Tagged_Incomplete_Type_Declaration
+               =>
                Decl := Corresponding_Type_Declaration (Decl);
             when A_Subtype_Declaration =>
                Decl := Corresponding_First_Subtype (Decl);
