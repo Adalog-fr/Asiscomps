@@ -687,6 +687,13 @@ package Thick_Queries is
    -- Returns Simple_name (Expr), unless Expr is the name of constant, in which case it returns
    -- the Ultimate_Expression of the initialization expression of the constant.
 
+   function Association_Choices (Assoc : Asis.Association) return Asis.Expression_List;
+   -- Returns the list of choices (LHS) of the association, independently of the association kind.
+   -- Returns Nil_Element_List for a positional association.
+
+   function Association_Value (Assoc : Asis.Association) return Asis.Expression;
+   -- Returns the value (RHS) of the association, independently of the association kind.
+
    function Is_Static_Object (Obj : Asis.Expression) return Boolean;
    -- Return True if Obj is a name that designates a statically determinable object
    -- (including, f.e., statically indexed array components).

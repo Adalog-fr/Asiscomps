@@ -3788,6 +3788,64 @@ package body Thick_Queries is
       return Result;
    end Ultimate_Expression;
 
+   -------------------------
+   -- Association_Choices --
+   -------------------------
+
+   function Association_Choices (Assoc : Asis.Association) return Asis.Expression_List is
+      use Asis.Expressions;
+   begin
+      case Association_Kind (Assoc) is
+         when Not_An_Association =>
+            Impossible ("Association_Choices: Not an association", Assoc);
+         when A_Discriminant_Association =>
+            return Discriminant_Selector_Names (Assoc);
+         when A_Record_Component_Association =>
+            return Record_Component_Choices (Assoc);
+         when An_Array_Component_Association =>
+            return Array_Component_Choices (Assoc);
+         when A_Parameter_Association
+            | A_Generic_Association
+            | A_Pragma_Argument_Association
+            =>
+            declare
+               Formal : constant Asis.Expression := Formal_Parameter (Assoc);
+            begin
+               if Is_Nil (Formal) then
+                  return Nil_Element_List;
+               else
+                  return (1 => Formal);
+               end if;
+            end;
+      end case;
+   end Association_Choices;
+
+   -----------------------
+   -- Association_Value --
+   -----------------------
+
+   function Association_Value (Assoc : Asis.Association) return Asis.Expression is
+      use Asis.Expressions;
+   begin
+      case Association_Kind (Assoc) is
+         when Not_An_Association =>
+            Impossible ("Association_Value: Not an association", Assoc);
+         when A_Discriminant_Association =>
+            return Discriminant_Expression (Assoc);
+         when A_Record_Component_Association =>
+            return Component_Expression (Assoc);
+         when An_Array_Component_Association =>
+            return Component_Expression (Assoc);
+
+         when A_Parameter_Association
+            | A_Generic_Association
+            | A_Pragma_Argument_Association
+            =>
+            return Actual_Parameter (Assoc);
+      end case;
+   end Association_Value;
+
+
    --------------------------------------
    -- Ultimate_Enclosing_Instantiation --
    --------------------------------------
