@@ -3202,6 +3202,11 @@ package body Thick_Queries is
          -- in that case.
          -- Incidentally, this will make Corresponding_Expression_Type_Definition work for any type
          -- To be checked if replaced by the equivalent ASIS05 query
+
+         -- Special case: funny identifiers from pragmas
+         if Association_Kind (Enclosing_Element (The_Element)) = A_Pragma_Argument_Association then
+            return Nil_Element;
+         end if;
          case Expression_Kind (The_Element) is
             when An_Identifier | A_Selected_Component =>
                -- Only these can be type names
