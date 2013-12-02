@@ -1789,7 +1789,7 @@ package body Thick_Queries is
                Indexes : constant Asis.Expression_List := Index_Expressions (Obj);
             begin
                for I in Indexes'Range loop
-                  if Static_Expression_Value_Image (Indexes (I)) = "" then
+                  if  not Is_Static_Expression (Indexes (I)) then
                      return False;
                   end if;
                end loop;
@@ -5402,6 +5402,16 @@ package body Thick_Queries is
       when Constraint_Error =>
          return Not_Static;
    end Discrete_Static_Expression_Value;
+
+
+   --------------------------
+   -- Is_Static_Expression --
+   --------------------------
+
+   function Is_Static_Expression (Expr : Asis.Expression) return Boolean is
+   begin
+      return Static_Expression_Value_Image (Expr) /= "";
+   end Is_Static_Expression;
 
 
    -------------------------

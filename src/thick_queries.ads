@@ -1052,6 +1052,9 @@ package Thick_Queries is
    -- Like Static_Expression_Value_Image, but returns the actual value for static discrete expressions.
    -- Returns Not_Static for other cases
 
+   function Is_Static_Expression (Expr : Asis.Expression) return Boolean;
+   -- Returns True if Expr is a static expression
+   -- TBH: if it is a static expression that Static_Expression_Value_Image is able to evaluate
 
    function Size_Value_Image (Name : Asis.Element) return Wide_String;
    -- Name must be the name of a type or object
