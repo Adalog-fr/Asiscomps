@@ -2010,6 +2010,61 @@ package body Thick_Queries is
       end if;
    end Is_Array_Subtype;
 
+
+   --------------------------
+   -- Is_Character_Subtype --
+   --------------------------
+
+   function Is_Character_Subtype (The_Subtype : Asis.Element) return Boolean is
+      use Asis.Definitions, Asis.Expressions;
+
+      Good_Name : Asis.Expression;
+      Good_Decl : Asis.Declaration;
+      Good_Def  : Asis.Definition;
+   begin
+      case Element_Kind (The_Subtype) is
+         when A_Declaration =>
+            Good_Decl := The_Subtype;
+         when A_Definition =>
+            Good_Decl := Enclosing_Element (The_Subtype);
+         when A_Defining_Name =>
+            Good_Decl := Enclosing_Element (The_Subtype);
+         when An_Expression =>
+            Good_Name := Simple_Name (The_Subtype);
+            if Attribute_Kind (Good_Name) = A_Base_Attribute then
+               Good_Name := Strip_Attributes (Good_Name);
+            end if;
+            Good_Decl := Corresponding_Name_Declaration (Good_Name);
+         when others =>
+            return False;
+      end case;
+
+      Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (Good_Decl));
+      if Type_Kind (Good_Def) /= An_Enumeration_Type_Definition then
+         return False;
+      end if;
+
+      -- Check these special cases that may raise Storage_Error from Enumeration_Literal_Declarations:
+      declare
+         Full_Name : constant Wide_String := To_Upper (Full_Name_Image (Names (Enclosing_Element (Good_Def)) (1)));
+      begin
+         if Full_Name = "STANDARD.WIDE_CHARACTER" or else Full_Name = "STANDARD.WIDE_WIDE_CHARACTER" then
+            return True;
+         end if;
+      end;
+
+      declare
+         Lits : constant Asis.Declaration_List := Enumeration_Literal_Declarations (Good_Def);
+      begin
+         for I in Lits'Range loop
+            if Defining_Name_Kind (Names (Lits (I)) (1)) = A_Defining_Character_Literal then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end;
+   end Is_Character_Subtype;
+
    ---------------------------
    -- Is_Class_Wide_Subtype --
    ---------------------------
@@ -5930,6 +5985,22 @@ package body Thick_Queries is
       end loop;
       return Result;
    end Strip_Attributes;
+
+
+   -----------------------
+   -- Strip_Parentheses --
+   -----------------------
+
+   function Strip_Parentheses (Expr : Asis.Expression) return Asis.Expression is
+      use Asis.Expressions;
+
+      Result : Asis.Expression := Expr;
+   begin
+      while Expression_Kind (Result) = A_Parenthesized_Expression loop
+         Result := Expression_Parenthesized (Result);
+      end loop;
+      return Result;
+   end Strip_Parentheses;
 
 
    ----------------------

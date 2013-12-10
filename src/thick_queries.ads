@@ -403,6 +403,16 @@ package Thick_Queries is
    --    An_Attribute_Reference
 
 
+   function Is_Character_Subtype (The_Subtype : Asis.Element) return Boolean;
+   -- Returns True if The_Subtype is a declaration of a character type, or a name of a character type
+   -- Returns False in all other cases
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Declaration
+   --    A_Definition
+   --    A_Defining_Name
+   --    An_Expression
+
    function Is_Class_Wide_Subtype (The_Subtype : Asis.Element) return Boolean;
    -- Unwinds subtype declarations and returns true if the given subtype declaration,
    -- or the type designated by the provided name, ultimately designates a class-wide type.
@@ -629,6 +639,10 @@ package Thick_Queries is
    function Strip_Attributes (Name : Asis.Expression) return Asis.Expression;
    -- If Name is an Attribute_Reference, returns the first prefix which is not itself an Attribute_Reference.
    -- Returns Name otherwise
+
+   function Strip_Parentheses (Expr : Asis.Expression) return Asis.Expression;
+   -- If Expr is a parenthesized expression, removes all levels of parentheses,
+   -- otherwise returns Expr
 
    function Ultimate_Name (The_Name : Asis.Element; No_Component : Boolean := False) return Asis.Element;
    -- For a name defined by a renaming declaration: returns the name of the entity, which is not
