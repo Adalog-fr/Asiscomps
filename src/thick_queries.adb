@@ -2308,6 +2308,69 @@ package body Thick_Queries is
    end Is_Limited;
 
 
+   ------------------------------------------
+   -- Corresponding_Derivation_Description --
+   ------------------------------------------
+
+   ------------------------------------------
+   -- Corresponding_Derivation_Description --
+   ------------------------------------------
+
+   function Corresponding_Derivation_Description (The_Subtype : Asis.Declaration;
+                                                  Privacy     : Privacy_Policy := Follow_User_Private)
+                                                  return Derivation_Descriptor
+   is
+      use Asis.Definitions, Asis.Expressions;
+      Result : Derivation_Descriptor := (The_Subtype, 0);
+   begin
+      loop
+         exit when Is_Nil (Result.Ultimate_Type); -- Anonymous type...
+
+         case Declaration_Kind (Result.Ultimate_Type) is
+            when An_Ordinary_Type_Declaration =>
+               exit when Type_Kind (Type_Declaration_View (Result.Ultimate_Type))
+                 not in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition;
+
+               -- NB: the only attribute possible here is 'Base, which is not interesting for us
+               Result := (Ultimate_Type => Corresponding_Name_Declaration
+                                            (Strip_Attributes
+                                             (Subtype_Simple_Name
+                                              (Parent_Subtype_Indication
+                                               (Type_Declaration_View (Result.Ultimate_Type))))),
+                          Derivation_Depth => Result.Derivation_Depth + 1);
+            when A_Task_Type_Declaration
+              | A_Protected_Type_Declaration
+              | A_Formal_Type_Declaration
+              =>
+               exit;
+            when A_Private_Type_Declaration
+              | A_Private_Extension_Declaration
+               =>
+               case Privacy is
+                  when Follow_Private =>
+                     Result.Ultimate_Type := Corresponding_Type_Declaration (Result.Ultimate_Type);
+                  when Follow_User_Private =>
+                     exit when Ultimate_Origin (Result.Ultimate_Type) /= An_Application_Unit;
+
+                     Result.Ultimate_Type := Corresponding_Type_Declaration (Result.Ultimate_Type);
+                  when Stop_At_Private =>
+                     exit;
+               end case;
+            when An_Incomplete_Type_Declaration
+               | A_Tagged_Incomplete_Type_Declaration
+               =>
+               Result.Ultimate_Type := Corresponding_Type_Declaration (Result.Ultimate_Type);
+            when A_Subtype_Declaration =>
+               Result.Ultimate_Type := Corresponding_First_Subtype (Result.Ultimate_Type);
+            when others =>
+               Impossible ("Ultimate_Type_Declaration: bad kind", Result.Ultimate_Type);
+         end case;
+      end loop;
+
+      return Result;
+   end Corresponding_Derivation_Description;
+
+
    -------------------------------
    -- Ultimate_Type_Declaration --
    -------------------------------
@@ -2316,49 +2379,22 @@ package body Thick_Queries is
                                        Privacy     : Privacy_Policy := Follow_User_Private)
                                        return Asis.Declaration
    is
-      use Asis.Definitions;
-      Decl : Asis.Declaration := The_Subtype;
    begin
-      loop
-         case Declaration_Kind (Decl) is
-            when An_Ordinary_Type_Declaration =>
-               if Type_Kind (Type_Declaration_View (Decl))
-                 not in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition
-               then
-                  return Decl;
-               end if;
-               Decl := Corresponding_Root_Type (Type_Declaration_View (Decl));
-            when A_Task_Type_Declaration
-              | A_Protected_Type_Declaration
-              | A_Formal_Type_Declaration
-              =>
-               return Decl;
-            when A_Private_Type_Declaration
-              | A_Private_Extension_Declaration
-               =>
-               case Privacy is
-                  when Follow_Private =>
-                     Decl := Corresponding_Type_Declaration (Decl);
-                  when Follow_User_Private =>
-                     if Ultimate_Origin (Decl) = An_Application_Unit then --## rule line off Simplifiable_statements
-                        Decl := Corresponding_Type_Declaration (Decl);
-                     else
-                        return Decl;
-                     end if;
-                  when Stop_At_Private =>
-                     return Decl;
-               end case;
-            when An_Incomplete_Type_Declaration
-               | A_Tagged_Incomplete_Type_Declaration
-               =>
-               Decl := Corresponding_Type_Declaration (Decl);
-            when A_Subtype_Declaration =>
-               Decl := Corresponding_First_Subtype (Decl);
-            when others =>
-               Impossible ("Ultimate_Type_Declaration: bad kind", Decl);
-         end case;
-      end loop;
+      return Corresponding_Derivation_Description (The_Subtype, Privacy).Ultimate_Type;
    end Ultimate_Type_Declaration;
+
+
+   ----------------------
+   -- Derivation_Depth --
+   ----------------------
+
+   function Derivation_Depth (The_Subtype : Asis.Declaration;
+                              Privacy     : Privacy_Policy := Follow_User_Private)
+                              return Asis.ASIS_Natural
+   is
+   begin
+      return Corresponding_Derivation_Description (The_Subtype, Privacy).Derivation_Depth;
+   end Derivation_Depth;
 
 
    ------------------------------

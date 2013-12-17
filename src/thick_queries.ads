@@ -454,11 +454,19 @@ package Thick_Queries is
    --       A_Selected_Component (applies to selector)
 
 
-   function Ultimate_Type_Declaration (The_Subtype : Asis.Declaration;
-                                       Privacy     : Privacy_Policy := Follow_User_Private)
-                                       return Asis.Declaration;
+   type Derivation_Descriptor is
+      record
+         Ultimate_Type : Asis.Declaration;
+         Derivation_Depth : Asis.ASIS_Natural;
+      end record;
+
+   function Corresponding_Derivation_Description (The_Subtype : Asis.Declaration;
+                                                  Privacy     : Privacy_Policy := Follow_User_Private)
+                                                  return Derivation_Descriptor;
    -- Unwinds subtype declarations, derivations, private types and returns the real declaration
-   -- that tells what the type really is!
+   -- that tells what the type really is, and how many declarations are encountered in the way
+   -- (0 means that The_Subtype is not a derived type).
+   --
    -- Note that for tagged types, derivations are also unwound up to the declaration that
    -- includes the word "tagged".
    -- Privacy defines behaviour when a private type is encountered during unwinding.
@@ -490,6 +498,17 @@ package Thick_Queries is
    --       A_Record_Type_Definition
    --       A_Tagged_Record_Type_Definition
    --       An_Access_Type_Definition
+
+
+   function Ultimate_Type_Declaration (The_Subtype : Asis.Declaration;
+                                       Privacy     : Privacy_Policy := Follow_User_Private)
+                                       return Asis.Declaration;
+   -- Returns the Ultimate_Type component of Corresponding_Derivation_Description
+
+   function Derivation_Depth (The_Subtype : Asis.Declaration;
+                              Privacy     : Privacy_Policy := Follow_User_Private)
+                                       return Asis.ASIS_Natural;
+   -- Returns the Derivation_Depth component of Corresponding_Derivation_Description
 
    function Is_Type_Declaration_Kind (The_Subtype : Asis.Declaration; The_Kind : Asis.Declaration_Kinds) return Boolean;
    -- Unwinds subtype declarations and derivations and returns true if the given subtype
