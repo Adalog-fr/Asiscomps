@@ -1517,6 +1517,29 @@ package body Thick_Queries is
       end;
    end Corresponding_Pragma_Set;
 
+
+   ------------------------
+   -- Is_Profile_Applied --
+   ------------------------
+
+   function Is_Profile_Applied (Element : in Asis.Element; Profile : Wide_String) return Boolean is
+      use Asis.Expressions;
+      Comp_Pragmas : constant Asis.Pragma_Element_List := Compilation_Pragmas (Enclosing_Compilation_Unit (Element));
+   begin
+      for P in Comp_Pragmas'Range loop
+         if Pragma_Kind (Comp_Pragmas (P)) = A_Profile_Pragma then
+            -- The name of the profile is always the first parameter of the pragma
+            if To_Upper (Name_Image (Actual_Parameter (Pragma_Argument_Associations (Comp_Pragmas (P)) (1))))
+              = Profile
+            then
+               return True;
+            end if;
+         end if;
+      end loop;
+      return False;
+   end Is_Profile_Applied;
+
+
    --------------------------
    -- Index_Subtypes_Names --
    --------------------------

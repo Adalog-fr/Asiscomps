@@ -815,6 +815,13 @@ package Thick_Queries is
    --   An_Indexed_Component
    --   A_Slice
 
+
+   -------------------------------------------------------------------------------------------------
+   --                                                                                             --
+   -- Queries about pragmas                                                                       --
+   --                                                                                             --
+   -------------------------------------------------------------------------------------------------
+
    type Pragma_Set is array (Asis.Pragma_Kinds) of Boolean;
    function Corresponding_Pragma_Set (Element : in Asis.Element) return Pragma_Set;
    -- Returns the set of pragmas that apply to the corresponding name or defining name
@@ -829,6 +836,15 @@ package Thick_Queries is
    -- Appropriate expression kinds
    --   An_Identifier
    --   A_Selected_Component (function applied to the selector)
+
+
+   function Is_Profile_Applied (Element : in Asis.Element; Profile : Wide_String) return Boolean;
+   -- Returns True if Profile applies to Element.
+   -- Profile must be given in upper case.
+   --
+   -- Appropriate element kinds:
+   --   Any element
+
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
