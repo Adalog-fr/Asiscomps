@@ -858,7 +858,7 @@ package Thick_Queries is
    subtype An_Entry_Callable     is Callable_Kinds range A_Task_Entry_Callable .. A_Protected_Entry_Callable;
 
    function Callable_Kind (Element : Asis.Element) return Callable_Kinds;
-   -- Checks whether the Element is a callable construct
+   -- Checks whether the Element is a callable construct, and which one
    -- Expected elements:
    --    A_Declaration
    --    A_Definition

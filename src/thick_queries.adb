@@ -1422,8 +1422,8 @@ package body Thick_Queries is
       end case;
 
       declare
-         Element_Pragmas : constant Asis.Pragma_Element_List := Corresponding_Pragmas (Enclosing_Element
-                                                                                       (Elem_Def_Name));
+         Element_Decl    : constant Asis.Declaration         := Enclosing_Element (Elem_Def_Name);
+         Element_Pragmas : constant Asis.Pragma_Element_List := Corresponding_Pragmas (Element_Decl);
          Type_Name       : Asis.Expression;
          Result          : Pragma_Set := (others => False);
       begin
@@ -1453,7 +1453,7 @@ package body Thick_Queries is
             end;
          end loop;
 
-         case Declaration_Kind (Enclosing_Element (Elem_Def_Name)) is
+         case Declaration_Kind (Element_Decl) is
             -- For variables and constants, add pragmas inherited from the type
             when A_Variable_Declaration                   -- Name : [aliased] Type          [:= Value];
               | A_Constant_Declaration                    -- Name : [aliased] constant Type  := Value;
@@ -1510,6 +1510,39 @@ package body Thick_Queries is
                   end case;
                end;
 
+            when A_Package_Declaration
+               | A_Generic_Package_Declaration
+               | A_Package_Body_Declaration
+               =>
+               -- For packages, categorizations are not returned by Corresponding_Pragmas
+               -- Of course, this applies only to compilation units
+               if Is_Compilation_Unit (Element_Decl) then
+                  declare
+                     Good_Decl : constant Asis.Declaration := Corresponding_Declaration (Element_Decl);
+                     -- Categorization pragmas can be declared inside the specification, or after as compilation pragma
+                     Other_Pragmas : constant Asis.Pragma_Element_List
+                       := Pragmas (Good_Decl) & Compilation_Pragmas (Enclosing_Compilation_Unit (Good_Decl));
+                     Kind : Asis.Pragma_Kinds;
+                  begin
+                     -- No need to check that categorization pragmas are for the current unit, the compiler
+                     -- did it for us.
+                     for P in Other_Pragmas'Range loop
+                        Kind := Pragma_Kind (Other_Pragmas (P));
+                        case Kind is
+                           when A_Pure_Pragma
+                              | A_Preelaborate_Pragma
+                              | A_Preelaborable_Initialization_Pragma
+                              | A_Shared_Passive_Pragma
+                              | A_Remote_Types_Pragma
+                              | A_Remote_Call_Interface_Pragma
+                              =>
+                              Result (Kind) := True;
+                           when others =>
+                              null;
+                        end case;
+                     end loop;
+                  end;
+               end if;
             when others =>
                null;
          end case;
