@@ -538,6 +538,26 @@ package Thick_Queries is
    --       A_Subtype_Declaration
    --       A_Formal_Type_Declaration
 
+   type Discriminant_Part_Kinds is (No_Discriminant_Part,          A_Nondefaulted_Discriminant_Part,
+                                    A_Defaulted_Discriminant_Part, An_Unknown_Discriminant_Part);
+   function Discriminant_Part_Kind (Elem : Asis.Element) return Discriminant_Part_Kinds;
+   -- Appropriate Element_Kinds:
+   --     A_Declaration
+   --     A_Definition
+   --  Appropriate Declaration_Kinds:
+   --     An_Ordinary_Type_Declaration
+   --     A_Task_Type_Declaration
+   --     A_Protected_Type_Declaration
+   --     An_Incomplete_Type_Declaration
+   --     A_Tagged_Incomplete_Type_Declaration
+   --     A_Private_Type_Declaration
+   --     A_Private_Extension_Declaration
+   --     A_Formal_Type_Declaration
+   --  Appropriate Definition_Kinds:
+   --     An_Unknown_Discriminant_Part
+   --     A_Known_Discriminant_Part
+   --  Nil_Element is allowed and returns No_Discriminant_Part
+
 
    function Attribute_Clause_Expression (Attribute : in Asis.Attribute_Kinds;
                                          Elem      : in Asis.Element)

@@ -3065,6 +3065,31 @@ package body Thick_Queries is
       end case;
    end Contains_Type_Declaration_Kind;
 
+   ----------------------------
+   -- Discriminant_Part_Kind --
+   ----------------------------
+
+   function Discriminant_Part_Kind (Elem : Asis.Element) return Discriminant_Part_Kinds is
+      use Asis.Definitions;
+      Discr : Asis.Definition;
+   begin
+      if Element_Kind (Elem) = A_Declaration then
+         Discr := Discriminant_Part (Elem);
+      else
+         Discr := Elem;
+      end if;
+
+      if Is_Nil (Discr) then
+         return No_Discriminant_Part;
+      elsif Definition_Kind (Discr) = Asis.An_Unknown_Discriminant_Part then
+         return An_Unknown_Discriminant_Part;
+      elsif Is_Nil (Initialization_Expression (Discriminants (Discr) (1))) then
+         return A_Nondefaulted_Discriminant_Part;
+      else
+         return A_Defaulted_Discriminant_Part;
+      end if;
+   end Discriminant_Part_Kind;
+
    -------------------
    -- Profile_Image --
    -------------------
