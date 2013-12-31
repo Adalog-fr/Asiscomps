@@ -1658,7 +1658,7 @@ package body Thick_Queries is
                -- Lower bound is of a universal type, try upper bound
                Decl := A4G_Bugs.Corresponding_Expression_Type (Upper_Bound (Range_Def));
                if Names (Decl) /= Nil_Element_List then
-                     return Names (Decl) (1);
+                  return Names (Decl) (1);
                end if;
 
                -- Both bounds are of a universal type (Implicit Integer)
@@ -2368,10 +2368,6 @@ package body Thick_Queries is
    -- Corresponding_Derivation_Description --
    ------------------------------------------
 
-   ------------------------------------------
-   -- Corresponding_Derivation_Description --
-   ------------------------------------------
-
    function Corresponding_Derivation_Description (The_Subtype : Asis.Declaration;
                                                   Privacy     : Privacy_Policy := Follow_User_Private)
                                                   return Derivation_Descriptor
@@ -2379,7 +2375,7 @@ package body Thick_Queries is
       use Asis.Definitions, Asis.Expressions;
       Result : Derivation_Descriptor := (The_Subtype, 0);
    begin
-      loop
+      loop                                   --## RULE LINE OFF Simplifiable_Statements ## We prefer exit to while here
          exit when Is_Nil (Result.Ultimate_Type); -- Anonymous type...
 
          case Declaration_Kind (Result.Ultimate_Type) is
@@ -2719,6 +2715,8 @@ package body Thick_Queries is
             end case;
          when A_Definition =>
             Good_Elem := Elem;
+         when A_Defining_Name =>
+            Good_Elem := Enclosing_Element (Elem);
          when others =>
             return Not_A_Type;
       end case;

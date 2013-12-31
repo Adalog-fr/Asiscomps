@@ -589,7 +589,7 @@ package Thick_Queries is
 
    function Corresponding_Enumeration_Clause (Enumeration_Value : in Asis.Defining_Name) return Asis.Association;
    -- Returns the association Enumeration_Value => Representation for the given Enumeration_Value
-   -- Returns Nil_Element if ther is no applicable enumeration representation clause
+   -- Returns Nil_Element if there is no applicable enumeration representation clause
 
 
    type Type_Categories is (Not_A_Type,
@@ -631,6 +631,7 @@ package Thick_Queries is
    -- Appropriate Element_Kinds:
    --       A_Declaration
    --       A_Definition
+   --       A_Defining_Name
    --       An_Expression
    -- Appropriate Declaration_Kinds:
    --       An_Ordinary_Type_Declaration
@@ -1049,6 +1050,7 @@ package Thick_Queries is
    --   An_Entry_Call_Statement
    --   A_Requeue_Statement
    --   A_Requeue_Statement_With_Abort
+
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
