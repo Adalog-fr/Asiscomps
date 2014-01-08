@@ -654,6 +654,14 @@ package Thick_Queries is
    --    Root_Real and Universal_Real returns A_Floating_Point_Type (which is the best we can do)
    --    Universal_Fixed returns A_Fixed_Point type, of course
 
+   function Range_Ultimate_Name (Range_Def : Asis.Definition) return Asis.Defining_Name;
+   -- Return the name of the type of the given range.
+   -- Returns Nil_Element if the range is given by two integer literals (implicit Integer)
+   --
+   --  Expected Definition_Kinds:
+   --       A_Discrete_Subtype_Definition
+   --       A_Discrete_Range
+
    function Index_Subtypes_Names (Type_Def : Asis.Type_Definition) return Asis.Element_List;
    -- Return the list of defining names for the subtypes of an (constrained or unconstrained) array
    -- definition.
