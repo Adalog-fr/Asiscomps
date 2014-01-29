@@ -192,7 +192,8 @@ package Thick_Queries is
    --    A_Block_Statement
 
 
-   function Statements (Element : in Asis.Element) return Asis.Statement_List;
+   function Statements (Element         : in Asis.Element;
+                        Include_Pragmas : in Boolean := False) return Asis.Statement_List;
    -- Returns the statements of any construct with statements.
    -- Appropriate Element_Kinds:
    --    A_Declaration
@@ -213,6 +214,7 @@ package Thick_Queries is
    --    A_Loop_Statement
    --    A_While_Loop_Statement
    --    A_For_Loop_Statement
+   --    An_Extended_Return_Statement
 
    function Exception_Handlers (Element : Asis.Element) return Asis.Exception_Handler_List;
    -- Returns the exception handlers of any construct with exception hanlders.

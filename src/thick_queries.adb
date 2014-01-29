@@ -4789,7 +4789,10 @@ package body Thick_Queries is
    -- Statements --
    ----------------
 
-   function Statements (Element : in Asis.Element) return Asis.Statement_List is --## rule line off LOCAL_HIDING
+   function Statements (Element         : in Asis.Element;       --## rule line off LOCAL_HIDING
+                        Include_Pragmas : in Boolean := False)
+                        return Asis.Statement_List
+   is
    begin
       case Element_Kind (Element) is
          when A_Declaration =>
@@ -4800,30 +4803,30 @@ package body Thick_Queries is
                   | A_Package_Body_Declaration
                   | A_Task_Body_Declaration
                  =>
-                  return Body_Statements (Element);
+                  return Body_Statements (Element, Include_Pragmas);
                when others =>
                   Impossible ("Statements: invalid declaration kind", Element);
             end case;
          when A_Statement =>
             case Statement_Kind (Element) is
                when An_Accept_Statement =>
-                  return Accept_Body_Statements (Element);
+                  return Accept_Body_Statements (Element, Include_Pragmas);
                when A_Block_Statement =>
-                  return Block_Statements (Element);
+                  return Block_Statements (Element, Include_Pragmas);
                when A_Loop_Statement
                   | A_While_Loop_Statement
                   | A_For_Loop_Statement
                     =>
-                  return Loop_Statements (Element);
+                  return Loop_Statements (Element, Include_Pragmas);
                when An_Extended_Return_Statement =>
-                  return Extended_Return_Statements (Element);
+                  return Extended_Return_Statements (Element, Include_Pragmas);
                when others =>
                   Impossible ("Statements: invalid statement kind", Element);
             end case;
          when A_Path =>
-            return Sequence_Of_Statements (Element);
+            return Sequence_Of_Statements (Element, Include_Pragmas);
          when An_Exception_Handler =>
-            return Handler_Statements (Element);
+            return Handler_Statements (Element, Include_Pragmas);
          when others =>
             Impossible ("Statements: invalid element kind", Element);
       end case;
