@@ -1148,7 +1148,8 @@ package body Thick_Queries is
    ---------------------
 
    function Full_Name_Image (The_Name     : in Asis.Element;
-                             With_Profile : in Boolean := False) return Wide_String is
+                             With_Profile : in Boolean := False) return Wide_String
+   is
       use Asis.Expressions;
 
       Parent                   : Element;
@@ -2942,7 +2943,8 @@ package body Thick_Queries is
    ------------------------------------
 
    function Contains_Type_Declaration_Kind (The_Subtype : Asis.Declaration;
-                                            The_Kind    : Asis.Declaration_Kinds) return Boolean is
+                                            The_Kind    : Asis.Declaration_Kinds) return Boolean
+   is
       use Asis.Definitions, Asis.Expressions;
 
       function Components_Contain_Type_Declaration_Kind (Components : Asis.Record_Component_List) return Boolean is

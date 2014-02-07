@@ -147,7 +147,8 @@ package body Utilities is
    ------------
 
    function Choose (Preferred : in Wide_String;
-                    Otherwise : in Wide_String) return Wide_String is
+                    Otherwise : in Wide_String) return Wide_String
+   is
    begin
       if Preferred = "" then
          return Otherwise;
@@ -194,7 +195,8 @@ package body Utilities is
 
    function Choose (Condition  : in Boolean;
                     When_True  : in Wide_String;
-                    When_False : in Wide_String) return Wide_String is
+                    When_False : in Wide_String) return Wide_String
+   is
    begin
       if Condition then
          return When_True;
@@ -655,7 +657,8 @@ package body Utilities is
 
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;
-                    With_Source : Boolean      := True) is
+                    With_Source : Boolean      := True)
+   is
       use Asis.Elements, Asis.Text;
       use  Thick_Queries;
    begin
@@ -684,7 +687,8 @@ package body Utilities is
 
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element_List;
-                    With_Source : Boolean           := True) is
+                    With_Source : Boolean           := True)
+   is
       use Asis.Text;
    begin
       if Debug_Option then
