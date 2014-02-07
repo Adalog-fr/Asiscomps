@@ -2701,15 +2701,18 @@ package body Thick_Queries is
                   | A_Deferred_Constant_Declaration
                   =>
                   Good_Elem := Object_Declaration_View (Elem);
-                  if Definition_Kind (Good_Elem) = A_Type_Definition then
-                     case Type_Kind (Good_Elem) is
-                        when A_Constrained_Array_Definition =>
+                  case Definition_Kind (Good_Elem) is
+                     when A_Type_Definition =>
+                        if Type_Kind (Good_Elem) = A_Constrained_Array_Definition then
                            return An_Array_Type;
-                        when others =>
-                           -- Safety for Ada 2005 where other anonymous types are possible
+                        else
                            Impossible ("Type_Category: anonymous type not array", Good_Elem);
-                     end case;
-                  end if;
+                        end if;
+                     when An_Access_Definition =>
+                        return An_Access_Type;
+                     when others =>
+                        null;
+                  end case;
                   Good_Elem := Subtype_Simple_Name (Good_Elem);
                   case Attribute_Kind (Good_Elem) is
                      when Not_An_Attribute =>
@@ -2740,7 +2743,29 @@ package body Thick_Queries is
                   return Not_A_Type;
             end case;
          when A_Definition =>
-            Good_Elem := Elem;
+            case Definition_Kind (Elem) is
+               when A_Type_Definition =>
+                  if Type_Kind (Elem) in An_Unconstrained_Array_Definition .. A_Constrained_Array_Definition then
+                     return An_Array_Type;
+                  else
+                     Good_Elem := Enclosing_Element (Elem);
+                  end if;
+               when A_Task_Definition =>
+                  return A_Task_Type;
+               when A_Protected_Definition =>
+                  return A_Protected_Type;
+               when An_Access_Definition =>
+                  return An_Access_Type;
+               when A_Subtype_Indication =>
+                  -- Note: we don't care about attributes ('Base or 'Range or 'Class), since they can't
+                  --       change the category of the type
+                  Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
+                                                            (Simple_Name
+                                                               (Strip_Attributes
+                                                                  (Subtype_Simple_Name (Elem)))));
+               when others =>
+                  Impossible ("Type category: wrong definition_kind", Elem);
+            end case;
          when A_Defining_Name =>
             Good_Elem := Enclosing_Element (Elem);
          when others =>
@@ -2798,7 +2823,7 @@ package body Thick_Queries is
                                                           (Strip_Attributes
                                                            (Subtype_Simple_Name (Good_Elem)))));
             when A_Component_Definition =>
-               Good_Elem := Component_Subtype_Indication (Good_Elem);
+               Good_Elem := Component_Definition_View (Good_Elem);
                if Definition_Kind (Good_Elem) = An_Access_Definition then
                   return An_Access_Type;
                end if;
