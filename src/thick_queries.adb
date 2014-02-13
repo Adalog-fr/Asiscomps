@@ -2399,7 +2399,10 @@ package body Thick_Queries is
                                                   return Derivation_Descriptor
    is
       use Asis.Definitions, Asis.Expressions;
-      Result : Derivation_Descriptor := (The_Subtype, 0);
+      Result : Derivation_Descriptor := (Ultimate_Type    => The_Subtype,
+                                         Derivation_Depth => 0,
+                                         First_Constraint => Nil_Element);
+      Parent : Asis.Definition;
    begin
       loop                                   --## RULE LINE OFF Simplifiable_Statements ## We prefer exit to while here
          exit when Is_Nil (Result.Ultimate_Type); -- Anonymous type...
@@ -2410,12 +2413,13 @@ package body Thick_Queries is
                  not in A_Derived_Type_Definition .. A_Derived_Record_Extension_Definition;
 
                -- NB: the only attribute possible here is 'Base, which is not interesting for us
-               Result := (Ultimate_Type => Corresponding_Name_Declaration
-                                            (Strip_Attributes
-                                             (Subtype_Simple_Name
-                                              (Parent_Subtype_Indication
-                                               (Type_Declaration_View (Result.Ultimate_Type))))),
-                          Derivation_Depth => Result.Derivation_Depth + 1);
+               Parent := Parent_Subtype_Indication (Type_Declaration_View (Result.Ultimate_Type));
+               Result. Ultimate_Type := Corresponding_Name_Declaration
+                                         (Strip_Attributes (Subtype_Simple_Name (Parent)));
+               Result.Derivation_Depth := Result.Derivation_Depth + 1;
+               if Is_Nil (Result.First_Constraint) then
+                  Result.First_Constraint := Subtype_Constraint (Parent);
+               end if;
             when A_Task_Type_Declaration
               | A_Protected_Type_Declaration
               | A_Formal_Type_Declaration

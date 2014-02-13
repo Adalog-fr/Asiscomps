@@ -458,8 +458,9 @@ package Thick_Queries is
 
    type Derivation_Descriptor is
       record
-         Ultimate_Type : Asis.Declaration;
-         Derivation_Depth : Asis.ASIS_Natural;
+         Ultimate_Type    : Asis.Declaration;  -- The ancestor which is not a derived types
+         Derivation_Depth : Asis.ASIS_Natural; -- How many derivations
+         First_Constraint : Asis.Constraint;   -- The first constraint encountered when going up derivations
       end record;
 
    function Corresponding_Derivation_Description (The_Subtype : Asis.Declaration;
@@ -788,7 +789,7 @@ package Thick_Queries is
 
 
    function Corresponding_Expression_Type_Definition (The_Element : Asis.Expression) return Asis.Definition;
-   -- return the type definition of the type of The_Element
+   -- return the (full) type definition of the type of The_Element
    -- Unlike Corresponding_Expression_Type, works if the the type of The_Element is
    -- an anonymous type and unwinds subtypes (but not derived types)
    -- This query is a candidate for ASIS05, and already provided by ASIS-for-GNAT,
