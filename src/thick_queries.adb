@@ -2676,26 +2676,74 @@ package body Thick_Queries is
       use Asis.Definitions, Asis.Expressions;
       Good_Elem : Asis.Declaration;
    begin
+
+      -- Go from (true) expressions and object declarations/definitions to their type declaration
       case Element_Kind (Elem) is
          when An_Expression =>
-            Good_Elem := Corresponding_Expression_Type_Definition (Elem);
-            if Is_Nil (Good_Elem) then
-               -- Annoying special case: a task of the form "task type TT;" has no definition
-               case Expression_Kind (Elem) is
-                  when An_Identifier | A_Selected_Component =>
-                     -- Only these can be type names
-                     declare
-                        Decl : constant Asis.Declaration
-                          := Corresponding_Name_Declaration (Simple_Name (Elem));
-                     begin
-                        if Declaration_Kind (Decl) = A_Task_Type_Declaration then
-                           return A_Task_Type;
-                        else
-                           return Not_A_Type;
-                        end if;
-                     end;
+            Good_Elem := Simple_Name (Elem);
+            if Expression_Kind (Good_Elem) = An_Identifier
+              and then Declaration_Kind
+                        (Corresponding_Name_Declaration
+                         (Good_Elem)) in An_Ordinary_Type_Declaration ..  A_Subtype_Declaration
+            then
+                -- it was the name of a type, not a true expression
+                Good_Elem := Corresponding_Name_Declaration (Good_Elem);
+            else
+               Good_Elem := Corresponding_Expression_Type_Definition (Elem);
+               if Is_Nil (Good_Elem) then
+                  -- Annoying special case: a task of the form "task type TT;" has no definition
+                  case Expression_Kind (Elem) is
+                     when An_Identifier | A_Selected_Component =>
+                        -- Only these can be type names
+                        declare
+                           Decl : constant Asis.Declaration
+                             := Corresponding_Name_Declaration (Simple_Name (Elem));
+                        begin
+                           if Declaration_Kind (Decl) = A_Task_Type_Declaration then
+                              return A_Task_Type;
+                           else
+                              return Not_A_Type;
+                           end if;
+                        end;
+                     when others =>
+                        return Not_A_Type;
+                  end case;
+               end if;
+
+               -- Good_Elem is not Nil (previous "if" has returns in all branches)
+               case Definition_Kind (Good_Elem) is
+                  when A_Type_Definition =>
+                     case Type_Kind (Good_Elem) is
+                        when An_Unconstrained_Array_Definition
+                           | A_Constrained_Array_Definition
+                           =>
+                           return An_Array_Type;
+                        when others =>
+                           Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
+                     end case;
+                  when A_Task_Definition =>
+                     return A_Task_Type;
+                  when A_Protected_Definition =>
+                     return A_Protected_Type;
+                  when An_Access_Definition =>
+                     return An_Access_Type;
+                  when A_Subtype_Indication =>
+                     -- Note: we don't care about attributes ('Base or 'Range or 'Class), since they can't
+                     --       change the category of the type
+                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
+                                                               (Simple_Name
+                                                                  (Strip_Attributes
+                                                                     (Subtype_Simple_Name (Good_Elem)))));
+                  when A_Component_Definition =>
+                     Good_Elem := Component_Definition_View (Good_Elem);
+                     if Definition_Kind (Good_Elem) = An_Access_Definition then
+                        return An_Access_Type;
+                     end if;
+                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
+                                                               (Strip_Attributes
+                                                                  (Subtype_Simple_Name (Good_Elem))));
                   when others =>
-                     return Not_A_Type;
+                     Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
                end case;
             end if;
          when A_Declaration =>
@@ -2767,6 +2815,10 @@ package body Thick_Queries is
                                                             (Simple_Name
                                                                (Strip_Attributes
                                                                   (Subtype_Simple_Name (Elem)))));
+               when A_Private_Extension_Definition
+                  | A_Formal_Type_Definition
+                  =>
+                  Good_Elem := Enclosing_Element (Elem);
                when others =>
                   Impossible ("Type category: wrong definition_kind", Elem);
             end case;
@@ -2776,6 +2828,7 @@ package body Thick_Queries is
             return Not_A_Type;
       end case;
 
+      -- At this point, Good_Elem is a type declaration, or Nil_Element in some weird cases
       if Is_Nil (Good_Elem) then
          -- Special case: not a good ol' type.
          -- It could be universal fixed if the expression is a fixed point multiply/divide
@@ -2792,57 +2845,17 @@ package body Thick_Queries is
             if Type_Category (Actual_Parameter (Params (1)), Follow_Derived => True) = A_Fixed_Point_Type
               and then Type_Category (Actual_Parameter (Params (2)), Follow_Derived => True) = A_Fixed_Point_Type
             then
-               -- Both operands are fixed => assume the result is fixed (remember we know it is
+               -- Both operands are fixed => Aassume the result is fixed (remember we know it is
                -- a predefined operator).
                return A_Fixed_Point_Type;
             else
                return Not_A_Type;
             end if;
          end;
-      elsif Element_Kind (Good_Elem) = A_Definition then
-         -- Get rid of definitions that can come from variable declarations and especially anonymous types
-         -- (that have no declaration)
-         --
-         case Definition_Kind (Good_Elem) is
-            when A_Type_Definition =>
-               case Type_Kind (Good_Elem) is
-                  when An_Unconstrained_Array_Definition
-                     | A_Constrained_Array_Definition
-                       =>
-                        return An_Array_Type;
-                  when others =>
-                     Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
-               end case;
-            when A_Task_Definition =>
-               return A_Task_Type;
-            when A_Protected_Definition =>
-               return A_Protected_Type;
-            when An_Access_Definition =>
-               return An_Access_Type;
-            when A_Subtype_Indication =>
-               -- Note: we don't care about attributes ('Base or 'Range or 'Class), since they can't
-               --       change the category of the type
-               Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
-                                                         (Simple_Name
-                                                          (Strip_Attributes
-                                                           (Subtype_Simple_Name (Good_Elem)))));
-            when A_Component_Definition =>
-               Good_Elem := Component_Definition_View (Good_Elem);
-               if Definition_Kind (Good_Elem) = An_Access_Definition then
-                  return An_Access_Type;
-               end if;
-               Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
-                                                         (Strip_Attributes
-                                                          (Subtype_Simple_Name (Good_Elem))));
-            when others =>
-               Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
-         end case;
-      else
-         -- Must be A_Declaration
-         Good_Elem := Corresponding_First_Subtype (Good_Elem);
       end if;
 
       -- At this point, Good_Elem is a type declaration
+      Good_Elem := Corresponding_First_Subtype (Good_Elem);
       loop -- because of derived and incomplete types
          case Declaration_Kind (Good_Elem) is
             when An_Ordinary_Type_Declaration =>
@@ -4412,13 +4425,14 @@ package body Thick_Queries is
       end Constraint_Bounds;
 
       Item             : Asis.Element := Elem; -- This item will navigate until we find the appropriate definition
+      Previous_Item    : Asis.Element;
       Constraint       : Asis.Definition;
       No_Unconstrained : Boolean := False;
-      -- In the case of an unconstrained array type, we normally return the indices of the index type. However, in the
-      -- case of an object of an unconstrained type (including the returned object of a function call), the constraint
-      -- is inherited from the initial (or actual) value, and hence not available. No_Unconstrained is set to True when
-      -- moving from an object declaration (or function call) to its type to prevent returning the indices of the
-      -- unconstrained type.
+      -- In the case of an unconstrained array type, we normally return the indices of the index type.
+      -- However, in the case of an object of an unconstrained type (including the returned object of
+      -- a function call), the constraint is inherited from the initial (or actual) value, and hence not
+      -- available. No_Unconstrained is set to True when moving from an object declaration (or function
+      -- call) to its type to prevent returning the indices of the unconstrained type.
    begin  -- Discrete_Constraining_Bounds
       loop
          case Element_Kind (Item) is
@@ -4636,6 +4650,31 @@ package body Thick_Queries is
                      -- The constraint is the one of the return type
                      No_Unconstrained := True;
                      Item             := A4G_Bugs.Corresponding_Expression_Type (Item);
+                  when A_Named_Array_Aggregate
+                     | A_Positional_Array_Aggregate
+                     | A_String_Literal
+                     =>
+                     Previous_Item := Item;
+                     Item          := Corresponding_Expression_Type_Definition (Item);
+                     if Is_Nil (Item) then
+                        -- Type cannot be determined, may be that this aggregate is assigned to
+                        -- a variable of an anonymous array type. Are they others contexts where
+                        -- an aggregate of an anonymous type can be used?
+                        if Statement_Kind (Enclosing_Element (Previous_Item)) = An_Assignment_Statement then
+                           -- the bounds are the same as the LHS
+                           Item := Corresponding_Expression_Type_Definition
+                                    (Assignment_Variable_Name
+                                       (Enclosing_Element (Previous_Item)));
+                        else
+                           -- in despair...
+                           return Nil_Element_List;
+                        end if;
+                     end if;
+                  when A_Qualified_Expression
+                     | A_Type_Conversion
+                     =>
+                     -- Easy: use the given type!
+                     Item := Converted_Or_Qualified_Subtype_Mark (Item);
                   when others =>
                      -- Assume it's a name, but it can be a type name, therefore
                      -- we cannot take directly Corresponding_Expression_Type
@@ -4694,7 +4733,7 @@ package body Thick_Queries is
                end case;
 
             when others =>
-               Impossible ("Discrete_Constraining_Bounds: Inappropriate element", Elem);
+               Impossible ("Discrete_Constraining_Bounds: Inappropriate element", Item);
          end case;                               ----------------- Declarations
       end loop;
    end Discrete_Constraining_Bounds;
