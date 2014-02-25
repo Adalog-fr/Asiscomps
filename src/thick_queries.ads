@@ -665,6 +665,17 @@ package Thick_Queries is
    --       A_Discrete_Subtype_Definition
    --       A_Discrete_Range
 
+   function Dimensionality (Type_Def : Asis.Type_Definition) return Asis.ASIS_Natural;
+   -- Return the number of dimensions of a (constrained or unconstrained) array type.
+   -- Returns 0 if the definition is not of an array type.
+   --
+   -- Appropriate type kinds:
+   --       An_Unconstrained_Array_Definition
+   --       A_Constrained_Array_Definition
+   -- Appropriate formal type kinds:
+   --       A_Formal_Unconstrained_Array_Definition
+   --       A_Formal_Constrained_Array_Definition
+
    function Index_Subtypes_Names (Type_Def : Asis.Type_Definition) return Asis.Element_List;
    -- Return the list of defining names for the subtypes of an (constrained or unconstrained) array
    -- definition.

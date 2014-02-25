@@ -1691,6 +1691,28 @@ package body Thick_Queries is
    end Range_Ultimate_Name;
 
 
+   --------------------
+   -- Dimensionality --
+   --------------------
+
+   function Dimensionality (Type_Def : Asis.Type_Definition) return Asis.ASIS_Natural is
+      use Asis.Definitions;
+   begin
+      if Type_Kind (Type_Def) = A_Constrained_Array_Definition
+        or else Formal_Type_Kind (Type_Def) = A_Formal_Constrained_Array_Definition
+      then
+         return Discrete_Subtype_Definitions (Type_Def)'Length;
+
+      elsif Type_Kind (Type_Def) = An_Unconstrained_Array_Definition
+        or else Formal_Type_Kind (Type_Def) = A_Formal_Unconstrained_Array_Definition
+      then
+         return Index_Subtype_Definitions (Type_Def)'Length;
+
+      else
+         return 0;
+      end if;
+   end Dimensionality;
+
    --------------------------
    -- Index_Subtypes_Names --
    --------------------------
