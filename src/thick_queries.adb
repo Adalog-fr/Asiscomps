@@ -1466,7 +1466,7 @@ package body Thick_Queries is
                begin
                   case Definition_Kind (Element_Type_Definition) is
                      when A_Component_Definition =>
-                        Type_Name := Subtype_Simple_Name (Component_Subtype_Indication (Element_Type_Definition));
+                        Type_Name := Subtype_Simple_Name (Component_Definition_View (Element_Type_Definition));
                         if Expression_Kind (Type_Name) /= An_Attribute_Reference then
                            Result := Result or Corresponding_Pragma_Set (Names
                                                                          (Corresponding_First_Subtype
@@ -1649,7 +1649,7 @@ package body Thick_Queries is
                      end if;
 
                   when A_Component_Declaration =>
-                     Def := Component_Subtype_Indication (Object_Declaration_View (Decl));
+                     Def := Component_Definition_View (Object_Declaration_View (Decl));
                      if Definition_Kind (Def) = A_Type_Definition then -- anonymous array type
                         return Index_Subtypes_Names (Def) (Range_Position);
                      end if;
@@ -2264,11 +2264,11 @@ package body Thick_Queries is
                   when A_Declaration =>
                      -- Can only be A_Component_Declaration
                      declare
-                        CSI : constant Asis.Definition := Component_Subtype_Indication
-                                                          (Object_Declaration_View (Components (I)));
+                        CSI : constant Asis.Definition := Component_Definition_View
+                                                           (Object_Declaration_View (Components (I)));
                      begin
-                        if not Is_Nil (CSI) then
-                           --2005: CSI is nil if the component is of an anonymous access type
+                        if Definition_Kind (CSI) /= An_Access_Definition then
+                           -- the component is not of an anonymous access type
                            Comp_Name := Subtype_Simple_Name (CSI);
                            if Expression_Kind (Comp_Name) = An_Attribute_Reference then
                               -- Limitedness is the same for 'Base and 'Class as the prefix
@@ -2361,7 +2361,7 @@ package body Thick_Queries is
                            | A_Constrained_Array_Definition
                              =>
                            -- The array type is limited if its components are
-                           Decl := Component_Subtype_Indication (Array_Component_Definition (Decl));
+                           Decl := Component_Definition_View (Array_Component_Definition (Decl));
                         when A_Record_Type_Definition =>
                            if Trait_Kind (Decl) = A_Limited_Trait then
                               return True;
@@ -2802,8 +2802,8 @@ package body Thick_Queries is
                   end case;
                when A_Component_Declaration =>
                   Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                                        (Component_Subtype_Indication
-                                                                         (Object_Declaration_View (Elem))));
+                                                               (Component_Definition_View
+                                                                (Object_Declaration_View (Elem))));
                when A_Discriminant_Specification =>
                   Good_Elem := Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Elem)));
                when An_Ordinary_Type_Declaration
@@ -3019,7 +3019,7 @@ package body Thick_Queries is
             case Element_Kind (Components (I)) is
                when A_Declaration =>
                   -- A_Component_Declaration
-                  Name := Subtype_Simple_Name (Component_Subtype_Indication (Object_Declaration_View (Components (I))));
+                  Name := Subtype_Simple_Name (Component_Definition_View (Object_Declaration_View (Components (I))));
                   if Expression_Kind (Name) = An_Attribute_Reference then
                      -- A record component can't be 'Class, must be 'Base
                      Name := Simple_Name (Prefix (Name));
@@ -3102,7 +3102,7 @@ package body Thick_Queries is
                when An_Unconstrained_Array_Definition | A_Constrained_Array_Definition =>
                   return Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
                                                          (Subtype_Simple_Name
-                                                          (Component_Subtype_Indication
+                                                          (Component_Definition_View
                                                            (Array_Component_Definition (Def)))),
                                                          The_Kind);
 
@@ -3148,7 +3148,7 @@ package body Thick_Queries is
                   if Declaration_Kind (Decls (I)) = A_Component_Declaration
                     and then Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
                                                              (Subtype_Simple_Name
-                                                              (Component_Subtype_Indication
+                                                              (Component_Definition_View
                                                                (Object_Declaration_View (Decls (I))))),
                                                              The_Kind)
                   then
@@ -3686,7 +3686,7 @@ package body Thick_Queries is
             =>
             Subtype_Indication := Object_Declaration_View (Name_Decl);
             if Definition_Kind (Subtype_Indication) = A_Component_Definition then
-               Subtype_Indication := Component_Subtype_Indication (Subtype_Indication);
+               Subtype_Indication := Component_Definition_View (Subtype_Indication);
             end if;
             Subtype_Indication := Subtype_Simple_Name (Subtype_Indication);
          when others =>
@@ -4329,7 +4329,7 @@ package body Thick_Queries is
                      end if;
                      Current := Subtype_Simple_Name (Current);
                   when A_Component_Definition =>
-                     Current := Component_Subtype_Indication (Current);
+                     Current := Component_Definition_View (Current);
                   when A_Type_Definition
                      | A_Constraint
                      | A_Discrete_Range
@@ -4575,7 +4575,7 @@ package body Thick_Queries is
                      end case;
 
                   when A_Component_Definition =>
-                     Item := Component_Subtype_Indication (Item);
+                     Item := Component_Definition_View (Item);
 
                   when A_Formal_Type_Definition =>
                      case Formal_Type_Kind (Item) is
@@ -5937,7 +5937,7 @@ package body Thick_Queries is
                                                              (Subtype_Simple_Name (L))));
                when A_Component_Definition =>
                   L_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                            (Component_Subtype_Indication (L)));
+                                                            (Component_Definition_View (L)));
                when A_Type_Definition
                   | A_Task_Definition
                   | A_Protected_Definition
@@ -5989,7 +5989,7 @@ package body Thick_Queries is
                when A_Component_Definition =>
                   R_Decl := Corresponding_Name_Declaration
                              (Subtype_Simple_Name
-                              (Component_Subtype_Indication (R)));
+                              (Component_Definition_View (R)));
                when A_Type_Definition
                   | A_Task_Definition
                   | A_Protected_Definition

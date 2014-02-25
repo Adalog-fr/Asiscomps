@@ -81,7 +81,7 @@ package body A4G_Bugs is
             -- Bug
             Trace_Bug ("A4G_Bugs.Corresponding_Expression_Type (2)");
             Result := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                      (Component_Subtype_Indication
+                                                      (Component_Definition_View
                                                        (Object_Declaration_View (Result))));
 
          when A_Type_Declaration | A_Subtype_Declaration | A_Formal_Type_Declaration =>
