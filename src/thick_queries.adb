@@ -2465,6 +2465,9 @@ package body Thick_Queries is
                =>
                Result.Ultimate_Type := Corresponding_Type_Declaration (Result.Ultimate_Type);
             when A_Subtype_Declaration =>
+               if Is_Nil (Result.First_Constraint) then
+                  Result.First_Constraint := Subtype_Constraint (Type_Declaration_View (Result.Ultimate_Type));
+               end if;
                Result.Ultimate_Type := Corresponding_First_Subtype (Result.Ultimate_Type);
             when others =>
                Impossible ("Ultimate_Type_Declaration: bad kind", Result.Ultimate_Type);
@@ -2777,11 +2780,10 @@ package body Thick_Queries is
                   Good_Elem := Object_Declaration_View (Elem);
                   case Definition_Kind (Good_Elem) is
                      when A_Type_Definition =>
-                        if Type_Kind (Good_Elem) = A_Constrained_Array_Definition then
-                           return An_Array_Type;
-                        else
+                        if Type_Kind (Good_Elem) /= A_Constrained_Array_Definition then
                            Impossible ("Type_Category: anonymous type not array", Good_Elem);
                         end if;
+                        return An_Array_Type;
                      when An_Access_Definition =>
                         return An_Access_Type;
                      when others =>
@@ -2821,9 +2823,8 @@ package body Thick_Queries is
                when A_Type_Definition =>
                   if Type_Kind (Elem) in An_Unconstrained_Array_Definition .. A_Constrained_Array_Definition then
                      return An_Array_Type;
-                  else
-                     Good_Elem := Enclosing_Element (Elem);
                   end if;
+                  Good_Elem := Enclosing_Element (Elem);
                when A_Task_Definition =>
                   return A_Task_Type;
                when A_Protected_Definition =>
@@ -4177,7 +4178,6 @@ package body Thick_Queries is
       -- Its Enclosing_Element is the corresponding declaration
       Parent_Decl : Asis.Declaration;
    begin
-
       if Is_Nil (Parent_Name) then
          -- Element was the declaration of a compilation unit
          return False;
@@ -4446,8 +4446,17 @@ package body Thick_Queries is
         end case;
       end Constraint_Bounds;
 
+      function Choice_Bounds (E : Asis.Element) return Expression_List is
+      begin
+         if Element_Kind (E) = An_Expression then
+            return (E, E);
+         else
+            -- Must be a range
+            return Discrete_Range_Bounds (E);
+         end if;
+      end Choice_Bounds;
+
       Item             : Asis.Element := Elem; -- This item will navigate until we find the appropriate definition
-      Previous_Item    : Asis.Element;
       Constraint       : Asis.Definition;
       No_Unconstrained : Boolean := False;
       -- In the case of an unconstrained array type, we normally return the indices of the index type.
@@ -4676,22 +4685,80 @@ package body Thick_Queries is
                      | A_Positional_Array_Aggregate
                      | A_String_Literal
                      =>
-                     Previous_Item := Item;
-                     Item          := Corresponding_Expression_Type_Definition (Item);
-                     if Is_Nil (Item) then
-                        -- Type cannot be determined, may be that this aggregate is assigned to
-                        -- a variable of an anonymous array type. Are they others contexts where
-                        -- an aggregate of an anonymous type can be used?
-                        if Statement_Kind (Enclosing_Element (Previous_Item)) = An_Assignment_Statement then
-                           -- the bounds are the same as the LHS
-                           Item := Corresponding_Expression_Type_Definition
-                                    (Assignment_Variable_Name
-                                       (Enclosing_Element (Previous_Item)));
-                        else
-                           -- in despair...
-                           return Nil_Element_List;
+                     declare
+                        Item_Def : Asis.Definition := Corresponding_Expression_Type_Definition (Item);
+                     begin
+                        if Is_Nil (Item_Def) then
+                           -- Type cannot be determined, may be that this aggregate is assigned to
+                           -- a variable of an anonymous array type. Are they others contexts where
+                           -- an aggregate of an anonymous type can be used?
+                           if Statement_Kind (Enclosing_Element (Item)) /= An_Assignment_Statement then
+                              -- in despair...
+                              return Nil_Element_List;
+                           end if;
+
+                           -- Assignment: the bounds are the same as the LHS
+                           Item_Def := Corresponding_Expression_Type_Definition
+                                          (Assignment_Variable_Name
+                                           (Enclosing_Element (Item)));
                         end if;
-                     end if;
+
+                        if Expression_Kind (Item) = A_Named_Array_Aggregate then
+                           -- Named aggregates may (sometimes) have their bounds defined
+                           -- from the aggregate itself ...
+                           -- TBSL for the moment, we deal only with the first dimension, and consider
+                           -- other dimensions to be dynamic. This can of course be improved, but 4.3.3
+                           -- is such a nightmare...
+                           declare
+                              Assocs         : constant Association_List := Array_Component_Associations (Item);
+                              Current_Bounds : Expression_List (1 .. 2);
+                              Extreme_Bounds : Expression_List (1 .. 2);
+                              Extreme_Vals   : Extended_Biggest_Int_List (1 .. 2)
+                                               := (Biggest_Int'Last, Biggest_Int'First);
+                              Value          : Extended_Biggest_Int;
+                           begin
+                              -- ... not if there is an others choice
+                              if Definition_Kind (Array_Component_Choices (Assocs (Assocs'Last)) (1))
+                                /= An_Others_Choice
+                              then
+                                 if Assocs'Length = 1 and then Array_Component_Choices (Assocs (1))'Length = 1 then
+                                    -- Only case where the bounds can be dynamic
+                                    return Choice_Bounds (Array_Component_Choices (Assocs (1)) (1))
+                                      & (3 .. 2 * Dimensionality (Item_Def) => Nil_Element);
+                                 else
+                                    -- All bounds (and ranges) static: find the extremes
+                                    for A in Assocs'Range loop
+                                       declare
+                                          Choices_List : constant Asis.Expression_List
+                                            :=  Array_Component_Choices (Assocs (A));
+                                       begin
+                                          for C in Choices_List'Range loop
+                                             Current_Bounds :=  Choice_Bounds (Choices_List (C));
+                                             -- Low
+                                             Value := Discrete_Static_Expression_Value (Current_Bounds (1));
+                                             if Value < Extreme_Vals (1) then
+                                                Extreme_Vals   (1) := Value;
+                                                Extreme_Bounds (1) := Current_Bounds (1);
+                                             end if;
+                                             --High
+                                             Value := Discrete_Static_Expression_Value (Current_Bounds (2));
+                                             if Value > Extreme_Vals (2) then
+                                                Extreme_Vals   (2) := Value;
+                                                Extreme_Bounds (2) := Current_Bounds (2);
+                                             end if;
+                                          end loop;
+                                       end;
+                                    end loop;
+                                    return Extreme_Bounds
+                                      & (3 .. 2 * Dimensionality (Item_Def) => Nil_Element);
+                                 end if;
+                              end if;
+                           end;
+                        end if;
+
+                        Item := Item_Def;
+                     end;
+
                   when A_Qualified_Expression
                      | A_Type_Conversion
                      =>
