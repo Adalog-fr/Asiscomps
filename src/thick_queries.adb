@@ -1609,11 +1609,28 @@ package body Thick_Queries is
 
             -- Here, Pfx is the good prefix simple name
 
-            if Expression_Kind (Pfx) = A_Function_Call then  -- f(...)'Range
-               Decl := A4G_Bugs.Corresponding_Expression_Type (Pfx);
-            else
-               Decl := Corresponding_Name_Declaration (Pfx);
-            end if;
+            case Expression_Kind (Pfx) is
+               when A_Function_Call =>  -- f(...)'Range
+                  Decl := A4G_Bugs.Corresponding_Expression_Type (Pfx);
+               when An_Explicit_Dereference => -- X.all'range
+                  Decl := Access_Target_Type (Corresponding_Expression_Type_Definition (Prefix (Pfx)));
+               when An_Indexed_Component =>   -- X (I)'Range
+                  Decl := Corresponding_Expression_Type_Definition (Prefix (Pfx));
+                  if Is_Access_Subtype (Decl) then
+                     -- Indexing of an implicit dereference
+                     Decl := Type_Declaration_View (Access_Target_Type (Decl));
+                  end if;
+                  Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                          (Component_Subtype_Indication
+                                                           (Array_Component_Definition
+                                                            (Decl))));
+                  if Is_Access_Subtype (Decl) then  -- X(I) is an implicit dereference
+                     Decl := Access_Target_Type (Decl);
+                  end if;
+               when others =>
+                  Decl := Corresponding_Name_Declaration (Pfx);
+            end case;
+
             loop
                case Declaration_Kind (Decl) is
                   when  An_Ordinary_Type_Declaration
@@ -1627,6 +1644,9 @@ package body Thick_Queries is
                           A_Formal_Unconstrained_Array_Definition .. A_Formal_Constrained_Array_Definition
                      then
                         return Index_Subtypes_Names (Def) (Range_Position);
+                     elsif Is_Access_Subtype (Decl) then
+                        -- The 'Range was on an implicit dereference, take the accessed type
+                        Decl := Access_Target_Type (Decl);
                      else
                         -- Not an array, must be T'Range where T is a discrete type, equivalent to T
                         return Corresponding_Name_Definition (Pfx);
@@ -1634,26 +1654,20 @@ package body Thick_Queries is
 
                   when A_Variable_Declaration
                      | A_Constant_Declaration
+                     | A_Return_Variable_Specification
+                     | A_Return_Constant_Specification
                      =>
                      Def := Object_Declaration_View (Decl);
                      if Definition_Kind (Def) = A_Type_Definition then -- anonymous array type
                         return Index_Subtypes_Names (Def) (Range_Position);
                      end if;
-
                      Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Def));
-                     if Is_Access_Subtype (Decl) then
-                        -- The 'Range was on an implicit dereference, take the accessed type
-                        Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                                (Definitions.Access_To_Object_Definition
-                                                                 (Type_Declaration_View (Decl))));
-                     end if;
 
                   when A_Component_Declaration =>
                      Def := Component_Definition_View (Object_Declaration_View (Decl));
                      if Definition_Kind (Def) = A_Type_Definition then -- anonymous array type
                         return Index_Subtypes_Names (Def) (Range_Position);
                      end if;
-
                      Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Def));
 
                   when A_Parameter_Specification
