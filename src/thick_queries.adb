@@ -4457,6 +4457,7 @@ package body Thick_Queries is
       end Choice_Bounds;
 
       Item             : Asis.Element := Elem; -- This item will navigate until we find the appropriate definition
+      Old_Item         : Asis.Element;
       Constraint       : Asis.Definition;
       No_Unconstrained : Boolean := False;
       -- In the case of an unconstrained array type, we normally return the indices of the index type.
@@ -4532,7 +4533,7 @@ package body Thick_Queries is
                                  -- No way to get the bounds...
                                  return (Nil_Element, Nil_Element);
                               when Not_A_Root_Type_Definition =>
-                                 Impossible ("Wrong root type in Discrete_Constraining_Bounds", Item);
+                                 Impossible ("Discrete_Constraining_Bounds: Wrong root type", Item);
                            end case;
                         when A_Floating_Point_Definition
                            | An_Ordinary_Fixed_Point_Definition
@@ -4690,8 +4691,8 @@ package body Thick_Queries is
                      begin
                         if Is_Nil (Item_Def) then
                            -- Type cannot be determined, may be that this aggregate is assigned to
-                           -- a variable of an anonymous array type. Are they others contexts where
-                           -- an aggregate of an anonymous type can be used?
+                           -- a variable of an anonymous array type.
+                           -- TBSL Are they other contexts where an aggregate of an anonymous type can be used?
                            if Statement_Kind (Enclosing_Element (Item)) /= An_Assignment_Statement then
                               -- in despair...
                               return Nil_Element_List;
@@ -4716,11 +4717,26 @@ package body Thick_Queries is
                               Extreme_Vals   : Extended_Biggest_Int_List (1 .. 2)
                                                := (Biggest_Int'Last, Biggest_Int'First);
                               Value          : Extended_Biggest_Int;
+                              Encl           : Asis.Element;
                            begin
                               -- ... not if there is an others choice
                               if Definition_Kind (Array_Component_Choices (Assocs (Assocs'Last)) (1))
-                                /= An_Others_Choice
+                                = An_Others_Choice
                               then
+                                 -- The bounds are given by the applicable index constraint.
+                                 -- TBSL for the moment, we deal only with simple cases
+                                 loop
+                                    Encl := Enclosing_Element (Item);
+                                    exit when Expression_Kind (Encl) /= A_Parenthesized_Expression;
+                                 end loop;
+                                 if Statement_Kind (Encl) = An_Assignment_Statement then
+                                    -- Assignment: the bounds are the same as the LHS
+                                    return Discrete_Constraining_Bounds (Assignment_Variable_Name (Encl));
+                                 elsif Expression_Kind (Encl) = A_Qualified_Expression then
+                                    return Discrete_Constraining_Bounds
+                                            (Converted_Or_Qualified_Subtype_Mark (Encl));
+                                 end if;
+                              else
                                  if Assocs'Length = 1 and then Array_Component_Choices (Assocs (1))'Length = 1 then
                                     -- Only case where the bounds can be dynamic
                                     return Choice_Bounds (Array_Component_Choices (Assocs (1)) (1))
@@ -4771,7 +4787,12 @@ package body Thick_Queries is
                end case;                         ----------------- Expressions
 
             when A_Defining_Name =>              ----------------- Defining name
-               Item := Enclosing_Element (Item);
+               Old_Item := Item;
+               Item     := Enclosing_Element (Item);
+               if Declaration_Kind (Item) = A_Deferred_Constant_Declaration then
+                  -- See below in path for A_Deferred_Constant_Declaration why it is special-cased here
+                  Item := Corresponding_Constant_Declaration (Old_Item);
+               end if;
 
             when A_Declaration =>                ----------------- Declarations
                case Declaration_Kind (Item) is
@@ -4800,6 +4821,19 @@ package body Thick_Queries is
                        =>
                      No_Unconstrained := True;
                      Item             := Object_Declaration_View (Item);
+
+                  when A_Deferred_Constant_Declaration =>
+                     Item := Corresponding_Constant_Declaration (Names (Item) (1));
+                     -- Note that in the case of multiple declarations, different identifiers might have
+                     -- different bounds, e.g.:
+                     --    A, B : constant String;
+                     -- private
+                     --   A : constant String := "abc";
+                     --   B : constant String := "abcdef";
+                     -- But we can come here only if directly given the declaration; if we were initially
+                     -- coming from a defining name, it is special cased there.
+                     -- Therefore returning the constraint of the first element makes as much sense as
+                     -- anything else...
 
                   when A_Loop_Parameter_Specification =>
                      No_Unconstrained := True;
