@@ -1621,7 +1621,7 @@ package body Thick_Queries is
                      Decl := Type_Declaration_View (Access_Target_Type (Decl));
                   end if;
                   Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                          (Component_Subtype_Indication
+                                                          (Component_Definition_View
                                                            (Array_Component_Definition
                                                             (Decl))));
                   if Is_Access_Subtype (Decl) then  -- X(I) is an implicit dereference
@@ -2484,7 +2484,7 @@ package body Thick_Queries is
                end if;
                Result.Ultimate_Type := Corresponding_First_Subtype (Result.Ultimate_Type);
             when others =>
-               Impossible ("Ultimate_Type_Declaration: bad kind", Result.Ultimate_Type);
+               Impossible ("Corresponding_Derivation_Description: bad kind", Result.Ultimate_Type);
          end case;
       end loop;
 
@@ -2882,7 +2882,7 @@ package body Thick_Queries is
             if Type_Category (Actual_Parameter (Params (1)), Follow_Derived => True) = A_Fixed_Point_Type
               and then Type_Category (Actual_Parameter (Params (2)), Follow_Derived => True) = A_Fixed_Point_Type
             then
-               -- Both operands are fixed => Aassume the result is fixed (remember we know it is
+               -- Both operands are fixed => Assume the result is fixed (remember we know it is
                -- a predefined operator).
                return A_Fixed_Point_Type;
             else
@@ -5831,8 +5831,32 @@ package body Thick_Queries is
    --------------------------
 
    function Is_Static_Expression (Expr : Asis.Expression) return Boolean is
-   begin
-      return Static_Expression_Value_Image (Expr) /= "";
+      use Asis.Expressions;
+
+      function Are_Static_Components (Compos : Asis.Association_List) return Boolean is
+      begin
+         for C in Compos'Range loop
+            if not Is_Static_Expression (Component_Expression (Compos (C))) then
+               return False;
+            end if;
+         end loop;
+         return True;
+      end Are_Static_Components;
+
+   begin  -- Is_Static_Expression
+      case Expression_Kind (Expr) is
+         when A_Record_Aggregate =>
+            return Are_Static_Components (Record_Component_Associations (Expr, Normalized => True));
+         when An_Extension_Aggregate =>
+            return Is_Static_Expression (Extension_Aggregate_Expression (Expr))
+              and then Are_Static_Components (Record_Component_Associations (Expr, Normalized => True));
+         when A_Positional_Array_Aggregate
+            | A_Named_Array_Aggregate
+            =>
+            return Are_Static_Components (Array_Component_Associations (Expr));
+         when others =>
+            return Static_Expression_Value_Image (Expr) /= "";
+      end case;
    end Is_Static_Expression;
 
 

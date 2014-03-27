@@ -96,7 +96,6 @@ package Utilities is
 
    function Integer_Img (Item : in Integer) return Wide_String;
    -- Like Integer'Wide_Image, without the !*#!! initial space.
-   -- (avoids depending on the Gnat specific attribute 'Img)
 
    function ASIS_Integer_Img (Item : in Asis.ASIS_Integer) return Wide_String;
    -- Same thing for ASIS_Integer (which is the type of Line_Number and Column_Position)
