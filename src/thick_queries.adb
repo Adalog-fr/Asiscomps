@@ -3938,7 +3938,6 @@ package body Thick_Queries is
          when A_Procedure_Declaration
             | A_Null_Procedure_Declaration   -- Ada 2005
             | A_Function_Declaration
-            | An_Expression_Function_Declaration   -- Ada 2012
             | An_Entry_Declaration
             | A_Package_Declaration
             | A_Single_Task_Declaration
@@ -3947,6 +3946,7 @@ package body Thick_Queries is
             return Def;
          when A_Procedure_Body_Declaration
             | A_Function_Body_Declaration
+            | An_Expression_Function_Declaration   -- Ada 2012
             | A_Procedure_Renaming_Declaration
             | A_Function_Renaming_Declaration
             | A_Procedure_Body_Stub
