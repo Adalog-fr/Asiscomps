@@ -3358,22 +3358,25 @@ package body Thick_Queries is
          end if;
 
          Decl := Corresponding_Name_Declaration (Good_Mark);
-         if Declaration_Kind (Decl) in An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration then
-            -- cannot take the Corresponding_First_Subtype of an incomplete type
-            Decl := Corresponding_Type_Declaration (Decl);
-            if Is_Nil (Decl) then
-            -- TBSL 2005 Issue not settled with AdaCore
-            -- In some cases of incomplete declarations resulting from limited views,
-            -- Corresponding_Type_Declaration is unable to retrieve the full declaration and
-            -- returns Nil_Element. For the moment, let's take back the incomplete type, and
-            -- forget about the first subtype
-               Decl := Corresponding_Name_Declaration (Good_Mark);
-            else
+         case Declaration_Kind (Decl) is
+            when An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration =>
+               -- cannot take the Corresponding_First_Subtype of an incomplete type
+               Decl := Corresponding_Type_Declaration (Decl);
+               if Is_Nil (Decl) then
+                  -- TBSL 2005 Issue not settled with AdaCore
+                  -- In some cases of incomplete declarations resulting from limited views,
+                  -- Corresponding_Type_Declaration is unable to retrieve the full declaration and
+                  -- returns Nil_Element. For the moment, let's take back the incomplete type, and
+                  -- forget about the first subtype
+                  Decl := Corresponding_Name_Declaration (Good_Mark);
+               else
+                  Decl := Corresponding_First_Subtype (Decl);
+               end if;
+            when A_Formal_Incomplete_Type_Declaration =>
+               null;
+            when others =>
                Decl := Corresponding_First_Subtype (Decl);
-            end if;
-         else
-            Decl := Corresponding_First_Subtype (Decl);
-         end if;
+         end case;
          return (Is_Access => False,
                  Attribute => Attribute,
                  Name      => Names (Decl)(1));
