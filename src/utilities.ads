@@ -86,6 +86,9 @@ package Utilities is
    --  Similar to To_Upper, but makes the string Title_Case
    pragma Inline (To_Title);
 
+   function Quote (Item : in Wide_String) return Wide_String;
+   -- Surrounds Item with double quotes; any inner double quote is doubled
+
    function Trim_All (Item : in Wide_String) return Wide_String;
    -- Remove spaces and control characters from both ends of the string
    -- Remove multiple spaces, line delimiters and comments within the string
@@ -109,6 +112,7 @@ package Utilities is
                     When_True  : in Wide_String;
                     When_False : in Wide_String) return Wide_String;
    --  Returns When_True if Condition is True, When_False otherwise
+
 
    --
    --  Error

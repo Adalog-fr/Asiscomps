@@ -435,6 +435,30 @@ package body Utilities is
       return Result;
    end To_Title;
 
+   -----------
+   -- Quote --
+   -----------
+
+   function Quote (Item : Wide_String) return Wide_String is
+      Result : Wide_String (Item'First .. Item'Last + Ada.Strings.Wide_Fixed.Count (Item, """") + 2);
+      Index  : Positive;
+   begin
+      Index := Result'First;
+      Result (Index) := '"';
+
+      for I in Item'Range loop
+         if Item (I) = '"' then
+            Index := Index + 1;
+            Result (Index) := '"';
+         end if;
+         Index := Index + 1;
+         Result (Index) := Item (I);
+      end loop;
+      Result (Result'Last) := '"';
+
+      return Result;
+   end Quote;
+
 
    ---------------------
    -- Stack_Traceback --
@@ -722,4 +746,3 @@ package body Utilities is
    --## rule on no_trace
 
 end Utilities;
-
