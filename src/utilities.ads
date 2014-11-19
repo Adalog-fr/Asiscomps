@@ -142,6 +142,9 @@ package Utilities is
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;
                     With_Source : Boolean      := True);
+   function  Trace (Message     : Wide_String;
+                    Element     : Asis.Element;
+                    With_Source : Boolean      := True) return Boolean;   -- Always returns True
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element_List;
                     With_Source : Boolean           := True);

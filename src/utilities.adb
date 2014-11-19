@@ -681,6 +681,19 @@ package body Utilities is
       end if;
    end Trace;
 
+   -----------
+   -- Trace --
+   -----------
+
+   function  Trace (Message     : Wide_String;
+                    Element     : Asis.Element;
+                    With_Source : Boolean      := True) return Boolean
+   is
+   begin
+      Trace (Message, Element, With_Source);
+      return True;
+   end Trace;
+
    ------------
    -- Trace  --
    ------------
