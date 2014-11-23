@@ -1410,7 +1410,7 @@ package body Thick_Queries is
                when An_Identifier =>
                   Elem_Def_Name  := Corresponding_Name_Definition (Element);
                when A_Selected_Component =>
-                  Elem_Def_Name  := Corresponding_Name_Definition (Prefix (Element));
+                  Elem_Def_Name  := Corresponding_Name_Definition (Selector (Element));
                when others =>
                   -- Expression is neither An_Identifier, nor A_Selected_Component
                   -- Includes An_Attribute_Reference (T'Class)
