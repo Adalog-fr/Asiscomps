@@ -5325,7 +5325,7 @@ package body Thick_Queries is
       -- Do we have a size clause (type or object)?
       Expr := Attribute_Clause_Expression (A_Size_Attribute, Good_Name);
       if not Is_Nil (Expr) then
-         -- we have a size clause
+         -- we have a size clauseie
          return Static_Expression_Value_Image (Expr);
       end if;
 
@@ -5362,6 +5362,19 @@ package body Thick_Queries is
                end if;
             end;
 
+         when A_Variable_Declaration | A_Constant_Declaration =>
+            declare
+               Def : constant Asis.Definition := Object_Declaration_View (Decl);
+            begin
+               case Definition_Kind (Def) is
+                  when A_Subtype_Indication =>
+                     return Size_Value_Image (First_Subtype_Name (Subtype_Simple_Name (Def)));
+                  when others =>
+                     -- Anonymous array type, anonymous access type, single task or protected object: give up
+                     return "";
+               end case;
+
+            end;
          when A_Component_Declaration =>
             -- Is this component sized by a component clause of the enclosing record?
             declare

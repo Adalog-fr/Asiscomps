@@ -1004,7 +1004,7 @@ package Thick_Queries is
 
 
    function Formal_Name (Assoc : Asis.Association) return Asis.Defining_Name;
-   -- Same as above, but retrieves the call (or instantiation) and the position given an association
+   -- Same as above, but retrieves the call (or inst antiation) and the position given an association
 
 
    function Matching_Formal_Name (Name : Asis.Defining_Name; Into : Asis.Declaration) return Asis.Defining_Name;
