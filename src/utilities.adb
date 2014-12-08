@@ -260,6 +260,20 @@ package body Utilities is
       Failure (Message);
    end Failure;
 
+   -------------------
+   -- Unimplemented --
+   -------------------
+
+   procedure Unimplemented (Origin : Wide_String; Fatal : Boolean := True) is
+      Message : constant Wide_String := "Unimplemented functionality: " & Origin;
+   begin
+      if Fatal then
+         Failure (Message);
+      else
+         Trace (Message);
+      end if;
+   end Unimplemented;
+
    -------------------------
    -- Locate_Regular_File --
    -------------------------

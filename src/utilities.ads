@@ -129,6 +129,10 @@ package Utilities is
    pragma No_Return (Failure);
    -- Failure raises Program_Error
 
+   procedure Unimplemented (Origin : Wide_String; Fatal : Boolean := True);
+   -- Unimplemented calls Failure if Fatal, Trace otherwise
+
+
    --
    -- Debugging facilities
    --
