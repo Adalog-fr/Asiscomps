@@ -1999,20 +1999,28 @@ package body Thick_Queries is
          when A_Defining_Name =>
             ST := Enclosing_Element (The_Subtype);
          when An_Expression =>
-            ST := Corresponding_Name_Declaration (Simple_Name (The_Subtype));
+            if Attribute_Kind (The_Subtype) = A_Base_Attribute then
+               ST := Corresponding_Name_Declaration (Simple_Name (Prefix (The_Subtype)));
+            else
+               ST := Corresponding_Name_Declaration (Simple_Name (The_Subtype));
+            end if;
          when others =>
             Impossible ("Wrong element kind in First_Subtype_Name", The_Subtype);
       end case;
       if Declaration_Kind (ST) /= A_Subtype_Declaration then
          -- The_Subtype was already the first named subtype
-         return The_Subtype;
+         if Attribute_Kind (The_Subtype) = A_Base_Attribute then
+            return Prefix (The_Subtype);
+         else
+            return The_Subtype;
+         end if;
       end if;
 
       -- We must unwind subtypes up to the last subtype (but not up to the type as
       -- Corresponding_First_Subtype would do). We ignore the 'Base attribute,
       -- but return the 'Class attribute
       -- We do not use Corresponding_Last_Subtype, because the ASIS standard does not
-      -- specify what happens in the case of a subtype of a 'class.
+      -- specify what happens in the case of a subtype of a 'Class.
       loop
          Mark := Subtype_Simple_Name (Type_Declaration_View (ST));
          case Expression_Kind (Mark) is

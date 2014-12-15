@@ -356,6 +356,7 @@ package Thick_Queries is
    -- Appropriate Expression_Kinds:
    --   An_Identifier
    --   A_Selected_Component (works on selector)
+   --   An_Attribute_Reference (T'Base only)
    --
    -- Returns Expression_Kinds:
    --   An_Identifier
