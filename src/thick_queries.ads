@@ -288,6 +288,7 @@ package Thick_Queries is
    --    An_Identifier
    --    A_Selected_Component
    --    An_Attribute_Reference
+   --    An_Explicit_Dereference
 
 
    function Full_Name_Image (The_Name     : in Asis.Element;
@@ -1004,7 +1005,7 @@ package Thick_Queries is
 
 
    function Formal_Name (Assoc : Asis.Association) return Asis.Defining_Name;
-   -- Same as above, but retrieves the call (or inst antiation) and the position given an association
+   -- Same as above, but retrieves the call (or instantiation) and the position given an association
 
 
    function Matching_Formal_Name (Name : Asis.Defining_Name; Into : Asis.Declaration) return Asis.Defining_Name;

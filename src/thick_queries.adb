@@ -1056,6 +1056,8 @@ package body Thick_Queries is
                   return Extended_Name_Image (Prefix (Name_Elem))
                     & '''
                     & Attribute_Name_Image (Name_Elem);
+               when An_Explicit_Dereference =>
+                  return Extended_Name_Image (Prefix (Name_Elem)) & ".all";
                when others =>
                   if Silent_If_Inappropriate then
                      return "";
