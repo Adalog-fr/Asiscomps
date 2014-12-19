@@ -5237,6 +5237,10 @@ package body Thick_Queries is
    -- Size_Value_Image --
    ----------------------
 
+   ----------------------
+   -- Size_Value_Image --
+   ----------------------
+
    function Size_Value_Image (Name : Asis.Element) return Wide_String is
       use Asis.Clauses, Asis.Definitions, Asis.Expressions;
 
@@ -5285,15 +5289,15 @@ package body Thick_Queries is
                                  when Not_Static =>
                                     return "";
                                  when 0 .. 8 =>
-                                    return " 8";
+                                    return "8";
                                  when 9 .. 16 =>
-                                    return " 16";
+                                    return "16";
                                  when 17 .. 32 =>
-                                    return " 32";
+                                    return "32";
                                  when 33 .. 64 =>
-                                    return " 64";
+                                    return "64";
                                  when 65 .. 128 =>
-                                    return " 128";
+                                    return "128";
                                  when others =>
                                     Impossible ("Size of integer type > 128", Good_Name);
                               end case;
@@ -5356,14 +5360,14 @@ package body Thick_Queries is
                elsif Pfx = "STANDARD.CHARACTER" then
                   return "8";
                elsif Pfx = "STANDARD.INTEGER" then
-                  return Integer'Wide_Image (Integer'Size);
+                  return Biggest_Int_Img (Integer'Size);
                elsif Pfx = "STANDARD.FLOAT" then
-                  return Integer'Wide_Image (Float'Size);
+                  return Biggest_Int_Img (Float'Size);
 
                elsif Pfx = "STANDARD.LONG_INTEGER" then
-                  return Integer'Wide_Image (Long_Integer'Size);
+                  return Biggest_Int_Img (Long_Integer'Size);
                elsif Pfx = "STANDARD.LONG_FLOAT" then
-                  return Integer'Wide_Image (Long_Float'Size);
+                  return Biggest_Int_Img (Long_Float'Size);
                elsif Pfx = "STANDARD.WIDE_CHARACTER" then
                   return "16";
 
@@ -5373,6 +5377,7 @@ package body Thick_Queries is
             end;
 
          when A_Variable_Declaration | A_Constant_Declaration =>
+            -- Try objects's type size
             declare
                Def : constant Asis.Definition := Object_Declaration_View (Decl);
             begin
@@ -5383,8 +5388,8 @@ package body Thick_Queries is
                      -- Anonymous array type, anonymous access type, single task or protected object: give up
                      return "";
                end case;
-
             end;
+
          when A_Component_Declaration =>
             -- Is this component sized by a component clause of the enclosing record?
             declare

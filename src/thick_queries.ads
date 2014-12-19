@@ -1109,6 +1109,7 @@ package Thick_Queries is
    --  and represents it as a (wide) string. For enumeration expressions, the
    --  image of the Pos value of the defining enumeration or character literal
    --  corresponding to the  value of the expression is returned.
+   --  There is NO leading space for positive values!
    --
    --  For non-static expressions, or expressions that we cannot (yet) evaluate,
    --  an empty string is returned.
