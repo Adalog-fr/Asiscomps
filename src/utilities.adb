@@ -270,7 +270,7 @@ package body Utilities is
       if Fatal then
          Failure (Message);
       else
-         Trace (Message);
+         Trace (Message);   --## RULE LINE OFF No_Trace
       end if;
    end Unimplemented;
 

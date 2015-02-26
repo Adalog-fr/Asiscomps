@@ -5379,11 +5379,11 @@ package body Thick_Queries is
          when A_Variable_Declaration | A_Constant_Declaration =>
             -- Try objects's type size
             declare
-               Def : constant Asis.Definition := Object_Declaration_View (Decl);
+               Obj_Def : constant Asis.Definition := Object_Declaration_View (Decl);
             begin
-               case Definition_Kind (Def) is
+               case Definition_Kind (Obj_Def) is
                   when A_Subtype_Indication =>
-                     return Size_Value_Image (First_Subtype_Name (Subtype_Simple_Name (Def)));
+                     return Size_Value_Image (First_Subtype_Name (Subtype_Simple_Name (Obj_Def)));
                   when others =>
                      -- Anonymous array type, anonymous access type, single task or protected object: give up
                      return "";
