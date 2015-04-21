@@ -1,9 +1,17 @@
 ----------------------------------------------------------------------
 --  Scope_Manager - Package body                                    --
+--  Copyright (C) 2004-2015 Adalog                                  --
+--  Author: J-P. Rosen                                              --
 --                                                                  --
---  This software  is (c) The European Organisation  for the Safety --
---  of Air  Navigation (EUROCONTROL) and Adalog  2004-2008. The Ada --
---  Controller  is  free software;  you can redistribute  it and/or --
+--  ADALOG   is   providing   training,   consultancy,   expertise, --
+--  assistance and custom developments  in Ada and related software --
+--  engineering techniques.  For more info about our services:      --
+--  ADALOG                          Tel: +33 1 45 29 21 52          --
+--  2 rue du Docteur Lombard        Fax: +33 1 45 29 25 00          --
+--  92441 ISSY LES MOULINEAUX CEDEX E-m: info@adalog.fr             --
+--  FRANCE                          URL: http://www.adalog.fr       --
+--                                                                  --
+--  This  unit is  free software;  you can  redistribute  it and/or --
 --  modify  it under  terms of  the GNU  General Public  License as --
 --  published by the Free Software Foundation; either version 2, or --
 --  (at your  option) any later version.  This  unit is distributed --
@@ -16,17 +24,12 @@
 --  Temple Place - Suite 330, Boston, MA 02111-1307, USA.           --
 --                                                                  --
 --  As  a special  exception, if  other files  instantiate generics --
---  from the units  of this program, or if you  link this unit with --
---  other files  to produce  an executable, this  unit does  not by --
---  itself cause the resulting executable  to be covered by the GNU --
---  General  Public  License.   This  exception  does  not  however --
---  invalidate any  other reasons why the executable  file might be --
---  covered by the GNU Public License.                              --
---                                                                  --
---  This  software is  distributed  in  the hope  that  it will  be --
---  useful,  but WITHOUT  ANY  WARRANTY; without  even the  implied --
---  warranty  of  MERCHANTABILITY   or  FITNESS  FOR  A  PARTICULAR --
---  PURPOSE.                                                        --
+--  from  this unit,  or you  link this  unit with  other  files to --
+--  produce an executable,  this unit does not by  itself cause the --
+--  resulting executable  to be covered  by the GNU  General Public --
+--  License.  This exception does  not however invalidate any other --
+--  reasons why  the executable  file might be  covered by  the GNU --
+--  Public License.                                                 --
 ----------------------------------------------------------------------
 
 -- Ada
@@ -40,14 +43,6 @@ with
 
 package body Scope_Manager is
 
-   --
-   -- Implementation notes:
-   --
-   -- This unit relies on the fact that a parent unit is always processed before its children.
-   -- this is ensured by the options' analyzer. See Adactl_Options.Add_Unit.
-   --
-   -- Note that a "unit" scope is not necessarily at level 1, in the case of subunits.
-   --
    -- Warning: this is a very delicate unit. If you think that it should be improved, or that
    -- things should be made differently, please write to rosen@adalog.fr before attempting anything.
 

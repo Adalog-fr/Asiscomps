@@ -1,9 +1,17 @@
 ----------------------------------------------------------------------
 --  Scope_Manager - Package specification                           --
+--  Copyright (C) 2004-2015 Adalog                                  --
+--  Author: J-P. Rosen                                              --
 --                                                                  --
---  This software  is (c) The European Organisation  for the Safety --
---  of Air  Navigation (EUROCONTROL) and Adalog  2004-2008. The Ada --
---  Controller  is  free software;  you can redistribute  it and/or --
+--  ADALOG   is   providing   training,   consultancy,   expertise, --
+--  assistance and custom developments  in Ada and related software --
+--  engineering techniques.  For more info about our services:      --
+--  ADALOG                          Tel: +33 1 45 29 21 52          --
+--  2 rue du Docteur Lombard        Fax: +33 1 45 29 25 00          --
+--  92441 ISSY LES MOULINEAUX CEDEX E-m: info@adalog.fr             --
+--  FRANCE                          URL: http://www.adalog.fr       --
+--                                                                  --
+--  This  unit is  free software;  you can  redistribute  it and/or --
 --  modify  it under  terms of  the GNU  General Public  License as --
 --  published by the Free Software Foundation; either version 2, or --
 --  (at your  option) any later version.  This  unit is distributed --
@@ -16,17 +24,12 @@
 --  Temple Place - Suite 330, Boston, MA 02111-1307, USA.           --
 --                                                                  --
 --  As  a special  exception, if  other files  instantiate generics --
---  from the units  of this program, or if you  link this unit with --
---  other files  to produce  an executable, this  unit does  not by --
---  itself cause the resulting executable  to be covered by the GNU --
---  General  Public  License.   This  exception  does  not  however --
---  invalidate any  other reasons why the executable  file might be --
---  covered by the GNU Public License.                              --
---                                                                  --
---  This  software is  distributed  in  the hope  that  it will  be --
---  useful,  but WITHOUT  ANY  WARRANTY; without  even the  implied --
---  warranty  of  MERCHANTABILITY   or  FITNESS  FOR  A  PARTICULAR --
---  PURPOSE.                                                        --
+--  from  this unit,  or you  link this  unit with  other  files to --
+--  produce an executable,  this unit does not by  itself cause the --
+--  resulting executable  to be covered  by the GNU  General Public --
+--  License.  This exception does  not however invalidate any other --
+--  reasons why  the executable  file might be  covered by  the GNU --
+--  Public License.                                                 --
 ----------------------------------------------------------------------
 
 -- Asis
@@ -34,7 +37,7 @@ with
   Asis;
 
 package Scope_Manager is
-   --  This package provides facilities for rules that need to manage
+   --  This package provides facilities for applications that need to manage
    --  information associated to scopes. A scope is a construct that can
    --  contain declarations.
    --
@@ -43,14 +46,31 @@ package Scope_Manager is
    --  while traversing the construct itself, the current scope is the one of the
    --  place where the construct is declared, but when traversing anything inside it
    --  the current scope is one more.
-   --  The current scope of a library unit is 0, and therefore the scope of anything
-   --  inside a library unit is 1.
+   --  The current scope of a root library unit is 0, and therefore the scope of anything
+   --  inside a root library unit is 1.
+   --  Note that a "unit" scope is not necessarily at level 1, in the case of subunits.
+   --
    --  Proper bodies have the same depth as their corresponding stub.
    --
    --  Note that when processing context clauses, the current scope is the one
    --  of the following library unit. This is what the user would expect,
    --  although from an ASIS point of view, the associated construct has not
    --  yet been entered.
+
+   --  Usage
+   --  ------
+   --
+   -- This package must know when certain constructs are being traversed; since in an ASIS application
+   -- the traversal is in the realm of the user application, the package offers some services ("plugs")
+   -- that must be called at appropriate places during the traversal.
+   -- The plugs are at the end of the specification, in the "plugs" section; appropriate comments describe
+   -- under what circumstances each plug must be called.
+   --
+   -- This unit relies on the fact that a parent unit is always processed before its children.
+   -- In AdaControl, this is ensured by the options' analyzer. See Adactl_Options.Add_Unit.
+   -- Make sure the same holds in your application
+   --
+
 
    -----------------------------------------------------------------------------------
    -- Scopes
@@ -201,21 +221,36 @@ package Scope_Manager is
 
 
    ----------------------------------------------------------------------------
-   --
-   --  Declarations below this line are for the use of the framework
-   --
+   --                                                                        --
+   --  Plugs section                                                         --
+   --                                                                        --
+   ----------------------------------------------------------------------------
 
    procedure Enter_Unit  (Unit  : in Asis.Compilation_Unit);
+   -- To be called at the beginning of processing a compilation unit, before any traversal
+
    procedure Enter_Scope (Scope : in Asis.Element; Is_Unit : Boolean := False);
+   -- To be called each time a scope is entered (see what it means in the body of Is_Scope),
+   -- after processing the Scope globally (i.e., after calling Enter_Scope, you are inside the entity)
+
    procedure Enter_Private_Part;
+   -- To be called between the traversal of the visible part of an entity with a private part
+   -- (package, generic package, single task, task type, single protected, protected type)
+   -- and the traversal of its private part.
+
    procedure Exit_Unit   (Unit  : in Asis.Compilation_Unit);
+   -- To be called at the end of processing a compilation unit, after all traversal
+
    procedure Exit_Scope  (Scope : in Asis.Element; Force : Boolean := False);
+   -- To be called each time a scope is left (see what it means in the body of Is_Scope)
+
    procedure Exit_Context_Clauses;
+   -- To be called after traversing context clauses, before traversing the attached unit
 
    procedure Reset (Deactivate : Boolean);
    -- Cleans up all active scope and all Scoped_Store data
-   -- To be used at the end of a Go command, or in the case of a premature
-   -- termination due to an unexpected exception.
+   -- To be used at the end of a full processing (like a Go command in AdaControl), or in the case
+   -- of a premature termination due to an unexpected exception.
    -- If Deactivate is True, scoped stores are also deactivated, which should not
    -- be done while recovering from an error.
 
