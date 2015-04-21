@@ -3803,6 +3803,19 @@ package body Thick_Queries is
       end if;
    end Simple_Name;
 
+   --------------------
+   -- Unindexed_Name --
+   --------------------
+
+   function Unindexed_Name (The_Name : Asis.Expression) return Asis.Expression is
+      use Asis.Expressions;
+   begin
+      if Expression_Kind (The_Name) = An_Indexed_Component then
+         return Selector (The_Name);
+      else
+         return The_Name;
+      end if;
+   end Unindexed_Name;
 
    -------------------
    -- Ultimate_Name --

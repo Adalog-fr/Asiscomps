@@ -87,7 +87,7 @@ package Thick_Queries is
    --
 
    function Is_Compilation_Unit (Element : Asis.Element) return Boolean;
-   --  Return True if the element is the declaration of the enclosing compilation unit
+   --  Return True if Element is the declaration of its enclosing compilation unit
    --
    --  Appropriate Element_Kinds:
    --     Any element
@@ -633,6 +633,8 @@ package Thick_Queries is
    --
    -- Incomplete types are always followed.
    --
+   -- Expressions can be either type names or true (typed) expressions
+   --
    -- Appropriate Element_Kinds:
    --       A_Declaration
    --       A_Definition
@@ -697,7 +699,11 @@ package Thick_Queries is
    -------------------------------------------------------------------------------------------------
 
    function Simple_Name (The_Name : Asis.Expression) return Asis.Expression;
-   -- Gets rid of selection, i.e. returns the selector of its argument if a selected_name,
+   -- Gets rid of selection, i.e. returns the selector of its argument if A_Selected_Component,
+   -- its argument otherwise.
+
+   function Unindexed_Name (The_Name : Asis.Expression) return Asis.Expression;
+   -- Gets rid of indexing, i.e. returns the selector of its argument if An_Indexed_Component,
    -- its argument otherwise.
 
    function Strip_Attributes (Name : Asis.Expression) return Asis.Expression;
