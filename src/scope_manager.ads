@@ -96,6 +96,8 @@ package Scope_Manager is
    function Current_Scope   return Asis.Element;
    function Enclosing_Scope return Asis.Element;
    function Active_Scopes   return Scope_List;
+   function Is_Active (Scope : Asis.Element) return Boolean;
+   -- True iff Scope is one of the elements of Active_Scopes
 
    function In_Private_Part (Scope : Scope_Range := Current_Depth) return Boolean;
    function In_Context_Clauses return Boolean;
@@ -105,6 +107,13 @@ package Scope_Manager is
    -- A scope is global if itself and all enclosing scopes are all
    -- packages or generic packages
 
+
+   procedure Reset (Deactivate : Boolean);
+   -- Cleans up all active scope and all Scoped_Store data
+   -- To be used at the end of a full processing (like a Go command in AdaControl), or in the case
+   -- of a premature termination due to an unexpected exception.
+   -- If Deactivate is True, scoped stores are also deactivated, which should not
+   -- be done while recovering from an error.
 
    -----------------------------------------------------------------------------------
    -- Scoped_Store                                                                  --
@@ -226,32 +235,33 @@ package Scope_Manager is
    --                                                                        --
    ----------------------------------------------------------------------------
 
+   --
+   -- To be called at Unit level:
+   --
    procedure Enter_Unit  (Unit  : in Asis.Compilation_Unit);
    -- To be called at the beginning of processing a compilation unit, before any traversal
 
+   procedure Exit_Unit   (Unit  : in Asis.Compilation_Unit);
+   -- To be called at the end of processing a compilation unit, after all traversal
+
+   procedure Exit_Context_Clauses;
+   -- To be called after traversing context clauses, before traversing the attached unit
+
+   --
+   -- To be called at Element level:
+   --
    procedure Enter_Scope (Scope : in Asis.Element; Is_Unit : Boolean := False);
    -- To be called each time a scope is entered (see what it means in the body of Is_Scope),
    -- after processing the Scope globally (i.e., after calling Enter_Scope, you are inside the entity)
+   -- Use the default value of Is_Unit (Is_Unit is True only for internal calls)
 
    procedure Enter_Private_Part;
    -- To be called between the traversal of the visible part of an entity with a private part
    -- (package, generic package, single task, task type, single protected, protected type)
    -- and the traversal of its private part.
 
-   procedure Exit_Unit   (Unit  : in Asis.Compilation_Unit);
-   -- To be called at the end of processing a compilation unit, after all traversal
-
    procedure Exit_Scope  (Scope : in Asis.Element; Force : Boolean := False);
    -- To be called each time a scope is left (see what it means in the body of Is_Scope)
-
-   procedure Exit_Context_Clauses;
-   -- To be called after traversing context clauses, before traversing the attached unit
-
-   procedure Reset (Deactivate : Boolean);
-   -- Cleans up all active scope and all Scoped_Store data
-   -- To be used at the end of a full processing (like a Go command in AdaControl), or in the case
-   -- of a premature termination due to an unexpected exception.
-   -- If Deactivate is True, scoped stores are also deactivated, which should not
-   -- be done while recovering from an error.
+   -- Use the default value of Force (Force is True only for internal calls)
 
 end Scope_Manager;

@@ -199,6 +199,20 @@ package body Scope_Manager is
       return Result;
    end Active_Scopes;
 
+   ---------------
+   -- Is_Active --
+   ---------------
+
+   function Is_Active (Scope : Asis.Element) return Boolean is
+      use Asis.Elements;
+   begin
+      for I in Scope_Range range 1 .. Scope_Top loop
+         if Is_Equal (Scope, Scope_Stack (I).Element) then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Is_Active;
 
    ------------------
    -- Scoped_Store --
