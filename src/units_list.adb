@@ -498,7 +498,6 @@ package body Units_List is
             else
                Stop := Stop - 1;
             end if;
-
             if Start = Spec'First or else Spec (Start-1) = '+' then
                Add_With_Parent (To_Upper (Spec (Start .. Stop)));
             else
@@ -576,4 +575,3 @@ package body Units_List is
    end Skip;
 
 end Units_List;
-

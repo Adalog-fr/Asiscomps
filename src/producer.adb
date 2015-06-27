@@ -64,7 +64,7 @@ package body Producer is
 
    -- Global state of the producer
    Print_Changed_Lines   : Boolean := False;
-   There_Is_Substitution : Boolean := False; -- (c) Bob Marley
+   There_Is_Substitution : Boolean := False;
    Insert_Count          : Line_Number := 0;
    Global_Changes        : Boolean := False;
    Col_At_Insert         : Character_Position;
@@ -559,11 +559,12 @@ package body Producer is
       -- This is a very important check, as most of client's bugs are trapped here!
       Assert (Last_Line > Last_Printed_Line or else (Last_Line = Last_Printed_Line and
                                                      Last_Column >= Last_Printed_Column),
-              "Illegal span in Print_Up_To (" &
-              Line_Number'Wide_Image (Last_Printed_Line) & ',' &
-              Character_Position'Wide_Image (Last_Printed_Column) & ") (" &
-              Line_Number'Wide_Image (Last_Line) & ',' &
-              Character_Position'Wide_Image (Last_Column) & ')'
+              "Illegal span in Print_Up_To ("
+              & Line_Number'Wide_Image (Last_Printed_Line) & ','
+              & Character_Position'Wide_Image (Last_Printed_Column) & ") ("
+              & Line_Number'Wide_Image (Last_Line) & ','
+              & Character_Position'Wide_Image (Last_Column) & ')',
+              The_Element
              );
 
       if Last_Line   = Last_Printed_Line   and
