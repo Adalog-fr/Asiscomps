@@ -55,7 +55,7 @@ separate (Scope_Manager)
 package body Scoped_Store is
    use Ada. Strings.Wide_Unbounded;
 
-   Is_Active : Boolean := False;
+   Is_Activated : Boolean := False;
 
    type Data_Access is access Data;
 
@@ -141,7 +141,7 @@ package body Scoped_Store is
 
    procedure Push (Info : in Data) is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -159,7 +159,7 @@ package body Scoped_Store is
       Insert_Ptr    : Link := Head;
       Before_Insert : Link := null;
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -189,7 +189,7 @@ package body Scoped_Store is
 
    procedure Reset (Mode : Iterator_Mode) is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -227,7 +227,7 @@ package body Scoped_Store is
 
    procedure Reset (Info : Data; Mode : Iterator_Mode) is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -250,7 +250,7 @@ package body Scoped_Store is
 
    procedure Continue (Mode : Iterator_Mode) is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -276,7 +276,7 @@ package body Scoped_Store is
 
    function Current_Data return Data is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -289,7 +289,7 @@ package body Scoped_Store is
 
    function Current_Data_Level return Scope_Range is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -302,7 +302,7 @@ package body Scoped_Store is
 
    function Current_Data_Scope return Asis.Element is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -319,7 +319,7 @@ package body Scoped_Store is
 
    function Current_Origin return Declaration_Origin is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -332,7 +332,7 @@ package body Scoped_Store is
 
    procedure Next is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -362,7 +362,7 @@ package body Scoped_Store is
 
    function Data_Available return Boolean is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -385,7 +385,7 @@ package body Scoped_Store is
 
    procedure Update_Current (Info : in Data) is
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -405,7 +405,7 @@ package body Scoped_Store is
       -- Otherwise, the node is effectively removed from the list and freed.
       Deleted_Node : Link := Current;
    begin
-      if not Is_Active then
+      if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
@@ -842,7 +842,7 @@ package body Scoped_Store is
       Temp : Link;
    begin
       if not Clear_Stay_Active then
-         Is_Active := False;
+         Is_Activated := False;
       end if;
 
       while Head /= null loop
@@ -866,6 +866,6 @@ package body Scoped_Store is
       Exit_Procs    := new Scoping_Node'(Exit_Access,    Exit_Procs);
       Clear_Procs   := new Scoping_Node'(Clear_Access,   Clear_Procs);
 
-      Is_Active := True;
+      Is_Activated := True;
    end Activate;
 end Scoped_Store;
