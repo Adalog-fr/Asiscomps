@@ -231,6 +231,8 @@ package body Scope_Manager is
    -- Enter_Unit --
    ----------------
 
+   procedure Enter_Scope (Scope : Asis.Element; Is_Unit : Boolean); -- Forward declaration for Enter_Unit
+
    procedure Enter_Unit (Unit : in Asis.Compilation_Unit) is
       use Asis, Asis.Compilation_Units, Asis.Elements;
       Current : Scoping_Link;
@@ -259,7 +261,7 @@ package body Scope_Manager is
    -- Enter_Scope --
    -----------------
 
-   procedure Enter_Scope (Scope : Asis.Element; Is_Unit : Boolean := False) is
+   procedure Enter_Scope (Scope : Asis.Element; Is_Unit : Boolean) is
       use Asis, Asis.Elements;
       Current : Scoping_Link;
    begin
@@ -294,6 +296,16 @@ package body Scope_Manager is
       end loop;
    end Enter_Scope;
 
+   -----------------
+   -- Enter_Scope --
+   -----------------
+
+   procedure Enter_Scope (Scope : Asis.Element) is
+      -- The provided plug is not to be used for compilation units
+   begin
+      Enter_Scope (Scope, Is_Unit => False);
+   end Enter_Scope;
+
    ------------------------
    -- Enter_Private_Part --
    ------------------------
@@ -320,7 +332,7 @@ package body Scope_Manager is
    -- Exit_Scope --
    ----------------
 
-   procedure Exit_Scope (Scope : Asis.Element; Force : Boolean := False) is
+   procedure Exit_Scope (Scope : Asis.Element; Force : Boolean) is
       Current : Scoping_Link;
    begin
       -- Delay exit from the unit-level scope until the unit is exited
@@ -341,6 +353,16 @@ package body Scope_Manager is
          Non_Package_Depth := 0;
       end if;
       Scope_Top := Scope_Top - 1;
+   end Exit_Scope;
+
+   ----------------
+   -- Exit_Scope --
+   ----------------
+
+   procedure Exit_Scope (Scope : Asis.Element) is
+      -- The provided plug is not to be used for compilation units
+   begin
+      Exit_Scope (Scope, Force => False);
    end Exit_Scope;
 
    ---------------

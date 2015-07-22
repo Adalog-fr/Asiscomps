@@ -250,18 +250,16 @@ package Scope_Manager is
    --
    -- To be called at Element level:
    --
-   procedure Enter_Scope (Scope : in Asis.Element; Is_Unit : Boolean := False);
+   procedure Enter_Scope (Scope : in Asis.Element);
    -- To be called each time a scope is entered (see what it means in the body of Is_Scope),
    -- after processing the Scope globally (i.e., after calling Enter_Scope, you are inside the entity)
-   -- Use the default value of Is_Unit (Is_Unit is True only for internal calls)
 
    procedure Enter_Private_Part;
    -- To be called between the traversal of the visible part of an entity with a private part
    -- (package, generic package, single task, task type, single protected, protected type)
    -- and the traversal of its private part.
 
-   procedure Exit_Scope  (Scope : in Asis.Element; Force : Boolean := False);
+   procedure Exit_Scope  (Scope : in Asis.Element);
    -- To be called each time a scope is left (see what it means in the body of Is_Scope)
-   -- Use the default value of Force (Force is True only for internal calls)
 
 end Scope_Manager;
