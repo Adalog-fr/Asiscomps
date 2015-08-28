@@ -33,6 +33,7 @@
 ----------------------------------------------------------------------
 pragma Ada_05;
 --## Rule off Use_Img_Function ## This package should not depend on utilities
+with Utilities; use Utilities;
 with   -- Standard Ada units
   Ada.Characters.Handling,
   Ada.Exceptions,
@@ -3508,6 +3509,9 @@ package body Thick_Queries is
          -- in that case.
          -- Incidentally, this will make Corresponding_Expression_Type_Definition work for any type
          -- To be checked if replaced by the equivalent ASIS05 query
+         --
+         -- The case of Nil_Element returned by expressions of an anonymous access type is handled
+         -- later
 
          -- Special case: funny identifiers from pragmas
          if Association_Kind (Enclosing_Element (The_Element)) = A_Pragma_Argument_Association then
@@ -3613,6 +3617,17 @@ package body Thick_Queries is
                   return Nil_Element;
                end if;
                return Component_Definition_View (Array_Component_Definition (Def));
+            when A_Function_Call =>
+               Def := Result_Profile (Corresponding_Name_Declaration (Simple_Name (Prefix (Local_Elem))));
+               if Definition_Kind (Def) = An_Access_Definition then -- ASIS 2005
+                  -- Result type is an anonymous access type
+                  return Def;
+               else
+                  -- An identifier, selected name, or attribute
+                  return Type_Declaration_View (Corresponding_Name_Declaration
+                                                (Simple_Name
+                                                   (Strip_Attributes (Def))));
+               end if;
             when others =>
                -- TBSL This unfortunately covers the case of an aggregate of an anonymous array type, like in:
                --   Tab : array (1..10) of Integer := (1..10 => 0);
@@ -3643,9 +3658,10 @@ package body Thick_Queries is
                  -- Anonymous access type
                   return Def;
                when others =>
-                  return Type_Declaration_View
-                           (Corresponding_Name_Declaration
-                             (Subtype_Simple_Name (Def)));
+                  return Type_Declaration_View (Corresponding_Name_Declaration
+                                                (Simple_Name
+                                                 (Strip_Attributes   -- Ignore 'Base and 'Class if any
+                                                  (Subtype_Simple_Name (Def)))));
             end case;
          when A_Formal_Object_Declaration =>
             if Is_Nil (Declaration_Subtype_Mark (Local_Elem)) then
@@ -3661,9 +3677,10 @@ package body Thick_Queries is
                -- A component whose type is an anonymous access type
                return Def;
             else
-               return Type_Declaration_View
-                 (Corresponding_Name_Declaration
-                    (Subtype_Simple_Name (Def)));
+               return Type_Declaration_View (Corresponding_Name_Declaration
+                                             (Simple_Name
+                                              (Strip_Attributes
+                                               (Subtype_Simple_Name (Def)))));
             end if;
          when A_Single_Protected_Declaration
             | A_Single_Task_Declaration
