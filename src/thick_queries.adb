@@ -3039,18 +3039,22 @@ package body Thick_Queries is
 
       function Components_Contain_Type_Declaration_Kind (Components : Asis.Record_Component_List) return Boolean is
          Name : Asis.Expression;
+         Def  : Asis.Definition;
       begin
          for I in Components'Range loop
             case Element_Kind (Components (I)) is
                when A_Declaration =>
                   -- A_Component_Declaration
-                  Name := Subtype_Simple_Name (Component_Definition_View (Object_Declaration_View (Components (I))));
-                  if Expression_Kind (Name) = An_Attribute_Reference then
-                     -- A record component can't be 'Class, must be 'Base
-                     Name := Simple_Name (Prefix (Name));
-                  end if;
-                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (Name), The_Kind) then
-                     return True;
+                  Def := Component_Definition_View (Object_Declaration_View (Components (I)));
+                  if Definition_Kind (Def) /= An_Access_Definition then -- Anonymous access types have no declaration
+                     Name := Subtype_Simple_Name (Def);
+                     if Expression_Kind (Name) = An_Attribute_Reference then
+                        -- A record component can't be 'Class, must be 'Base
+                        Name := Simple_Name (Prefix (Name));
+                     end if;
+                     if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (Name), The_Kind) then
+                        return True;
+                     end if;
                   end if;
                when A_Definition =>
                   if Definition_Kind (Components (I)) = A_Variant_Part then
@@ -3063,7 +3067,7 @@ package body Thick_Queries is
                            end if;
                         end loop;
                      end;
-                  -- else it is A_Null_Component
+                  -- else it is A_Null_Component or an access definition
                   end if;
                when others =>
                   -- pragma, clause
@@ -4905,6 +4909,9 @@ package body Thick_Queries is
 
                   when An_Object_Renaming_Declaration =>
                      Item := Renamed_Entity (Item);
+
+                  when An_Element_Iterator_Specification =>
+                     Item := Iteration_Scheme_Name (Item);
 
                   when others =>
                      Impossible ("Discrete_Constraining_Bounds: Bad declaration "
