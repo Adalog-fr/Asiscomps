@@ -49,6 +49,22 @@ package Thick_Queries is
    -- The user procedure may raise an exception. If it doesn't (or no user procedure is defined),
    -- Program_Error will be raised.
 
+   -------------------------------------------------------------------------------------------------
+   --                                                                                             --
+   -- Convenience subtypes (for binary operators only)                                            --
+   --                                                                                             --
+   -------------------------------------------------------------------------------------------------
+   subtype Logical_Operators     is Asis.Operator_Kinds range Asis.An_And_Operator     .. Asis.An_Xor_Operator;
+   subtype Equality_Operators    is Asis.Operator_Kinds range Asis.An_Equal_Operator   .. Asis.A_Not_Equal_Operator;
+   subtype Relational_Operators  is Asis.Operator_Kinds range Asis.An_Equal_Operator   ..
+                                                                              Asis.A_Greater_Than_Or_Equal_Operator;
+   subtype Adding_Operators      is Asis.Operator_Kinds range Asis.A_Plus_Operator     .. Asis.A_Minus_Operator;
+   subtype Multiplying_Operators is Asis.Operator_Kinds range Asis.A_Multiply_Operator .. Asis.A_Rem_Operator;
+
+   subtype Discrete_Type_Kinds is Asis.Type_Kinds
+   range Asis.An_Enumeration_Type_Definition .. Asis.A_Modular_Type_Definition;
+   subtype Fixed_Type_Kinds    is Asis.Type_Kinds
+   range Asis.An_Ordinary_Fixed_Point_Definition .. Asis.A_Decimal_Fixed_Point_Definition;
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
@@ -932,6 +948,12 @@ package Thick_Queries is
    -- Appropriate Declaration_Kinds:
    --    An_Entry_Declaration
 
+   function Is_Predefined_Operator (Decl : Asis.Declaration) return Boolean;
+   -- Expected declaration kind:
+   --    A_Function_Declaration
+   --    A_Function_Body_Declaration
+   -- (of operator)
+   -- Returns True if the operator is identical to a predefined one.
 
    function Called_Simple_Name (Call : Asis.Element) return Asis.Expression;
    -- Given a procedure, entry or function call, returns the simple name of the called
@@ -1036,32 +1058,6 @@ package Thick_Queries is
    function Actual_Parameters (Element : Asis.Element; Normalized : Boolean := False) return Asis.Association_List;
    -- Returns the actual parameters of a procedure, entry, or function call, or of
    -- a generic instantiation
-
-
-   type Type_Attribute is (None, Base, Class);
-   type Profile_Entry is
-      record
-         Is_Access : Boolean;
-         Attribute : Type_Attribute;
-         Name      : Asis.Defining_Name;
-      end record;
-   type Profile_Table is array (Asis.List_Index range <>) of Profile_Entry;
-   type Profile_Descriptor (Formals_Length : Asis.ASIS_Natural) is
-      record
-         Result_Type : Profile_Entry;
-         Formals     : Profile_Table (1..Formals_Length);
-      end record;
-   function Types_Profile (Declaration : in Asis.Declaration) return Profile_Descriptor;
-   -- Given a callable entity declaration, returns a description of the profile
-   -- Result_Type.Name is the result *type* for a function, Nil_Element for other callable entities
-   -- Formals are (in order of declaration) the *types* of the parameters.
-   -- Multiple declarations are separated, i.e. "A,B : Integer" yields two entries in the table.
-   --
-   -- Appropriate Element_Kinds:
-   --   A_Declaration
-   --
-   -- Appropriate Declaration_Kinds:
-   --   Any (generic) callable entity declaration or body declaration
 
 
    function External_Call_Target (Call : Asis.Element) return Asis.Expression;

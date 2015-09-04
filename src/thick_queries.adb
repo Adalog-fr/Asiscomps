@@ -97,6 +97,256 @@ package body Thick_Queries is
       return Translate (S, Upper_Case_Map);
    end To_Upper;
 
+   -------------------
+   -- Types_Profile --
+   -------------------
+
+   -- Given a callable entity declaration, returns a description of the profile
+   -- Result_Type.Name is the result *type* for a function, Nil_Element for other callable entities
+   -- Formals are (in order of declaration) the *types* of the parameters.
+   -- Multiple declarations are separated, i.e. "A,B : Integer" yields two entries in the table.
+   --
+   -- Appropriate Element_Kinds:
+   --   A_Declaration
+   --
+   -- Appropriate Declaration_Kinds:
+   --   Any (generic) callable entity declaration or body declaration
+
+   type Type_Attribute is (None, Base, Class);
+   type Profile_Descriptor (Formals_Length : Asis.ASIS_Natural);
+   type Profile_Access is access Profile_Descriptor;
+
+   type Profile_Entry is
+      record
+         Access_Form  : Asis.Access_Definition_Kinds;
+         Attribute    : Type_Attribute;
+         Name         : Asis.Defining_Name;
+         Anon_Profile : Profile_Access;
+      end record;
+   -- Name is only for non-anonymous access types and anonymous access to object types, while
+   -- Anon_Profile is only for anonymour access to subprograms. We didn't put them as variants though,
+   -- because this would require a discriminant (sometimes evaluated dynamically, preventing aggregates) and would
+   -- complicate making arrays of Profile_Entry... Too much burden to save a single word.
+   --
+   -- Anon_Profile is not null only for subprograms with parameters that are of an anonymous access to subprogram
+   -- type. Since these are supposed to be pretty (!) rare, we don't care about deallocating the corresponding
+   -- structure (yes, it is a deliberate memory leak).
+
+   type Profile_Table is array (Asis.List_Index range <>) of Profile_Entry;
+   type Profile_Descriptor (Formals_Length : Asis.ASIS_Natural) is
+      record
+         Result_Type : Profile_Entry;
+         Formals     : Profile_Table (1 .. Formals_Length);
+      end record;
+
+   function Types_Profile (Declaration : in Asis.Element)  return Profile_Descriptor is
+      -- Declaration is a callable entity declaration, or an anonymous access to subprogram definition
+
+      function Build_Entry (Def : Asis.Element) return Profile_Entry is
+      -- Def is the parameter or result type definition
+         use Asis.Definitions, Asis.Expressions;
+
+         Good_Mark : Asis.Element;
+         Attribute : Type_Attribute;
+         Decl      : Asis.Declaration;
+         Form      : constant Asis.Access_Definition_Kinds := Access_Definition_Kind (Def);
+      begin
+         case Form is
+            when Not_An_Access_Definition =>
+               -- Normal case
+               null;
+            when An_Anonymous_Access_To_Constant
+               | An_Anonymous_Access_To_Variable
+               =>
+               declare
+                  Ret_Val : Profile_Entry := Build_Entry (Anonymous_Access_To_Object_Subtype_Mark (Def));
+               begin
+                  Ret_Val.Access_Form := Form;
+                  return Ret_Val;
+               end;
+            when An_Anonymous_Access_To_Procedure
+               | An_Anonymous_Access_To_Protected_Procedure
+               =>
+               return (Access_Form  => Form,
+                       Attribute    => None,
+                       Name         => Nil_Element,
+                       Anon_Profile => new Profile_Descriptor'(Types_Profile(Def)));
+            when An_Anonymous_Access_To_Function
+               | An_Anonymous_Access_To_Protected_Function
+               =>
+               return (Access_Form  => Form,
+                       Attribute    => None,
+                       Name         => Nil_Element,
+                       Anon_Profile => new Profile_Descriptor'(Types_Profile (Def)));
+         end case;
+
+         -- Here, no more anonymous access types
+         if Expression_Kind (Def) = An_Attribute_Reference then
+            Good_Mark := Prefix (Def);
+
+            case Attribute_Kind (Def) is
+               when A_Base_Attribute =>
+                  Attribute := Base;
+               when A_Class_Attribute =>
+                  Attribute := Class;
+                  -- According to 3.9(14), T'Class'Class is allowed, and "is the same as" T'Class.
+                  -- They are even conformant (checked with Gnat).
+                  -- => Discard extra 'Class before they damage the rest of this algorithm
+                  Good_Mark := Simple_Name (Strip_Attributes (Good_Mark));
+               when others =>
+                  -- Impossible
+                  Impossible ("Attribute of Type_Profile = "
+                              & Attribute_Kinds'Wide_Image (Attribute_Kind (Def)),
+                              Declaration);
+            end case;
+
+         else
+            Good_Mark := Simple_Name (Def);
+            Attribute := None;
+         end if;
+
+         Decl := Corresponding_Name_Declaration (Good_Mark);
+         case Declaration_Kind (Decl) is
+            when An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration =>
+               -- cannot take the Corresponding_First_Subtype of an incomplete type
+               Decl := Corresponding_Type_Declaration (Decl);
+               if Is_Nil (Decl) then
+                  -- TBSL 2005 Issue not settled with AdaCore
+                  -- In some cases of incomplete declarations resulting from limited views,
+                  -- Corresponding_Type_Declaration is unable to retrieve the full declaration and
+                  -- returns Nil_Element. For the moment, let's take back the incomplete type, and
+                  -- forget about the first subtype
+                  Decl := Corresponding_Name_Declaration (Good_Mark);
+               else
+                  Decl := Corresponding_First_Subtype (Decl);
+               end if;
+            when A_Formal_Incomplete_Type_Declaration =>
+               null;
+            when others =>
+               Decl := Corresponding_First_Subtype (Decl);
+         end case;
+         return (Access_Form  => Not_An_Access_Definition,
+                 Attribute    => Attribute,
+                 Name         => Names (Decl) (1),
+                 Anon_Profile => null);
+      end Build_Entry;
+
+      function Build_Profile (Parameters : Parameter_Specification_List) return Profile_Table is
+      -- Assert: parameters is not an empty list
+      -- This function is written to avoid recursivity if there is no other multiple
+      -- parameter declaration than the first one.
+
+         Names_1    : constant Name_List     := Names (Parameters (Parameters'First));
+         Entry_1    : constant Profile_Entry := Build_Entry (Object_Declaration_View
+                                                             (Parameters (Parameters'First)));
+         Result     : Profile_Table (List_Index range 1 .. Names_1'Length + Parameters'Length - 1);
+         Result_Inx : Asis.List_Index;
+      begin
+         for I in List_Index range 1 .. Names_1'Length loop
+            Result (I) := Entry_1;
+         end loop;
+
+         Result_Inx := Names_1'Length;
+         for I in List_Index range Parameters'First + 1 .. Parameters'Last loop
+            declare
+               Names_Rest : constant Name_List := Names (Parameters (I));
+            begin
+               if Names_Rest'Length /= 1 then
+                  return Result (1 .. Result_Inx) & Build_Profile (Parameters (I .. Parameters'Last));
+               end if;
+
+               Result_Inx := Result_Inx + 1;
+               Result (Result_Inx) := Build_Entry (Object_Declaration_View (Parameters (I)));
+            end;
+         end loop;
+         return Result;
+      end Build_Profile;
+
+      Result_Entry     : Profile_Entry;
+      Good_Declaration : Asis.Declaration := Declaration;
+      use Asis.Definitions;
+   begin  --  Types_Profile
+      if Declaration_Kind (Good_Declaration) in A_Generic_Instantiation then
+         -- We must get the profile from the corresponding generic element
+         Good_Declaration := Corresponding_Declaration (Good_Declaration);
+      end if;
+
+      case Declaration_Kind (Good_Declaration) is
+         when A_Function_Declaration
+            | An_Expression_Function_Declaration   -- Ada 2012
+            | A_Function_Body_Declaration
+            | A_Function_Renaming_Declaration
+            | A_Function_Body_Stub
+            | A_Generic_Function_Declaration
+            | A_Formal_Function_Declaration
+            =>
+            Result_Entry := Build_Entry (Result_Profile (Good_Declaration));
+
+         when An_Enumeration_Literal_Specification =>
+            -- Profile for an enumeration litteral
+            -- Like a parameterless function; go up two levels (type specification then type declaration)
+            -- to find the return type.
+            -- of the Enumaration_Literal_Specification
+            -- Return immediately, since we know there are no parameters, and Parameter_Profile
+            -- would choke on this.
+            return (Formals_Length => 0,
+                    Result_Type    => (Access_Form => Not_An_Access_Definition,
+                                       Attribute   => None,
+                                       Name        => Names (Enclosing_Element
+                                                             (Enclosing_Element (Good_Declaration))) (1),
+                                      Anon_Profile => null),
+                    Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
+         when Not_A_Declaration =>
+            Assert (Definition_Kind (Good_Declaration) = An_Access_Definition,
+                    "Types_Profile: bad declaration",
+                    Good_Declaration);
+            case Access_Definition_Kind (Good_Declaration) is
+               when An_Anonymous_Access_To_Procedure | An_Anonymous_Access_To_Protected_Procedure =>
+                  Result_Entry := (Access_Form  => Not_An_Access_Definition,
+                                   Attribute    => None,
+                                   Name         => Nil_Element,
+                                   Anon_Profile => null);
+               when An_Anonymous_Access_To_Function  | An_Anonymous_Access_To_Protected_Function  =>
+                  Result_Entry := Build_Entry (Access_To_Function_Result_Profile (Good_Declaration));
+               when others =>
+                  Impossible ("Types_Profile: bad access_definition", Good_Declaration);
+            end case;
+         when others => -- (generic) procedure or entry declaration
+            Result_Entry := (Access_Form  => Not_An_Access_Definition,
+                             Attribute    => None,
+                             Name         => Nil_Element,
+                             Anon_Profile => null);
+      end case;
+
+      declare
+         function All_Parameter_Profile (D : Asis.Element) return Asis.Parameter_Specification_List is
+         -- of course, an if-expression would do as well, but we still stick to Ada05
+         begin
+            if Element_Kind (D) = A_Declaration then
+               return Parameter_Profile (D);
+            else
+               return Access_To_Subprogram_Parameter_Profile (D);
+            end if;
+         end All_Parameter_Profile;
+
+         Parameters : constant Asis.Parameter_Specification_List := All_Parameter_Profile (Good_Declaration);
+      begin
+         if Parameters'Length = 0 then
+            return (Formals_Length => 0,
+                    Result_Type    => Result_Entry,
+                    Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
+         else
+            declare
+               Profile : constant Profile_Table := Build_Profile (Parameters);
+            begin
+               return (Formals_Length => Profile'Length,
+                       Result_Type    => Result_Entry,
+                       Formals        => Profile);
+            end;
+         end if;
+      end;
+   end Types_Profile;
+
    ------------------------------------------------------------------
    -- Exported subprograms                                         --
    ------------------------------------------------------------------
@@ -135,7 +385,6 @@ package body Thick_Queries is
       if Left'Length /= Right'Length then
          return False;
       end if;
-
       R := Right'First;
       for L in Left'Range loop
          if Left (L) = Not_Static or else Right (R) = Not_Static or else Left (L) /= Right (R) then
@@ -1198,12 +1447,7 @@ package body Thick_Queries is
          end if;
       end if;
 
-      if Is_Nil (The_Name) then
-         -- TBSL 2005 Coming from an anonymous access to subprogram
-         -- We don't have a syntax for these yet on input, but we must do something
-         -- on output. Just use "null" as a stub.
-         return "null";
-      elsif Element_Kind (The_Name) = A_Defining_Name then
+      if Element_Kind (The_Name) = A_Defining_Name then
          Decl_Name := The_Name;
       else
          Decl_Name := Corresponding_Name_Definition (Simple_Name (The_Name));
@@ -1955,6 +2199,193 @@ package body Thick_Queries is
       end case;
    end Is_Static_Object;
 
+   ----------------------------
+   -- Is_Predefined_Operator --
+   ----------------------------
+
+   function Is_Predefined_Operator (Decl : Asis.Declaration) return Boolean is
+   -- Expected declaration kind:
+   --    A_Function_Declaration
+   --    A_Function_Body_Declaration
+   -- (of operator)
+   -- Returns True if the operator is identical to a predefined one.
+      use Asis.Definitions, Asis.Expressions;
+
+      Profile : constant Profile_Descriptor := Types_Profile (Decl);
+      Temp    : Asis.Element;
+      Name    : constant Asis.Defining_Name := Names (Decl) (1);
+      Kind    : constant Operator_Kinds := Operator_Kind (Name);
+
+      Operation_Ultimate_Type : constant Asis.Definition
+        := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (Profile.Formals (1).Name)));
+
+      function Array_Dimensions (Arr_Def : Asis.Definition) return Asis.List_Index is
+      -- How many dimensions in provided array declaration ?
+      begin
+         if Type_Kind (Arr_Def) = A_Constrained_Array_Definition then
+            return Discrete_Subtype_Definitions (Arr_Def)'Length;
+         else
+            -- unconstrained array
+            return Index_Subtype_Definitions (Arr_Def)'Length;
+         end if;
+      end Array_Dimensions;
+
+      function Is_Type (N : Asis.Defining_Name; Value : Wide_String; Or_Derived : Boolean := False) return Boolean is
+      -- True if the ultimate type of N is Value
+         D : Asis.Declaration := Enclosing_Element (N);
+      begin
+         if Or_Derived then
+            D := Ultimate_Type_Declaration (D);
+         end if;
+         return To_Upper (Full_Name_Image (Names (D) (1))) = Value;
+      end Is_Type;
+
+   begin   -- Is_Predefined_Operator
+      if Profile.Formals_Length = 1 then
+         -- Unary operators
+
+         -- Eliminate weird cases (not homogenous, access, class...) that cannot be predefined
+         -- We purposedly ignore the 'Base attribute
+         if not Is_Equal (Profile.Formals (1).Name, Profile.Result_Type.Name)
+           or Profile.Formals (1).Access_Form /= Not_An_Access_Definition
+           or Profile.Formals (1).Attribute = Class
+           or Profile.Result_Type.Attribute = Class
+         then
+            return False;
+         end if;
+
+         case Type_Kind (Operation_Ultimate_Type) is
+            when A_Signed_Integer_Type_Definition
+               | A_Floating_Point_Definition
+               | An_Ordinary_Fixed_Point_Definition
+               | A_Decimal_Fixed_Point_Definition
+               =>
+               -- All unary operators except "not" are predefined
+               return Kind /= A_Not_Operator;
+            when A_Modular_Type_Definition =>
+               -- All unary operators are predefined
+               return True;
+            when An_Enumeration_Type_Definition =>
+               -- Only Boolean has predefined operators
+               return Is_Type (Profile.Formals (1).Name, "STANDARD.BOOLEAN", Or_Derived => True)
+                 and then Kind = A_Not_Operator;
+            when A_Constrained_Array_Definition
+               | An_Unconstrained_Array_Definition
+               =>
+               if Array_Dimensions (Operation_Ultimate_Type) /= 1 then
+                  return False;
+               end if;
+               -- Temp <- True component type name definition
+               Temp := Corresponding_Name_Definition (Subtype_Simple_Name
+                                                      (Component_Definition_View
+                                                         (Array_Component_Definition
+                                                            (Operation_Ultimate_Type))));
+               -- Boolean array?
+               if Is_Type (Temp, "STANDARD.BOOLEAN", Or_Derived => True) then
+                  return Kind = A_Not_Operator;
+               end if;
+               return False;
+            when others =>
+               return False;
+         end case;
+      end if;
+
+      -- Binary operators
+
+      -- Special case: "**" on floating point types
+      if Kind = An_Exponentiate_Operator then
+         return Is_Equal (Profile.Formals (1).Name, Profile.Result_Type.Name)
+           and then Profile.Formals (1).Access_Form = Not_An_Access_Definition
+           and then Profile.Formals (2).Access_Form = Not_An_Access_Definition
+           and then Type_Kind (Operation_Ultimate_Type) = A_Floating_Point_Definition
+           and then Is_Type (Profile.Formals (2).Name, "STANDARD.INTEGER");
+      end if;
+
+      -- Special case: "*" and "/" on fixed point types
+      if Kind in A_Multiply_Operator .. A_Divide_Operator then
+         return Is_Equal (Profile.Formals (1).Name, Profile.Result_Type.Name)
+           and then Profile.Formals (1).Access_Form = Not_An_Access_Definition
+           and then Profile.Formals (2).Access_Form = Not_An_Access_Definition
+           and then Type_Kind (Operation_Ultimate_Type) in Fixed_Type_Kinds
+           and then Is_Type (Profile.Formals (2).Name, "STANDARD.INTEGER");
+      end if;
+
+      -- Eliminate weird cases (not homogenous, access, class...) that cannot be predefined
+      -- We purposedly ignore the 'Base attribute
+      if Kind in Relational_Operators then
+         if not Is_Equal (Profile.Formals (1).Name, Profile.Formals (2).Name)
+           or not Is_Type (Profile.Result_Type.Name, "STANDARD.BOOLEAN", Or_Derived => True)
+           or Profile.Formals (1).Access_Form /= Not_An_Access_Definition
+           or Profile.Formals (2).Access_Form /= Not_An_Access_Definition
+           or Profile.Formals (1).Attribute = Class
+           or Profile.Formals (2).Attribute = Class
+           or Profile.Result_Type.Attribute = Class
+         then
+            return False;
+         end if;
+      else
+         if not Is_Equal (Profile.Formals (1).Name, Profile.Formals (2).Name)
+           or not Is_Equal (Profile.Formals (1).Name, Profile.Result_Type.Name)
+           or Profile.Formals (1).Access_Form /= Not_An_Access_Definition
+           or Profile.Formals (2).Access_Form /= Not_An_Access_Definition
+           or Profile.Formals (1).Attribute = Class
+           or Profile.Formals (2).Attribute = Class
+           or Profile.Result_Type.Attribute = Class
+         then
+            return False;
+         end if;
+      end if;
+
+      -- Special case: "=" and "/=" of limited types
+      if Kind in Equality_Operators and then Is_Limited (Profile.Formals (1).Name) then
+         return False;
+      end if;
+
+      case Type_Kind (Operation_Ultimate_Type) is
+         when A_Signed_Integer_Type_Definition
+            | A_Floating_Point_Definition
+            | An_Ordinary_Fixed_Point_Definition
+            | A_Decimal_Fixed_Point_Definition
+            =>
+            return Kind in Adding_Operators
+              or Kind in Multiplying_Operators
+              or Kind in Relational_Operators;
+         when A_Modular_Type_Definition =>
+            return Kind in Adding_Operators
+              or Kind in Multiplying_Operators
+              or Kind in Logical_Operators
+              or Kind in Relational_Operators;
+         when A_Constrained_Array_Definition
+            | An_Unconstrained_Array_Definition
+            =>
+            if Array_Dimensions (Operation_Ultimate_Type) /= 1 then
+               return Kind in Equality_Operators;
+            end if;
+
+            -- Temp <- True component type name definition
+            Temp := Corresponding_Name_Definition (Subtype_Simple_Name
+                                                   (Component_Definition_View
+                                                      (Array_Component_Definition
+                                                         (Operation_Ultimate_Type))));
+            -- Boolean array?
+            if Is_Type (Temp, "STANDARD.BOOLEAN", Or_Derived => True) then
+               return Kind in Logical_Operators
+                 or Kind in Relational_Operators
+                 or Kind = A_Concatenate_Operator;
+            end if;
+
+            -- Discrete array ?
+            if Type_Kind (Enclosing_Element (Temp)) in Discrete_Type_Kinds then
+               return Kind in Relational_Operators
+                 or Kind = A_Concatenate_Operator;
+            end if;
+
+            return Kind in Equality_Operators
+              or Kind = A_Concatenate_Operator;
+         when others =>
+            return Kind in Equality_Operators;
+      end case;
+   end Is_Predefined_Operator;
 
    -------------------
    -- Is_Task_Entry --
@@ -1977,6 +2408,7 @@ package body Thick_Queries is
             return False;
       end case;
    end Is_Task_Entry;
+
 
    -------------------------
    -- Subtype_Simple_Name --
@@ -3233,25 +3665,38 @@ package body Thick_Queries is
    function Profile_Image (The_Name : Asis.Element; With_Profile : Boolean := True) return Wide_String is
       Decl_Name : Asis.Defining_Name;
 
+      ----------------
+      -- Entry_Name --
+      ----------------
+      function Build_Names (The_List : Profile_Table) return Wide_String;  -- Forward
+
       function Entry_Name (The_Entry : Profile_Entry) return Wide_String is
-         function Add_Attribute (S : Wide_String) return Wide_String is
+         function Attributed_Name return Wide_String is
+            Name_Image : constant Wide_String := Full_Name_Image (The_Entry.Name, With_Profile);
          begin
             case The_Entry.Attribute is
                when None =>
-                  return S;
+                  return Name_Image;
                when Base =>
-                  return S & "'BASE";
+                  return Name_Image & "'BASE";
                when Class =>
-                  return S & "'CLASS";
+                  return Name_Image & "'CLASS";
             end case;
-         end Add_Attribute;
+         end Attributed_Name;
 
       begin  -- Entry_Name
-         if The_Entry.Is_Access then
-            return '*' & Add_Attribute (Full_Name_Image (The_Entry.Name, With_Profile));
-         else
-            return Add_Attribute (Full_Name_Image (The_Entry.Name, With_Profile));
-         end if;
+         -- 'O' for object, 'P' for procedure, 'F' for function
+         case The_Entry.Access_Form is
+            when Not_An_Access_Definition =>
+               return Attributed_Name;
+            when An_Anonymous_Access_To_Variable | An_Anonymous_Access_To_Constant =>
+               return "*O" & Attributed_Name;
+            when An_Anonymous_Access_To_Procedure | An_Anonymous_Access_To_Protected_Procedure =>
+               return "*P{" & Build_Names (The_Entry.Anon_Profile.Formals) & '}';
+            when An_Anonymous_Access_To_Function | An_Anonymous_Access_To_Protected_Function =>
+               return "*F{" & Build_Names (The_Entry.Anon_Profile.Formals)
+                      & ':' & Entry_Name  (The_Entry.Anon_Profile.Result_Type) & '}';
+         end case;
       end Entry_Name;
 
       function Build_Names (The_List : Profile_Table) return Wide_String is
@@ -3296,206 +3741,6 @@ package body Thick_Queries is
          end if;
       end;
    end Profile_Image;
-
-   -------------------
-   -- Types_Profile --
-   -------------------
-
-   function Types_Profile (Declaration : in Asis.Declaration)  return Profile_Descriptor is
-
-      function Build_Entry (Mark : Asis.Element) return Profile_Entry is
-      -- To be honnest, builds the entry except the Is_Access field
-      -- Has to be set by the caller, because we don't have enough information in some cases
-         use Asis.Definitions, Asis.Expressions;
-
-         Good_Mark : Asis.Element;
-         Attribute : Type_Attribute;
-         Decl      : Asis.Declaration;
-      begin
-         if Is_Nil (Mark) then
-            -- A 2005 weird type, like anonymous access to subprograms
-            -- Nil_Element is generated by Declaration_Subtype_Mark (for parameters) in this case
-            -- TBSL: for the moment, we don't handle this, but we try just not to choke
-            --       if we encounter such a type => just set Name to a stub (Nil_Element)
-            -- Note that Is_Access will be properly set by the caller (should always be true)
-            return (Is_Access => False,
-                    Attribute => None,
-                    Name      => Nil_Element);
-         end if;
-
-         case Access_Definition_Kind (Mark) is
-            when Not_An_Access_Definition =>
-               -- Normal case
-               null;
-            when An_Anonymous_Access_To_Constant
-               | An_Anonymous_Access_To_Variable
-               =>
-               -- Since Is_Access is set by the caller:
-               return Build_Entry (Anonymous_Access_To_Object_Subtype_Mark (Mark));
-            when An_Anonymous_Access_To_Procedure
-               | An_Anonymous_Access_To_Protected_Procedure
-               | An_Anonymous_Access_To_Function
-               | An_Anonymous_Access_To_Protected_Function
-               =>
-               -- We may get An_Anonymous_Access_To_Procedure (or siblings) for a return type.
-               -- Same as above Is_Nil (Mark)
-               return (Is_Access => False,
-                       Attribute => None,
-                       Name      => Nil_Element);
-         end case;
-
-
-         if Expression_Kind (Mark) = An_Attribute_Reference then
-            Good_Mark := Prefix (Mark);
-
-            case Attribute_Kind (Mark) is
-               when A_Base_Attribute =>
-                  Attribute := Base;
-               when A_Class_Attribute =>
-                  Attribute := Class;
-                  -- According to 3.9(14), T'Class'Class is allowed, and "is the same as" T'Class.
-                  -- They are even conformant (checked with Gnat).
-                  -- => Discard extra 'Class before they damage the rest of this algorithm
-                  while Attribute_Kind (Good_Mark) = A_Class_Attribute loop -- especially, /= Not_An_Attribute
-                     Good_Mark := Prefix (Good_Mark);
-                  end loop;
-                  Good_Mark := Simple_Name (Good_Mark);
-               when others =>
-                  -- Impossible
-                  Impossible ("Attribute of Type_Profile = "
-                                & Attribute_Kinds'Wide_Image (Attribute_Kind (Mark)),
-                              Declaration);
-            end case;
-
-         else
-            Good_Mark := Simple_Name (Mark);
-            Attribute := None;
-         end if;
-
-         Decl := Corresponding_Name_Declaration (Good_Mark);
-         case Declaration_Kind (Decl) is
-            when An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration =>
-               -- cannot take the Corresponding_First_Subtype of an incomplete type
-               Decl := Corresponding_Type_Declaration (Decl);
-               if Is_Nil (Decl) then
-                  -- TBSL 2005 Issue not settled with AdaCore
-                  -- In some cases of incomplete declarations resulting from limited views,
-                  -- Corresponding_Type_Declaration is unable to retrieve the full declaration and
-                  -- returns Nil_Element. For the moment, let's take back the incomplete type, and
-                  -- forget about the first subtype
-                  Decl := Corresponding_Name_Declaration (Good_Mark);
-               else
-                  Decl := Corresponding_First_Subtype (Decl);
-               end if;
-            when A_Formal_Incomplete_Type_Declaration =>
-               null;
-            when others =>
-               Decl := Corresponding_First_Subtype (Decl);
-         end case;
-         return (Is_Access => False,
-                 Attribute => Attribute,
-                 Name      => Names (Decl)(1));
-      end Build_Entry;
-
-      function Build_Profile (Parameters : Parameter_Specification_List) return Profile_Table is
-         -- Assert: parameters is not an empty list
-         -- This function is written to avoid recursivity if there is no other multiple
-         -- parameter declaration than the first one.
-
-         Names_1    : constant Name_List := Names (Parameters (Parameters'First));
-         Entry_1    : Profile_Entry := Build_Entry (Declaration_Subtype_Mark
-                                                      (Parameters (Parameters'First)));
-         Result     : Profile_Table (List_Index range 1 .. Names_1'Length + Parameters'Length -1);
-         Result_Inx : Asis.List_Index;
-      begin
-         Entry_1.Is_Access := Definition_Kind
-                               (Object_Declaration_View
-                                (Parameters (Parameters'First))) = An_Access_Definition;
-         for I in List_Index range 1 .. Names_1'Length loop
-            Result (I) := Entry_1;
-         end loop;
-
-         Result_Inx := Names_1'Length;
-         for I in List_Index range Parameters'First + 1 .. Parameters'Last loop
-            declare
-               Names_Rest : constant Name_List := Names (Parameters (I));
-            begin
-               if Names_Rest'Length /= 1 then
-                  return Result (1 .. Result_Inx) & Build_Profile (Parameters (I .. Parameters'Last));
-               end if;
-
-               Result_Inx := Result_Inx + 1;
-               Result (Result_Inx) := Build_Entry (Declaration_Subtype_Mark (Parameters (I)));
-               Result (Result_Inx).Is_Access := Definition_Kind
-                                                 (Object_Declaration_View
-                                                  (Parameters (I))) = An_Access_Definition;
-            end;
-         end loop;
-         return Result;
-      end Build_Profile;
-
-      Result_Entry     : Profile_Entry;
-      Good_Declaration : Asis.Declaration := Declaration;
-   begin  --  Types_Profile
-      if Declaration_Kind (Good_Declaration) in A_Generic_Instantiation then
-         -- We must get the profile from the corresponding generic element
-         Good_Declaration := Corresponding_Declaration (Good_Declaration);
-      end if;
-
-      case Declaration_Kind (Good_Declaration) is
-         when A_Function_Declaration
-            | An_Expression_Function_Declaration   -- Ada 2012
-            | A_Function_Body_Declaration
-            | A_Function_Renaming_Declaration
-            | A_Function_Body_Stub
-            | A_Generic_Function_Declaration
-            | A_Formal_Function_Declaration
-            =>
-            declare
-               Profile : constant Asis.Element := Result_Profile (Good_Declaration);
-            begin
-               Result_Entry           := Build_Entry (Profile);
-               Result_Entry.Is_Access := Definition_Kind (Profile) = An_Access_Definition;
-            end;
-
-         when An_Enumeration_Literal_Specification =>
-            -- Profile for an enumeration litteral
-            -- Like a parameterless function; go up two levels (type specification then type declaration)
-            -- to find the return type.
-            -- of the Enumaration_Literal_Specification
-            -- Return immediately, since we know there are no parameters, and Parameter_Profile
-            -- would choke on this.
-            return (Formals_Length => 0,
-                    Result_Type    => (Is_Access => False,
-                                       Attribute => None,
-                                       Name      => Names (Enclosing_Element
-                                                             (Enclosing_Element
-                                                                (Good_Declaration)))(1)),
-                    Formals        => (others => (False, None, Nil_Element)));
-         when others =>
-            Result_Entry := (Is_Access => False,
-                             Attribute => None,
-                             Name      => Nil_Element);
-      end case;
-
-      declare
-         Parameters : constant Asis.Parameter_Specification_List := Parameter_Profile (Good_Declaration);
-      begin
-         if Parameters'Length = 0 then
-            return (Formals_Length => 0,
-                    Result_Type    => Result_Entry,
-                    Formals        => (others => (False, None, Nil_Element)));
-         else
-            declare
-               Profile : constant Profile_Table := Build_Profile (Parameters);
-            begin
-               return (Formals_Length => Profile'Length,
-                       Result_Type    => Result_Entry,
-                       Formals        => Profile);
-            end;
-         end if;
-      end;
-   end Types_Profile;
 
    ----------------------------------------------
    -- Corresponding_Expression_Type_Definition --
