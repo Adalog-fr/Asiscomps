@@ -2633,53 +2633,42 @@ package body Thick_Queries is
    function Is_Class_Wide_Subtype (The_Subtype : Asis.Element) return Boolean is
       use Asis.Expressions;
 
-      ST        : Asis.Declaration;
+      ST        : Asis.Declaration := The_Subtype;
       Good_Name : Asis.Expression;
    begin
-      case Element_Kind (The_Subtype) is
-         when A_Declaration =>
-            ST := The_Subtype;
-         when A_Definition =>
-            -- Get rid of easy cases
-            case Definition_Kind (The_Subtype) is
-               when An_Access_Definition =>
-                  -- 2005: an anonymous access type => not class wide
+      loop
+         case Element_Kind (ST) is
+            when A_Declaration =>
+               if Declaration_Kind (ST) /= A_Subtype_Declaration then
                   return False;
-               when A_Type_Definition =>
-                  -- Plain type => not class wide
-                  return False;
-               when others =>
-                  null;
-            end case;
-            Good_Name := Subtype_Simple_Name (The_Subtype);
-            if Expression_Kind (Good_Name) = An_Attribute_Reference then
-               return Attribute_Kind (Good_Name) = A_Class_Attribute;
-            end if;
-            ST := Corresponding_Name_Declaration (Good_Name);
-         when A_Defining_Name =>
-            ST := Enclosing_Element (The_Subtype);
-         when An_Expression =>
-            Good_Name := Simple_Name (The_Subtype);
-            if Expression_Kind (Good_Name) = An_Attribute_Reference then
-               return Attribute_Kind (Good_Name) = A_Class_Attribute;
-            end if;
-            ST := Corresponding_Name_Declaration (Good_Name);
-         when others =>
-            return False;
-      end case;
-
-      -- If it is not a *sub*type, it cannot be class-wide
-      if Declaration_Kind (ST) /= A_Subtype_Declaration then
-         return False;
-      end if;
-      -- We must unwind subtypes up to the last subtype (but not up to the type as
-      -- Corresponding_First_Subtype would do), and check if the subtype mark is a
-      -- 'Class attribute.
-      while Declaration_Kind (Corresponding_Last_Subtype (ST)) = A_Subtype_Declaration loop
-         ST := Corresponding_Last_Subtype (ST);
+               end if;
+               ST := Type_Declaration_View (ST);
+            when A_Definition =>
+               -- Get rid of easy cases
+               case Definition_Kind (ST) is
+                  when An_Access_Definition =>
+                     -- 2005: an anonymous access type => not class wide
+                     return False;
+                  when A_Type_Definition =>
+                     -- Plain type => not class wide
+                     return False;
+                  when A_Subtype_Indication =>
+                     ST := Subtype_Simple_Name (ST);
+                  when others =>
+                     return False;
+               end case;
+            when A_Defining_Name =>
+               ST := Enclosing_Element (ST);
+            when An_Expression =>
+               Good_Name := Simple_Name (ST);
+               if Expression_Kind (Good_Name) = An_Attribute_Reference then
+                  return Attribute_Kind (Good_Name) = A_Class_Attribute;
+               end if;
+               ST := Corresponding_Name_Declaration (Good_Name);
+            when others =>
+               return False;
+         end case;
       end loop;
-
-      return Attribute_Kind (Subtype_Simple_Name (Type_Declaration_View (ST))) = A_Class_Attribute;
    end Is_Class_Wide_Subtype;
 
    -------------------------
