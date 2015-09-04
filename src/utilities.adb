@@ -109,6 +109,66 @@ package body Utilities is
       New_Line (Current_Trace.all);
    end Trace_Elem;
 
+   ------------------
+   -- Adjust_Image --
+   ------------------
+
+   function Adjust_Image (Original : Wide_String) return Wide_String is
+      use Ada.Strings.Wide_Fixed;
+
+      function Access_KW (C : Wide_Character) return Wide_String is
+      begin
+         case C is
+            when 'O' =>
+               return "access ";
+            when 'F' =>
+               return "access function";
+            when 'P' =>
+               return "access procedure";
+            when others =>
+               Failure ("Access_KW: bad character " & C);
+         end case;
+      end Access_KW;
+
+      Pos   : Natural;
+      Start : Natural;
+   begin   -- Adjust_Image
+      Pos := Index (Original, ":");
+      if Pos /= 0 then
+         return
+           Adjust_Image (Original (Original'First .. Pos - 1)) &
+           " return " &
+           Adjust_Image (Original (Pos + 1 .. Original'Last));
+      end if;
+
+      -- Find a real * meaning "access", discard the "*" and "**" operators
+      Start := Original'First;
+      loop
+         Pos := Index (Original (Start .. Original'Last), "*");
+
+         if Pos = 0 then
+            -- No * found
+            return Original;
+
+         elsif Original (Pos + 1) = '"' then
+            -- "*" operator
+            Start := Pos + 2;
+
+         elsif Original (Pos + 1) = '*' then
+            -- "**" operator
+            Start := Pos + 3;
+
+         else
+            -- Real access parameter
+            exit;
+         end if;
+      end loop;
+
+      return Original (Original'First .. Pos - 1)
+             & Access_KW (Original (Pos + 1))
+             & Adjust_Image (Original (Pos + 2 .. Original'Last));
+   end Adjust_Image;
+
    -----------------------------
    -- Asis_Exception_Messages --
    -----------------------------

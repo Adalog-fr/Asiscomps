@@ -113,6 +113,12 @@ package Utilities is
                     When_False : in Wide_String) return Wide_String;
    --  Returns When_True if Condition is True, When_False otherwise
 
+   function Adjust_Image (Original : Wide_String) return Wide_String;
+   -- Transform a Full_Name_Image according to the syntax we use externally.
+   -- The differences with the string return by Full_Name_Image are:
+   --   we use "return" rather than ":" for the return type of functions.
+   --   we use "access" rather than "*" for access parameters
+
 
    --
    --  Error
