@@ -684,9 +684,9 @@ package body Thick_Queries is
            or Declaration_Kind (Call) = A_Formal_Package_Declaration
          then
             declare
-               Formal_Part : Asis.Element_List :=  Generic_Formal_Part (Corresponding_Name_Declaration
-                                                                        (Ultimate_Name
-                                                                         (Generic_Unit_Name (Call))));
+               Formal_Part : Asis.Element_List := Generic_Formal_Part (Corresponding_Name_Declaration
+                                                                       (Ultimate_Name
+                                                                        (Generic_Unit_Name (Call))));
                Last : List_Index := Formal_Part'Last;
                Inx  : List_Index := Formal_Part'First;
             begin
@@ -791,18 +791,37 @@ package body Thick_Queries is
    is
       use Asis.Expressions;
       Actuals : constant Asis.Association_List := Actual_Parameters (Call);
+      Last_Is_Others    : Boolean := False;
+      Good_Actuals_Last : Asis.List_Index;
    begin
       if Is_Dispatching_Call (Call) then
          return Nil_Element;
       end if;
 
-      for I in Actuals'Range loop
-         if Is_Equal (Formal, Formal_Name (Call, I)) then
-            return Actual_Parameter (Actuals (I));
+      if Actuals /= Nil_Element_List then
+         if Definition_Kind (Formal_Parameter (Actuals (Actuals'Last))) = An_Others_Choice then
+            -- This happens only for the others => <> in a partial generic instantiation (in Ada 2012)
+            -- but it doesn't harm to write it more general
+            Last_Is_Others    := True;
+            Good_Actuals_Last := Actuals'Last - 1;
+         else
+            Last_Is_Others    := False;
+            Good_Actuals_Last := Actuals'Last;
          end if;
-      end loop;
 
-      -- Not found, can still be a default value
+         for I in Asis.List_Index range Actuals'First .. Good_Actuals_Last loop
+            if Is_Equal (Formal, Formal_Name (Call, I)) then
+               return Actual_Parameter (Actuals (I));
+            end if;
+         end loop;
+
+         -- Not found, can be covered by others
+         if Last_Is_Others then
+            return Actual_Parameter (Actuals (Actuals'Last));
+         end if;
+      end if;
+
+      -- Otherwise, can still be covered by a default value
       if not Return_Default then
          return Nil_Element;
       end if;

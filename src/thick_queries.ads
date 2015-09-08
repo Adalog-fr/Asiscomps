@@ -1026,6 +1026,8 @@ package Thick_Queries is
    function Formal_Name (Call : Asis.Element; Actual : Asis.List_Index) return Asis.Defining_Name;
    -- Given a procedure, entry or function call, or a generic instantiation, returns the defining name
    -- of the formal corresponding to the actual at the given position in the call.
+   -- Not to be called on an actual which is An_Others_Choice_Specification, since it may correspond to
+   -- several formals.
    -- Note: if the full Parameter_Specification is desired, it is the Enclosing_Element of the Formal_Name
    --
    -- Returns a nil element if:
@@ -1048,11 +1050,13 @@ package Thick_Queries is
                                Return_Default : Boolean := True) return Asis.Expression;
    -- Given a procedure, entry or function call, or a generic instantiation, returns the value
    -- of the actual corresponding to the formal whose defining_identifier is passed.
-   -- If there is no such actual (the call used the default value), the default expression is returned.
+   -- If there is no such actual (the call used the default value) and Return_Default is True,
+   -- the default expression is returned.
    --
    -- Returns a nil element if:
    --   The call is to a dispatching operation
    --   The formal is not from the called entity
+   --   The call used the default value and Return_Default is False
 
 
    function Actual_Parameters (Element : Asis.Element; Normalized : Boolean := False) return Asis.Association_List;
