@@ -4132,17 +4132,35 @@ package body Thick_Queries is
                when A_Selected_Component =>
                   if Is_Access_Expression (Prefix (Result)) then
                      -- Implicit dereference
-                     Result := Nil_Element;
-                     exit Going_Up_Renamings;
-                  end if;
-
-                  if No_Component
-                    and then Declaration_Kind (Corresponding_Name_Declaration (Selector (Result)))
-                  in A_Discriminant_Specification .. A_Component_Declaration
-                  then
-                     Result := Prefix (Result);
+                     -- Normally dynamic (target unknown), except for the case of a pointer to tagged type used in
+                     -- prefix notation for a subprogram call.
+                     case Declaration_Kind (Corresponding_Name_Declaration (Selector (Result))) is
+                        when A_Procedure_Declaration -- all callable entities
+                           | A_Function_Declaration
+                           | A_Procedure_Body_Declaration
+                           | A_Function_Body_Declaration
+                           | A_Null_Procedure_Declaration
+                           | An_Expression_Function_Declaration
+                           | A_Procedure_Renaming_Declaration
+                           | A_Function_Renaming_Declaration
+                           | An_Entry_Declaration
+                           | A_Procedure_Instantiation
+                           | A_Function_Instantiation
+                           =>
+                           Result := Selector (Result);
+                        when others =>
+                           Result := Nil_Element;
+                           exit Going_Up_Renamings;
+                     end case;
                   else
-                     Result := Selector (Result);
+                     if No_Component
+                       and then Declaration_Kind (Corresponding_Name_Declaration (Selector (Result)))
+                     in A_Discriminant_Specification .. A_Component_Declaration
+                     then
+                        Result := Prefix (Result);
+                     else
+                        Result := Selector (Result);
+                     end if;
                   end if;
                when A_Slice
                   | An_Indexed_Component
