@@ -33,7 +33,6 @@
 ----------------------------------------------------------------------
 pragma Ada_05;
 --## Rule off Use_Img_Function ## This package should not depend on utilities
-with Utilities; use Utilities;
 with   -- Standard Ada units
   Ada.Characters.Handling,
   Ada.Exceptions,
@@ -297,9 +296,10 @@ package body Thick_Queries is
                                       Anon_Profile => null),
                     Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
          when Not_A_Declaration =>
-            Assert (Definition_Kind (Good_Declaration) = An_Access_Definition,
-                    "Types_Profile: bad declaration",
-                    Good_Declaration);
+            if Definition_Kind (Good_Declaration) /= An_Access_Definition then
+               Impossible ("Types_Profile: bad declaration", Good_Declaration);
+            end if;
+
             case Access_Definition_Kind (Good_Declaration) is
                when An_Anonymous_Access_To_Procedure | An_Anonymous_Access_To_Protected_Procedure =>
                   Result_Entry := (Access_Form  => Not_An_Access_Definition,
@@ -3303,7 +3303,8 @@ package body Thick_Queries is
                                                             (Simple_Name
                                                                (Strip_Attributes
                                                                   (Subtype_Simple_Name (Elem)))));
-               when A_Private_Extension_Definition
+               when A_Private_Type_Definition
+                  | A_Private_Extension_Definition
                   | A_Formal_Type_Definition
                   =>
                   Good_Elem := Enclosing_Element (Elem);
@@ -3774,6 +3775,7 @@ package body Thick_Queries is
          if Association_Kind (Enclosing_Element (The_Element)) = A_Pragma_Argument_Association then
             return Nil_Element;
          end if;
+
          case Expression_Kind (The_Element) is
             when An_Identifier | A_Selected_Component =>
                -- Only these can be type names

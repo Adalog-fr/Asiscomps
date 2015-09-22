@@ -272,7 +272,7 @@ package body Scope_Manager is
          Unit_State := Inside_Unit;
          return;
       elsif Scope_Top = Scope_Index'Last then
-         raise Program_Error with ("Scope_Manager: maximum scope nesting reached");
+         raise Program_Error with "Scope_Manager: maximum scope nesting reached";
       end if;
 
       Scope_Top := Scope_Top + 1;
