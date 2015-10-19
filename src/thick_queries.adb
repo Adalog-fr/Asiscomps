@@ -3344,7 +3344,12 @@ package body Thick_Queries is
       end if;
 
       -- At this point, Good_Elem is a type declaration
+      -- If an incomplete type, go to full type declaration   #0000041
+      if Declaration_Kind (Good_Elem) in An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration then
+         Good_Elem := Corresponding_Type_Completion (Good_Elem);
+      end if;
       Good_Elem := Corresponding_First_Subtype (Good_Elem);
+
       loop -- because of derived and incomplete types
          case Declaration_Kind (Good_Elem) is
             when An_Ordinary_Type_Declaration =>
