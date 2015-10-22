@@ -3535,8 +3535,14 @@ package body Thick_Queries is
             SM     : Expression;
          begin
             for I in Discrs'Range loop
-               SM := Declaration_Subtype_Mark (Discrs (I));
-               case Expression_Kind (SM) is
+               if Definition_Kind (Object_Declaration_View (Discrs (I))) = An_Access_Definition then
+                  -- Just to be rigorous, consider anonymous access types as An_Ordinary_Type_Declaration
+                  if The_Kind = An_Ordinary_Type_Declaration then
+                     return True;
+                  end if;
+               else
+                  SM := Declaration_Subtype_Mark (Discrs (I));
+                  case Expression_Kind (SM) is
                   when A_Selected_Component =>
                      SM := Selector (SM);
                   when An_Attribute_Reference =>
@@ -3547,10 +3553,11 @@ package body Thick_Queries is
                      null;
                   when others =>
                      Impossible ("Wrong declaration_subtype_mark", SM);
-               end case;
+                  end case;
 
-               if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (SM), The_Kind) then
-                  return True;
+                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (SM), The_Kind) then
+                     return True;
+                  end if;
                end if;
             end loop;
          end;
@@ -3928,7 +3935,7 @@ package body Thick_Queries is
                                                   (Subtype_Simple_Name (Def)))));
             end case;
          when A_Formal_Object_Declaration =>
-            if Is_Nil (Declaration_Subtype_Mark (Local_Elem)) then
+            if Definition_Kind (Object_Declaration_View (Local_Elem)) = An_Access_Definition then
                -- Must be an anonymous formal type
                return Object_Declaration_View (Local_Elem);
             else
