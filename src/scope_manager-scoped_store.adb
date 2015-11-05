@@ -538,7 +538,7 @@ package body Scoped_Store is
    -- Enter_Scope --
    -----------------
 
-   procedure Enter_Scope (Scope : Asis.Element) is
+   procedure Enter_Scope (Scope : Asis.Element) is   --## rule line off LOCAL_HIDING ## same name intentional
       use Asis, Asis.Declarations, Asis.Elements;
       use Thick_Queries;
 
@@ -703,7 +703,7 @@ package body Scoped_Store is
    -- Exit_Scope --
    ----------------
 
-   procedure Exit_Scope (Scope : Asis.Element) is
+   procedure Exit_Scope (Scope : Asis.Element) is   --## rule line off LOCAL_HIDING ## same name intentional
       use Asis, Asis.Declarations, Asis.Elements, Thick_Queries, Spec_Maps;
 
       procedure Delete_Data (Stop_At : Link) is

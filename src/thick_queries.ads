@@ -628,12 +628,13 @@ package Thick_Queries is
                             A_Private_Type,
                             A_Task_Type,
                             A_Protected_Type);
-   subtype Discrete_Types  is Type_Categories range An_Enumeration_Type   .. A_Modular_Type;
-   subtype Numeric_Types   is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
-   subtype Scalar_Types    is Type_Categories range An_Enumeration_Type   .. A_Floating_Point_Type;
-   subtype Integer_Types   is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
-   subtype Real_Types      is Type_Categories range A_Fixed_Point_Type    .. A_Floating_Point_Type;
-   subtype Composite_Types is Type_Categories range An_Array_Type         .. A_Tagged_Type;
+   subtype Discrete_Types     is Type_Categories range An_Enumeration_Type   .. A_Modular_Type;
+   subtype Numeric_Types      is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
+   subtype Scalar_Types       is Type_Categories range An_Enumeration_Type   .. A_Floating_Point_Type;
+   subtype Integer_Types      is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
+   subtype Real_Types         is Type_Categories range A_Fixed_Point_Type    .. A_Floating_Point_Type;
+   subtype Composite_Types    is Type_Categories range An_Array_Type         .. A_Tagged_Type;
+   subtype Synchronized_Types is Type_Categories range A_Task_Type           .. A_Protected_Type;
 
    function Type_Category (Elem               : in Asis.Element;
                            Follow_Derived     : in Boolean := False;
@@ -664,6 +665,11 @@ package Thick_Queries is
    --       A_Private_Extension_Declaration
    --       A_Subtype_Declaration
    --       A_Formal_Type_Declaration
+   --       A_Variable_Declaration
+   --       A_Constant_Declaration
+   --       A_Deferred_Constant_Declaration
+   --       A_Component_Declaration
+   --       A_Discriminant_Specification
    -- Appropriate Definition_Types:
    --       A_Type_Definition
    --       A_Task_Definition

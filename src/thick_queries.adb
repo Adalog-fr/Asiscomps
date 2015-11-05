@@ -5038,7 +5038,7 @@ package body Thick_Queries is
                         if Is_Nil (Item_Def) then
                            -- Type cannot be determined, may be that this aggregate is assigned to
                            -- a variable of an anonymous array type.
-                           -- TBSL Are they other contexts where an aggregate of an anonymous type can be used?
+                           -- TBSL Are there other contexts where an aggregate of an anonymous type can be used?
                            if Statement_Kind (Enclosing_Element (Item)) /= An_Assignment_Statement then
                               -- in despair...
                               return Nil_Element_List;
