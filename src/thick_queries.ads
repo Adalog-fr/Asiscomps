@@ -716,6 +716,7 @@ package Thick_Queries is
                             A_Record_Type,               -- untagged
                             A_Tagged_Type,               -- including record extensions if Separate_Extension is false
                             An_Extended_Tagged_Type,
+                            An_Interface_Type,
                             An_Access_Type,
                             A_Derived_Type,
                             A_Private_Type,
@@ -726,7 +727,7 @@ package Thick_Queries is
    subtype Scalar_Types       is Type_Categories range An_Enumeration_Type   .. A_Floating_Point_Type;
    subtype Integer_Types      is Type_Categories range A_Signed_Integer_Type .. A_Modular_Type;
    subtype Real_Types         is Type_Categories range A_Fixed_Point_Type    .. A_Floating_Point_Type;
-   subtype Composite_Types    is Type_Categories range An_Array_Type         .. A_Tagged_Type;
+   subtype Composite_Types    is Type_Categories range An_Array_Type         .. An_Extended_Tagged_Type;
    subtype Synchronized_Types is Type_Categories range A_Task_Type           .. A_Protected_Type;
 
    function Type_Category (Elem               : in Asis.Element;

@@ -3751,6 +3751,8 @@ package body Thick_Queries is
                      else
                         return A_Tagged_Type;
                      end if;
+                  when An_Interface_Type_Definition =>
+                     return An_Interface_Type;
                   when An_Access_Type_Definition =>
                      return An_Access_Type;
                   when others =>
