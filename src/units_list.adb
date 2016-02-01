@@ -70,7 +70,10 @@ package body Units_List is
       record
          Value : Wide_String (1..Length);
          Next  : Link;
+         Order : Unit_Order;
       end record;
+   -- Order defines a position order in the list. There can be gaps in order
+   -- between two successive nodes if nodes are deleted.
 
    type Context_Access is access all Asis.Context;
 
@@ -84,6 +87,7 @@ package body Units_List is
    Cursor      : Link;
    Previous    : Link;
    List_Length : Natural := 0;
+   Max_Order   : Unit_Order := 0;
 
    ---------
    -- Add --
@@ -99,10 +103,14 @@ package body Units_List is
       Current    : Link := Head;
    begin
       if Current = null then
-         Head        := new Node'(Upper_Unit'Length, Upper_Unit, null);
+         Head        := new Node'(Length => Upper_Unit'Length,
+                                  Value  => Upper_Unit,
+                                  Next   => null,
+                                  Order  => 1);
          Cursor      := Head;
          Previous    := null;
          List_Length := 1;
+         Max_Order   := 1;
          return;
       end if;
 
@@ -116,8 +124,12 @@ package body Units_List is
 
       -- Not found
       -- Current still points to the last node
-      Current.Next := new Node'(Upper_Unit'Length, Upper_Unit, null);
+      Current.Next := new Node'(Length => Upper_Unit'Length,
+                                Value  => Upper_Unit,
+                                Next   => null,
+                                Order  => Max_Order + 1);
       List_Length := List_Length + 1;
+      Max_Order   := Current.Next.Order;
       if Cursor = null then
          Cursor   := Current.Next;
          Previous := Current;
@@ -215,6 +227,24 @@ package body Units_List is
    --                 Exported subprograms                       --
    ----------------------------------------------------------------
 
+   ----------
+   -- "<=" --
+   ----------
+
+   function "<=" (Left, Right : Unit_Order) return Boolean is
+   begin
+      return Natural (Left) <= Natural (Right);
+   end "<=";
+
+   -------------------
+   -- Current_Order --
+   -------------------
+
+   function Current_Order return Unit_Order is
+   begin
+      return Cursor.Order;
+   end Current_Order;
+
    ------------------
    -- Current_Unit --
    ------------------
@@ -260,11 +290,20 @@ package body Units_List is
       return Cursor = null;
    end Is_Exhausted;
 
+   ----------------
+   -- Last_Order --
+   ----------------
+
+   function Last_Order return Unit_Order is
+   begin
+      return Max_Order;
+   end Last_Order;
+
    ------------
    -- Length --
    ------------
 
-   function Length return Integer is
+   function Length return Natural is
    begin
       return List_Length;
    end Length;
@@ -273,9 +312,9 @@ package body Units_List is
    -- Register --
    --------------
 
-   procedure Register (Unit_Spec  : in     Wide_String;
-                       Recursive  : in     Boolean;
-                       Add_Stubs  : in     Boolean)
+   procedure Register (Units_Spec : in Wide_String;
+                       Recursion  : in Recursion_Mode;
+                       Add_Stubs  : in Boolean)
    is
       use Asis, Asis.Compilation_Units;
       use Ada.Strings, Ada.Strings.Wide_Maps;
@@ -312,55 +351,89 @@ package body Units_List is
          return False;
       end Must_Ignore;
 
-      procedure Do_Process_With (My_Unit : Compilation_Unit) is
-         use Asis.Clauses, Asis.Elements;
+      procedure Process_Dependents (Unit_Spec, Unit_Body : Compilation_Unit) is
 
-         procedure Add_Withed_Unit (Withed_Name : Asis.Expression) is
-            use Asis.Expressions;
-            use Thick_Queries;
-            Unit_Name : Asis.Expression;
-         begin
-            if Expression_Kind (Withed_Name) = A_Selected_Component then
-               -- Must add all units in the prefix
-               Add_Withed_Unit (Prefix (Withed_Name));
+         procedure Process_Unit (My_Unit : Compilation_Unit) is
+            use Asis.Clauses, Asis.Elements;
 
-               -- Treat this one
-               Unit_Name := Selector (Withed_Name);
-            else
-               Unit_Name := Withed_Name;
-            end if;
-
-            declare
-               Name_Def : constant Asis.Definition := Corresponding_Name_Definition (Unit_Name);
+            procedure Add_Withed_Unit (Withed_Name : Asis.Expression) is
+               use Asis.Expressions;
+               use Thick_Queries;
+               Unit_Name : Asis.Expression;
             begin
-               if Unit_Origin (Enclosing_Compilation_Unit         --## rule line off Use_Ultimate_Origin
-                               (Name_Def)) = An_Application_Unit  --   we want to keep library unit renamings
-               then
-                  Add (Full_Name_Image (Name_Def));
-               end if;
-            end;
-         end Add_Withed_Unit;
-      begin   -- Do_Process_With
-         if Is_Nil (My_Unit) then
-            return;
-         end if;
+               if Expression_Kind (Withed_Name) = A_Selected_Component then
+                  -- Must add all units in the prefix
+                  Add_Withed_Unit (Prefix (Withed_Name));
 
-         declare
-            My_CC_List : constant Context_Clause_List := Context_Clause_Elements (My_Unit) ;
-         begin
+                  -- Treat this one
+                  Unit_Name := Selector (Withed_Name);
+               else
+                  Unit_Name := Withed_Name;
+               end if;
+
+               declare
+                  Name_Def : constant Asis.Definition := Corresponding_Name_Definition (Unit_Name);
+               begin
+                  if Unit_Origin (Enclosing_Compilation_Unit         --## rule line off Use_Ultimate_Origin
+                                  (Name_Def)) = An_Application_Unit  --   we want to keep library unit renamings
+                  then
+                     Add (Full_Name_Image (Name_Def));
+                  end if;
+               end;
+            end Add_Withed_Unit;
+
+            My_CC_List : constant Context_Clause_List := Context_Clause_Elements (My_Unit);
+         begin   -- Process_Unit
             for I in My_CC_List'Range loop
                if Clause_Kind (My_CC_List (I)) = A_With_Clause then
-                   declare
-                      Withed_Units : constant Asis.Name_List := Clause_Names (My_CC_List (I));
-                   begin
-                      for J in Withed_Units'Range loop
-                         Add_Withed_Unit (Withed_Units (J));
-                      end loop;
-                   end;
+                  declare
+                     Withed_Units : constant Asis.Name_List := Clause_Names (My_CC_List (I));
+                  begin
+                     for J in Withed_Units'Range loop
+                        Add_Withed_Unit (Withed_Units (J));
+                     end loop;
+                  end;
                end if;
             end loop;
-         end;
-      end Do_Process_With;
+         end Process_Unit;
+
+         Good_Spec : Compilation_Unit;
+         Good_Body : Compilation_Unit;
+      begin   -- Process_Dependents
+         case Recursion is
+            when None =>
+               return;
+            when Spec_Only  =>
+               Good_Spec := Unit_Spec;
+               Good_Body := Nil_Compilation_Unit;
+            when Spec_Closure =>
+               if Is_Nil (Unit_Spec)
+                 and then not Is_Nil (Unit_Body)
+                 and then Unit_Kind (Unit_Body) in A_Procedure_Body .. A_Function_Body
+               then
+                  -- Subprogram without explicit specification => body acts as declaration, process its clauses
+                  -- Subunits are purposedly not included, since the body of a subunit is not part of the required
+                  -- closure for compilation.
+                  Good_Spec := Nil_Compilation_Unit;
+                  Good_Body := Unit_Body;
+               else
+                  Good_Spec := Unit_Spec;
+                  -- It is the caller's responsibility to filter out bodies that are not required
+                  Good_Body := Unit_Body;
+               end if;
+            when Full =>
+               Good_Spec := Unit_Spec;
+               Good_Body := Unit_Body;
+         end case;
+
+         if not Is_Nil (Good_Spec) then
+            Process_Unit (Unit_Spec);
+         end if;
+
+         if not Is_Nil (Good_Body) then
+            Process_Unit (Unit_Body);
+         end if;
+      end Process_Dependents;
 
       procedure Do_Process_Stub (My_Unit : Compilation_Unit) is
          use Ada.Wide_Characters.Handling;
@@ -387,14 +460,14 @@ package body Units_List is
                   Add (Unit_Full_Name (My_CU_List (I)));
                end if;
 
-               if Recursive then
-                  Do_Process_With (My_CU_List (I));
+               if Recursion /= None then
+                  Process_Dependents (Unit_Spec => Nil_Compilation_Unit, Unit_Body => My_CU_List (I));
                end if;
             end loop;
          end;
       end Do_Process_Stub;
 
-      procedure Process_Unit_Spec (Spec : Wide_String) is
+      procedure Process_Units_Spec (Spec : Wide_String) is
          use Ada.Characters.Handling, Ada.Wide_Characters.Handling, Ada.Strings.Wide_Fixed;
 
          procedure Process_Indirect_File (Name : String) is
@@ -429,9 +502,9 @@ package body Units_List is
                     and then (Line'Length = 1 or else Line (1 .. 2) /= "--")
                   then
                      if Stop = 0 then
-                        Process_Unit_Spec (Line);
+                        Process_Units_Spec (Line);
                      else
-                        Process_Unit_Spec (Line (Line'First .. Stop-1));
+                        Process_Units_Spec (Line (Line'First .. Stop-1));
                      end if;
                   end if;
                end;
@@ -466,7 +539,7 @@ package body Units_List is
 
          Start : Positive;
          Stop  : Natural;
-      begin  -- Process_Unit_Spec
+      begin  -- Process_Units_Spec
          --
          -- Get rid of case of indirect file:
          --
@@ -506,12 +579,15 @@ package body Units_List is
             exit when Stop = Spec'Last;
             Start := Stop + 2;
          end loop;
-      end Process_Unit_Spec;
+      end Process_Units_Spec;
 
-      Unit_Found : Boolean := False;
+      Unit_Found      : Boolean := False;
+      Specified_Limit : Unit_Order;  -- Order of last node from Unit_Spec
+                                    -- Following nodes are added from stubs/with clauses
    begin  -- Register
       -- Build list of units
-      Process_Unit_Spec (Unit_Spec);
+      Process_Units_Spec (Units_Spec);
+      Specified_Limit := Current_Order;
 
       --  Process list of units
       Reset;
@@ -526,11 +602,11 @@ package body Units_List is
             else
                -- Temporary fix for problem with System
                -- Make sure at least one unit is open before accessing anything else
-               if not Unit_Found or Add_Stubs or Recursive then
+               if not Unit_Found or Add_Stubs or Recursion /= None then
                   Body_Decl  := Compilation_Unit_Body (This_Unit, My_Context.all);
                   Unit_Found := not Is_Nil (Body_Decl);
                end if;
-               if not Unit_Found or Recursive then
+               if not Unit_Found or Recursion /= None then
                   Spec_Decl  := Library_Unit_Declaration (This_Unit, My_Context.all);
                   Unit_Found := not Is_Nil (Spec_Decl);
                end if;
@@ -539,14 +615,15 @@ package body Units_List is
                -- Stubs can only appear in bodies
                -- If recursive, stubs must be parsed since they can have their own
                -- "with" clauses
-               if Add_Stubs or Recursive then
+               if Add_Stubs or Recursion /= None then
                   Do_Process_Stub (Body_Decl);
                end if;
 
-               if Recursive then
-                  -- Analyze with clauses
-                  Do_Process_With (Spec_Decl);
-                  Do_Process_With (Body_Decl);
+               -- Analyze with clauses
+               if Recursion = Full or Current_Order <= Specified_Limit then
+                  Process_Dependents (Spec_Decl, Body_Decl);
+               else
+                  Process_Dependents (Spec_Decl, Nil_Compilation_Unit);
                end if;
                Skip;
             end if;

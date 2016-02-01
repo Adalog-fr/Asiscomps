@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
 --  Units_List - Package specification                              --
---  Copyright (C) 2002 Adalog                                       --
+--  Copyright (C) 2002-2016 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -39,9 +39,14 @@ package Units_List is
 
    -- Register unit specification
    -- Syntax : <unit>{+|-<unit>} | @<file>
-   procedure Register (Unit_Spec : in Wide_String;
-                       Recursive : in Boolean;
-                       Add_Stubs : in Boolean);
+   type Recursion_Mode is (None, Spec_Only, Spec_Closure, Full);
+   -- None:         Don't consider any with clause
+   -- Spec_Only:    Consider (recursively) only with clauses on specifications
+   -- Spec_Closure: Like Spec_Only, + with clauses of bodies of units given in Unit_Spec
+   -- Full:         Consider (recursively) all with clauses
+   procedure Register (Units_Spec : in Wide_String;
+                       Recursion  : in Recursion_Mode;
+                       Add_Stubs  : in Boolean);
    Specification_Error : exception;
 
    -- List iterator:
@@ -49,8 +54,17 @@ package Units_List is
    procedure Skip;
    function Is_Exhausted return Boolean;
 
-   function Length       return Integer;
-   function Current_Unit return Wide_String;
+   type Unit_Order is private;
+   function "<=" (Left, Right : Unit_Order) return Boolean;
+   -- Order of addition of units to the list
+
+   function Length        return Natural;
+   function Current_Unit  return Wide_String;
+   function Current_Order return Unit_Order;
+   function Last_Order    return Unit_Order;
    procedure Delete_Current;
+
+private
+   type Unit_Order is new Natural;
 
 end Units_List;
