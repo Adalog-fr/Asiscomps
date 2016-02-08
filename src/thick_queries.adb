@@ -2557,26 +2557,31 @@ package body Thick_Queries is
       use Asis.Expressions;
 
       Good_Name : Asis.Expression;
-      Good_Decl : Asis.Declaration;
       Good_Def  : Asis.Definition;
    begin
       case Element_Kind (The_Subtype) is
          when A_Declaration =>
-            Good_Decl := The_Subtype;
+            Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (The_Subtype));
+         when A_Definition =>
+            Good_Def := The_Subtype;
+            if Definition_Kind (Good_Def) = A_Subtype_Indication then
+               Good_Def := Type_Declaration_View (Ultimate_Type_Declaration
+                                                  (Corresponding_Name_Declaration
+                                                   (Subtype_Simple_Name (Good_Def))));
+            end if;
          when A_Defining_Name =>
-            Good_Decl := Enclosing_Element (The_Subtype);
+            Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (The_Subtype)));
          when An_Expression =>
             Good_Name := Simple_Name (The_Subtype);
             if Expression_Kind (Good_Name) = An_Attribute_Reference then
                -- 'Base and 'Class cannot be arrays
                return False;
             end if;
-            Good_Decl := Corresponding_Name_Declaration (Good_Name);
+            Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (Corresponding_Name_Declaration (Good_Name)));
          when others =>
             return False;
       end case;
 
-      Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (Good_Decl));
       if Type_Kind (Good_Def)
          in An_Unconstrained_Array_Definition .. A_Constrained_Array_Definition
       then
@@ -3166,7 +3171,6 @@ package body Thick_Queries is
       use Asis.Definitions, Asis.Expressions;
       Good_Elem : Asis.Declaration;
    begin
-
       -- Go from (true) expressions and object declarations/definitions to their type declaration
       case Element_Kind (Elem) is
          when An_Expression =>
@@ -3176,8 +3180,8 @@ package body Thick_Queries is
                         (Corresponding_Name_Declaration
                          (Good_Elem)) in An_Ordinary_Type_Declaration ..  A_Subtype_Declaration
             then
-                -- it was the name of a type, not a true expression
-                Good_Elem := Corresponding_Name_Declaration (Good_Elem);
+               -- it was the name of a type, not a true expression
+               Good_Elem := Corresponding_Name_Declaration (Good_Elem);
             else
                Good_Elem := Corresponding_Expression_Type_Definition (Elem);
                if Is_Nil (Good_Elem) then

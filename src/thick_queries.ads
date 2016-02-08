@@ -400,11 +400,12 @@ package Thick_Queries is
    --    A_Defining_Name
 
    function Is_Array_Subtype (The_Subtype : Asis.Element) return Boolean;
-   -- Returns True if The_Subtype is a declaration of an array type, or a name of an array type
+   -- Returns True if The_Subtype is a declaration (or a definition) of an array type, or a name of an array type
    -- Returns False in all other cases
    --
    -- Appropriate Element_Kinds:
    --    A_Declaration
+   --    A_Definition
    --    A_Defining_Name
    --    An_Expression
    --
