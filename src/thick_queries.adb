@@ -2589,9 +2589,13 @@ package body Thick_Queries is
          when A_Definition =>
             Good_Def := The_Subtype;
             if Definition_Kind (Good_Def) = A_Subtype_Indication then
+               Good_Name := Subtype_Simple_Name (Good_Def);
+               if Expression_Kind (Good_Name) = An_Attribute_Reference then
+                  -- 'Base and 'Class cannot be arrays
+                  return False;
+               end if;
                Good_Def := Type_Declaration_View (Ultimate_Type_Declaration
-                                                  (Corresponding_Name_Declaration
-                                                   (Subtype_Simple_Name (Good_Def))));
+                                                  (Corresponding_Name_Declaration (Good_Name)));
             end if;
          when A_Defining_Name =>
             Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (The_Subtype)));
