@@ -108,6 +108,9 @@ package Thick_Queries is
    --  Appropriate Element_Kinds:
    --     Any element
 
+   function Is_Ancestor (Outer : Asis.Compilation_Unit; Inner : Asis.Compilation_Unit) return Boolean;
+   -- Returns True if Inner Is_Equal to Outer or one of its (direct or indirect) children
+
    Global_Level : constant Asis.ASIS_Natural := 0;
    function Static_Level (Element : Asis.Element) return Asis.ASIS_Natural;
    -- Returns the static scope nesting level of Element

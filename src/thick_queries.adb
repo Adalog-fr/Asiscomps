@@ -2549,6 +2549,30 @@ package body Thick_Queries is
         or else Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition;
    end Is_Access_Subtype;
 
+   -----------------
+   -- Is_Ancestor --
+   -----------------
+
+   function Is_Ancestor (Outer : Asis.Compilation_Unit; Inner : Asis.Compilation_Unit) return Boolean is
+      use Asis.Compilation_Units;
+
+      Good_Inner : Asis.Compilation_Unit := Inner;
+   begin
+      -- Get rid of subunits
+      while Unit_Kind (Good_Inner) in A_Subunit loop
+         Good_Inner := Corresponding_Subunit_Parent_Body (Good_Inner);
+      end loop;
+
+      while not Is_Nil (Good_Inner) loop
+         if Is_Equal (Outer, Good_Inner) then
+            return True;
+         end if;
+         Good_Inner := Corresponding_Parent_Declaration (Good_Inner);
+      end loop;
+
+      return False;
+   end Is_Ancestor;
+
    ----------------------
    -- Is_Array_Subtype --
    ----------------------
