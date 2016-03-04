@@ -53,6 +53,7 @@ with   -- ASIS units
   Asis.Expressions,
   Asis.Implementation,
   Asis.Iterator,
+  Asis.Limited_Views,
   Asis.Statements,
   Asis.Text;
 package body Thick_Queries is
@@ -143,7 +144,7 @@ package body Thick_Queries is
 
       function Build_Entry (Def : Asis.Element) return Profile_Entry is
       -- Def is the parameter or result type definition
-         use Asis.Definitions, Asis.Expressions;
+         use Asis.Definitions, Asis.Expressions, Asis.Limited_Views;
 
          Good_Mark : Asis.Element;
          Attribute : Type_Attribute;
@@ -205,19 +206,22 @@ package body Thick_Queries is
          end if;
 
          Decl := Corresponding_Name_Declaration (Good_Mark);
+         if Is_From_Limited_View (Decl) then
+            Decl := Get_Nonlimited_View (Decl);
+         end if;
+
          case Declaration_Kind (Decl) is
             when An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration =>
-               -- cannot take the Corresponding_First_Subtype of an incomplete type
-               Decl := Corresponding_Type_Declaration (Decl);
+               -- cannot take the Corresponding_First_Subtype of an incomplete type, go to the
+               -- full type first
+               --
+               -- Decl can be Nil_Element if the full context is not available. TBH, it should always be
+               -- available, and an enhancement request has been submitted to AdaCore about this.
+               -- In the meantime, let's take back the incomplete type, and forget about the first subtype
                if Is_Nil (Decl) then
-                  -- TBSL 2005 Issue not settled with AdaCore
-                  -- In some cases of incomplete declarations resulting from limited views,
-                  -- Corresponding_Type_Declaration is unable to retrieve the full declaration and
-                  -- returns Nil_Element. For the moment, let's take back the incomplete type, and
-                  -- forget about the first subtype
                   Decl := Corresponding_Name_Declaration (Good_Mark);
                else
-                  Decl := Corresponding_First_Subtype (Decl);
+                  Decl := Corresponding_First_Subtype (Corresponding_Type_Declaration (Decl));
                end if;
             when A_Formal_Incomplete_Type_Declaration =>
                null;
@@ -3196,7 +3200,7 @@ package body Thick_Queries is
                            Privacy            : in Privacy_Policy := Stop_At_Private;
                            Separate_Extension : in Boolean := False) return Type_Categories
    is
-      use Asis.Definitions, Asis.Expressions;
+      use Asis.Definitions, Asis.Expressions, Asis.Limited_Views;
       Good_Elem : Asis.Declaration;
    begin
       -- Go from (true) expressions and object declarations/definitions to their type declaration
@@ -3378,6 +3382,9 @@ package body Thick_Queries is
       -- At this point, Good_Elem is a type declaration
       -- If an incomplete type, go to full type declaration   #0000041
       if Declaration_Kind (Good_Elem) in An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration then
+         if Is_From_Limited_View (Good_Elem) then
+            Good_Elem := Get_Nonlimited_View (Good_Elem);
+         end if;
          Good_Elem := Corresponding_Type_Completion (Good_Elem);
       end if;
       Good_Elem := Corresponding_First_Subtype (Good_Elem);
