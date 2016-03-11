@@ -1,5 +1,6 @@
 with "asis";
 with "adalog_comps";
+with "gnatcoll";
 
 project Adalog_Asiscomps is
 
@@ -24,4 +25,3 @@ project Adalog_Asiscomps is
    end Linker;
 
 end Adalog_Asiscomps;
-

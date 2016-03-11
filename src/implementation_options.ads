@@ -45,4 +45,6 @@ package Implementation_Options is
 
    -- Parameters for Wide_Text_IO:
    Form_Parameters : constant String := "WCEM=h"; -- Use Hex encoding
+
+   Implementation_Error : exception;
 end Implementation_Options;
