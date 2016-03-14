@@ -478,6 +478,14 @@ package Thick_Queries is
    --       A_Selected_Component (applies to selector)
 
 
+   function Corresponding_Full_Type_Declaration (Decl : Asis.Declaration) return Asis.Declaration;
+   -- Returns the full type of Decl if Decl is an incomplete or private (tagged) type declaration
+   -- Returns Decl otherwise
+   --
+   -- Appropriate Declaration_Kinds:
+   --       A_Type_Declaration
+
+
    type Derivation_Descriptor is
       record
          Ultimate_Type    : Asis.Declaration;  -- The ancestor which is not a derived types

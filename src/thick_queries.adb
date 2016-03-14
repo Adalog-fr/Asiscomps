@@ -221,7 +221,7 @@ package body Thick_Queries is
                if Is_Nil (Decl) then
                   Decl := Corresponding_Name_Declaration (Good_Mark);
                else
-                  Decl := Corresponding_First_Subtype (Corresponding_Type_Declaration (Decl));
+                  Decl := Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
                end if;
             when A_Formal_Incomplete_Type_Declaration =>
                null;
@@ -428,13 +428,7 @@ package body Thick_Queries is
                     (Simple_Name
                      (Strip_Attributes
                       (Anonymous_Access_To_Object_Subtype_Mark (Good_Def))));
-            case Declaration_Kind (Decl) is
-               when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
-                  Decl := Corresponding_Type_Declaration (Decl);
-               when others =>
-                  null;
-            end case;
-            return Corresponding_First_Subtype (Decl);
+            return Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
          when A_Type_Definition =>
             if Type_Kind (Good_Def) = An_Access_Type_Definition then
                Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (Good_Def)));
@@ -446,14 +440,7 @@ package body Thick_Queries is
                          (Strip_Attributes
                           (Subtype_Simple_Name
                            (Asis.Definitions.Access_To_Object_Definition (Good_Def)))));
-
-               case Declaration_Kind (Decl) is
-                  when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
-                     Decl := Corresponding_Type_Declaration (Decl);
-                  when others =>
-                     null;
-               end case;
-               return  Corresponding_First_Subtype (Decl);
+               return  Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
             end if;
          when A_Formal_Type_Definition =>
             if Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition then
@@ -465,13 +452,7 @@ package body Thick_Queries is
                              (Type_Declaration_View
                               (Ultimate_Type_Declaration
                                (Enclosing_Element (Good_Def))))))));
-               case Declaration_Kind (Decl) is
-                  when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
-                     Decl := Corresponding_Type_Declaration (Decl);
-                  when others =>
-                     null;
-               end case;
-               return Corresponding_First_Subtype (Decl);
+               return Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
             end if;
          when others =>
             null;
@@ -1950,7 +1931,7 @@ package body Thick_Queries is
                      -- If this private (or incomplete) type was used as a range, it is necessarily from a place
                      -- where the full declaration is visible => we can take the full declaration without breaking
                      -- privacy
-                     Decl := Corresponding_Type_Declaration (Decl);
+                     Decl := Corresponding_Full_Type_Declaration (Decl);
 
                   when others =>
                      Impossible ("Range_Ultimate_Name: unexpected declaration", Decl);
@@ -2914,6 +2895,21 @@ package body Thick_Queries is
    end Is_Limited;
 
 
+   -----------------------------------------
+   -- Corresponding_Full_Type_Declaration --
+   -----------------------------------------
+
+   function Corresponding_Full_Type_Declaration (Decl : Asis.Declaration) return Asis.Declaration is
+      Result : Asis.Declaration := Decl;
+   begin
+      -- Ada 2012: Decl can be incomplete, then private, hence the loop
+      while Declaration_Kind (Result) in An_Incomplete_Type_Declaration .. A_Private_Extension_Declaration loop
+         Result := Corresponding_Type_Completion (Result);
+      end loop;
+      return Result;
+   end Corresponding_Full_Type_Declaration;
+
+
    ------------------------------------------
    -- Corresponding_Derivation_Description --
    ------------------------------------------
@@ -2954,18 +2950,18 @@ package body Thick_Queries is
                =>
                case Privacy is
                   when Follow_Private =>
-                     Result.Ultimate_Type := Corresponding_Type_Declaration (Result.Ultimate_Type);
+                     Result.Ultimate_Type := Corresponding_Type_Completion (Result.Ultimate_Type);
                   when Follow_User_Private =>
                      exit when Ultimate_Origin (Result.Ultimate_Type) /= An_Application_Unit;
 
-                     Result.Ultimate_Type := Corresponding_Type_Declaration (Result.Ultimate_Type);
+                     Result.Ultimate_Type := Corresponding_Type_Completion (Result.Ultimate_Type);
                   when Stop_At_Private =>
                      exit;
                end case;
             when An_Incomplete_Type_Declaration
                | A_Tagged_Incomplete_Type_Declaration
                =>
-               Result.Ultimate_Type := Corresponding_Type_Declaration (Result.Ultimate_Type);
+               Result.Ultimate_Type := Corresponding_Full_Type_Declaration (Result.Ultimate_Type);
             when A_Subtype_Declaration =>
                if Is_Nil (Result.First_Constraint) then
                   Result.First_Constraint := Subtype_Constraint (Type_Declaration_View (Result.Ultimate_Type));
@@ -3385,7 +3381,7 @@ package body Thick_Queries is
          if Is_From_Limited_View (Good_Elem) then
             Good_Elem := Get_Nonlimited_View (Good_Elem);
          end if;
-         Good_Elem := Corresponding_Type_Completion (Good_Elem);
+         Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
       end if;
       Good_Elem := Corresponding_First_Subtype (Good_Elem);
 
@@ -3487,14 +3483,14 @@ package body Thick_Queries is
             when A_Protected_Type_Declaration =>
                return A_Protected_Type;
             when An_Incomplete_Type_Declaration =>
-               Good_Elem := Corresponding_Type_Declaration (Good_Elem);
+               Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
             when A_Private_Type_Declaration =>
                case Privacy is
                   when Follow_Private =>
-                     Good_Elem := Corresponding_Type_Declaration (Good_Elem);
+                     Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
                   when Follow_User_Private =>
                      if Ultimate_Origin (Good_Elem) = An_Application_Unit then --##rule line off Simplifiable_statements
-                        Good_Elem := Corresponding_Type_Declaration (Good_Elem);
+                        Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
                      else
                         return A_Private_Type;
                      end if;
@@ -3857,7 +3853,7 @@ package body Thick_Queries is
 
       if Declaration_Kind (Local_Elem) = A_Private_Type_Declaration then
          -- We want a true definition, therefore we have to look through private types
-         Local_Elem := Corresponding_Type_Declaration (Local_Elem);
+         Local_Elem := Corresponding_Full_Type_Declaration (Local_Elem);
       end if;
       if not Is_Nil (Local_Elem) then
          -- Normal case, we have a type declaration
@@ -4093,7 +4089,7 @@ package body Thick_Queries is
       if Declaration_Kind (Local_Elem) in
         An_Incomplete_Type_Declaration .. A_Private_Extension_Declaration
       then
-         Local_Elem := Corresponding_Type_Declaration (Local_Elem);
+         Local_Elem := Corresponding_Full_Type_Declaration (Local_Elem);
       end if;
 
       Local_Elem := Type_Declaration_View (Corresponding_First_Subtype (Local_Elem));
@@ -4102,7 +4098,7 @@ package body Thick_Queries is
         A_Private_Type_Definition .. A_Private_Extension_Definition
       then
          Local_Elem := Type_Declaration_View (Corresponding_First_Subtype
-                                                (Corresponding_Type_Declaration
+                                                (Corresponding_Full_Type_Declaration
                                                    (Enclosing_Element (Local_Elem))));
       end if;
 
@@ -4300,7 +4296,7 @@ package body Thick_Queries is
             | A_Task_Type_Declaration
             | A_Protected_Type_Declaration
               =>
-            Other_Decl := Corresponding_Type_Declaration (Decl);
+            Other_Decl := Corresponding_Type_Partial_View (Decl);
             if Is_Nil (Other_Decl) then
                return Def;
             else
@@ -5196,7 +5192,7 @@ package body Thick_Queries is
                   when An_Incomplete_Type_Declaration
                      | A_Private_Type_Declaration
                        =>
-                     Item := Corresponding_Type_Declaration (Item);
+                     Item := Corresponding_Full_Type_Declaration (Item);
 
                   when A_Variable_Declaration
                      | A_Constant_Declaration
