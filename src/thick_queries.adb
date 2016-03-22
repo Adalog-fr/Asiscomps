@@ -2280,10 +2280,12 @@ package body Thick_Queries is
                   return False;
                end if;
                -- Temp <- True component type name definition
-               Temp := Corresponding_Name_Definition (Subtype_Simple_Name
-                                                      (Component_Definition_View
-                                                         (Array_Component_Definition
-                                                            (Operation_Ultimate_Type))));
+               -- Get rid of 'Base! (cannot be 'Class)
+               Temp := Corresponding_Name_Definition (Strip_Attributes
+                                                      (Subtype_Simple_Name
+                                                       (Component_Definition_View
+                                                        (Array_Component_Definition
+                                                        (Operation_Ultimate_Type)))));
                -- Boolean array?
                if Is_Type (Temp, "STANDARD.BOOLEAN", Or_Derived => True) then
                   return Kind = A_Not_Operator;
@@ -3617,10 +3619,12 @@ package body Thick_Queries is
          when An_Ordinary_Type_Declaration =>
             case Type_Kind (Def) is
                when An_Unconstrained_Array_Definition | A_Constrained_Array_Definition =>
+                  -- Get rid of 'Base if any (cannot be 'Class)
                   return Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                                         (Subtype_Simple_Name
-                                                          (Component_Definition_View
-                                                           (Array_Component_Definition (Def)))),
+                                                         (Strip_Attributes
+                                                          (Subtype_Simple_Name
+                                                           (Component_Definition_View
+                                                            (Array_Component_Definition (Def))))),
                                                          The_Kind);
 
                when A_Record_Type_Definition | A_Tagged_Record_Type_Definition =>
