@@ -1930,7 +1930,7 @@ package body Thick_Queries is
                   when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
                      -- If this private (or incomplete) type was used as a range, it is necessarily from a place
                      -- where the full declaration is visible => we can take the full declaration without breaking
-                     -- privacy
+                     -- privacy. And of course, it cannot be a tagged incomplete type.
                      Decl := Corresponding_Full_Type_Declaration (Decl);
 
                   when others =>
@@ -3484,7 +3484,9 @@ package body Thick_Queries is
                return A_Task_Type;
             when A_Protected_Type_Declaration =>
                return A_Protected_Type;
-            when An_Incomplete_Type_Declaration =>
+            when An_Incomplete_Type_Declaration | A_Tagged_Incomplete_Type_Declaration =>
+               -- Note that tagged incomplete can correspond to a tagged declaration or to
+               -- an extension => we must also go to the full type
                Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
             when A_Private_Type_Declaration =>
                case Privacy is
