@@ -2369,10 +2369,12 @@ package body Thick_Queries is
             end if;
 
             -- Temp <- True component type name definition
-            Temp := Corresponding_Name_Definition (Subtype_Simple_Name
-                                                   (Component_Definition_View
-                                                      (Array_Component_Definition
-                                                         (Operation_Ultimate_Type))));
+            -- Remove 'Base (cannot be 'Class)
+            Temp := Corresponding_Name_Definition (Strip_Attributes
+                                                   (Subtype_Simple_Name
+                                                    (Component_Definition_View
+                                                     (Array_Component_Definition
+                                                      (Operation_Ultimate_Type)))));
             -- Boolean array?
             if Is_Type (Temp, "STANDARD.BOOLEAN", Or_Derived => True) then
                return Kind in Logical_Operators
@@ -3857,10 +3859,8 @@ package body Thick_Queries is
          end case;
       end if;
 
-      if Declaration_Kind (Local_Elem) = A_Private_Type_Declaration then
-         -- We want a true definition, therefore we have to look through private types
-         Local_Elem := Corresponding_Full_Type_Declaration (Local_Elem);
-      end if;
+      -- We want a true definition, therefore we have to look through private types (and incomplete types of course)
+      Local_Elem := Corresponding_Full_Type_Declaration (Local_Elem);
       if not Is_Nil (Local_Elem) then
          -- Normal case, we have a type declaration
          return Type_Declaration_View (Corresponding_First_Subtype (Local_Elem));
