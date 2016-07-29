@@ -2029,6 +2029,119 @@ package body Thick_Queries is
       return Is_Access_Subtype (Def);
    end Is_Access_Expression;
 
+   -------------------------------------
+   -- Corresponding_Static_Predicates --
+   -------------------------------------
+
+   function Corresponding_Static_Predicates (Elem : in Asis.Element) return Asis.Element_List is
+      use Asis.Definitions, Asis.Expressions;
+
+      function Filter_Aspects (Aspects : Asis.Element_List; Name : Wide_String) return Asis.Element_List is
+      -- Name is expected to be uppercase
+
+         Result : Asis.Element_List (1 .. Aspects'Length);
+         Count  : Asis_Natural := 0;
+      begin
+         for A in Aspects'Range loop
+            if To_Upper (Extended_Name_Image (Aspect_Mark (Aspects (A)))) = Name then
+               Count := Count + 1;
+               Result (Count) := Aspects (A);
+            end if;
+         end loop;
+         return Result (1 .. Count);
+      end Filter_Aspects;
+
+      Decl : Asis.Declaration;
+   begin  -- Corresponding_Static_Predicates
+      case Element_Kind (Elem) is
+         when An_Expression =>
+            case Expression_Kind (Elem) is
+               when An_Identifier =>
+                  -- if it is a type name, Corresponding_Expression_Type cannot be applied to it
+                  Decl := Corresponding_Name_Declaration (Elem);
+                  case Declaration_Kind (Decl) is
+                     when A_Type_Declaration | A_Subtype_Declaration =>
+                        null;
+                     when others =>
+                        Decl := A4G_Bugs.Corresponding_Expression_Type (Elem);
+                  end case;
+               when others =>
+                  Decl := A4G_Bugs.Corresponding_Expression_Type (Elem);
+            end case;
+         when A_Declaration =>
+            case Declaration_Kind (Elem) is
+               when A_Type_Declaration | A_Subtype_Declaration =>
+                  Decl := Elem;
+               when others =>
+                  return Nil_Element_List;
+            end case;
+         when others =>
+            return Nil_Element_List;
+      end case;
+
+      if Is_Nil (Decl) then
+         -- Anonymous type... Cannot have static predicate
+         return Nil_Element_List;
+      end if;
+
+      -- Here we have a type or subtype declaration
+      declare
+         Decl_Aspects : constant Asis.Element_List := Filter_Aspects (Aspect_Specifications (Decl), "STATIC_PREDICATE");
+         Def          : constant Asis.Definition := Type_Declaration_View (Decl);
+      begin
+         --## Rule off Avoid_Query ## for Corresponding_Parent_Subtype, we need a declaration, and we cannot have
+         --                           anonymous stuff here
+         case Declaration_Kind (Decl) is
+            when An_Ordinary_Type_Declaration =>
+               case Type_Kind (Def) is
+                  when A_Derived_Type_Definition =>
+                     return Decl_Aspects
+                       & Corresponding_Static_Predicates (Corresponding_Parent_Subtype (Def));
+                  when A_Derived_Record_Extension_Definition =>
+                     -- we can have progenitors here
+                     return Decl_Aspects
+                       & Corresponding_Static_Predicates (Corresponding_Parent_Subtype (Def))
+                       & Corresponding_Static_Predicates (Definition_Interface_List (Def));
+                  when others =>
+                     return Decl_Aspects;
+               end case;
+            when Declaration_Kinds'Succ (An_Ordinary_Type_Declaration) .. A_Type_Declaration'Last =>
+               return Decl_Aspects;
+            when A_Subtype_Declaration =>
+               return Decl_Aspects
+                    & Corresponding_Static_Predicates (Subtype_Simple_Name (Type_Declaration_View (Decl)));
+            when A_Formal_Type_Declaration =>
+               case Formal_Type_Kind (Def) is
+                  when A_Formal_Derived_Type_Definition =>
+                     -- we can have progenitors here
+                     return Decl_Aspects
+                       & Corresponding_Static_Predicates (Corresponding_Parent_Subtype (Def))
+                       & Corresponding_Static_Predicates (Definition_Interface_List (Def));
+                  when others =>
+                     return Decl_Aspects;
+               end case;
+
+            when others =>
+               Impossible ("Corresponding_Static_Predicates: unexpected declaration", Decl);
+         end case;
+         --## Rule on Avoid_Query
+      end;
+   end Corresponding_Static_Predicates;
+
+   -------------------------------------
+   -- Corresponding_Static_Predicates --
+   -------------------------------------
+
+   function Corresponding_Static_Predicates (List : in Asis.Element_List) return Asis.Element_List is
+   begin
+      if Is_Nil (List) then
+         return Nil_Element_List;
+      end if;
+
+      return Corresponding_Static_Predicates (List (List'First))
+           & Corresponding_Static_Predicates (List (List'First + 1 .. List'Last));
+   end Corresponding_Static_Predicates;
+
    -------------------
    -- Callable_Kind --
    -------------------

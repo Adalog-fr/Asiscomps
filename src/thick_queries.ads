@@ -726,6 +726,19 @@ package Thick_Queries is
    --       A_Formal_Unconstrained_Array_Definition
    --       A_Formal_Constrained_Array_Definition
 
+   function Corresponding_Static_Predicates (Elem : in Asis.Element) return Asis.Element_List;
+   -- Return the list of expressions of all applicable static predicates (directly given or inherited)
+   -- Returns a Nil_Element_List if there are no applicable static predicate
+   -- In case of an expression, returns applicable static predicates for its subtype.
+   -- Returns Nil_Element_List for any inappropriate element
+   --
+   -- Appropriate element kinds:
+   --      An_Expression
+   --      A_Declaration
+
+   function Corresponding_Static_Predicates (List : in Asis.Element_List) return Asis.Element_List;
+   -- Return the catenation of Corresponding_Static_Predicates for all elements in List
+
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
    -- Queries about names and expressions                                                         --
