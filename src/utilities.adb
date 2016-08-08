@@ -721,6 +721,14 @@ package body Utilities is
       return True;
    end Trace;
 
+   -----------
+   -- Trace --
+   -----------
+
+   procedure Trace (Message : Wide_String; Value : Wide_String) is
+   begin
+      Trace (Message & ", value= """ & Value & '"');
+   end Trace;
    ------------
    -- Trace  --
    ------------
