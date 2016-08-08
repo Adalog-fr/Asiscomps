@@ -1905,6 +1905,7 @@ package body Thick_Queries is
 
                   when A_Variable_Declaration
                      | A_Constant_Declaration
+                     | A_Deferred_Constant_Declaration
                      | A_Return_Variable_Specification
                      | A_Return_Constant_Specification
                      =>
@@ -5402,7 +5403,7 @@ package body Thick_Queries is
                      Result (I)   := 0;
                      Modular_Type := True;
                   else
-                     Result (I) := Not_Static;
+                     Result (I)   := Not_Static;
                      Modular_Type := False;
                   end if;
                when others =>
