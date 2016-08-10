@@ -5753,7 +5753,9 @@ package body Thick_Queries is
                      when A_Base_Attribute =>
                         -- The prefix has to be scalar
                         -- The base type is at least the first named subtype => go there
-                        Decl := Corresponding_First_Subtype (Corresponding_Name_Declaration (Prefix (Good_Name)));
+                        Decl := Corresponding_First_Subtype
+                                (Corresponding_Name_Declaration
+                                 (Simple_Name (Prefix (Good_Name))));
                         case Scalar_Types (Type_Category (Decl)) is
                            when An_Enumeration_Type =>
                               -- Base type is the same as the type
