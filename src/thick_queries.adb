@@ -97,260 +97,6 @@ package body Thick_Queries is
       return Translate (S, Upper_Case_Map);
    end To_Upper;
 
-   -------------------
-   -- Types_Profile --
-   -------------------
-
-   -- Given a callable entity declaration, returns a description of the profile
-   -- Result_Type.Name is the result *type* for a function, Nil_Element for other callable entities
-   -- Formals are (in order of declaration) the *types* of the parameters.
-   -- Multiple declarations are separated, i.e. "A,B : Integer" yields two entries in the table.
-   --
-   -- Appropriate Element_Kinds:
-   --   A_Declaration
-   --
-   -- Appropriate Declaration_Kinds:
-   --   Any (generic) callable entity declaration or body declaration
-
-   type Type_Attribute is (None, Base, Class);
-   type Profile_Descriptor (Formals_Length : Asis.ASIS_Natural);
-   type Profile_Access is access Profile_Descriptor;
-
-   type Profile_Entry is
-      record
-         Access_Form  : Asis.Access_Definition_Kinds;
-         Attribute    : Type_Attribute;
-         Name         : Asis.Defining_Name;
-         Anon_Profile : Profile_Access;
-      end record;
-   -- Name is only for non-anonymous access types and anonymous access to object types, while
-   -- Anon_Profile is only for anonymour access to subprograms. We didn't put them as variants though,
-   -- because this would require a discriminant (sometimes evaluated dynamically, preventing aggregates) and would
-   -- complicate making arrays of Profile_Entry... Too much burden to save a single word.
-   --
-   -- Anon_Profile is not null only for subprograms with parameters that are of an anonymous access to subprogram
-   -- type. Since these are supposed to be pretty (!) rare, we don't care about deallocating the corresponding
-   -- structure (yes, it is a deliberate memory leak).
-
-   type Profile_Table is array (Asis.List_Index range <>) of Profile_Entry;
-   type Profile_Descriptor (Formals_Length : Asis.ASIS_Natural) is
-      record
-         Result_Type : Profile_Entry;
-         Formals     : Profile_Table (1 .. Formals_Length);
-      end record;
-
-   function Types_Profile (Declaration : in Asis.Element)  return Profile_Descriptor is
-      -- Declaration is a callable entity declaration, or an anonymous access to subprogram definition
-
-      function Build_Entry (Def : Asis.Element) return Profile_Entry is
-      -- Def is the parameter or result type definition
-         use Asis.Definitions, Asis.Expressions, Asis.Limited_Views;
-
-         Good_Mark : Asis.Element;
-         Attribute : Type_Attribute;
-         Decl      : Asis.Declaration;
-         Form      : constant Asis.Access_Definition_Kinds := Access_Definition_Kind (Def);
-      begin
-         case Form is
-            when Not_An_Access_Definition =>
-               -- Normal case
-               null;
-            when An_Anonymous_Access_To_Constant
-               | An_Anonymous_Access_To_Variable
-               =>
-               declare
-                  Ret_Val : Profile_Entry := Build_Entry (Anonymous_Access_To_Object_Subtype_Mark (Def));
-               begin
-                  Ret_Val.Access_Form := Form;
-                  return Ret_Val;
-               end;
-            when An_Anonymous_Access_To_Procedure
-               | An_Anonymous_Access_To_Protected_Procedure
-               =>
-               return (Access_Form  => Form,
-                       Attribute    => None,
-                       Name         => Nil_Element,
-                       Anon_Profile => new Profile_Descriptor'(Types_Profile(Def)));
-            when An_Anonymous_Access_To_Function
-               | An_Anonymous_Access_To_Protected_Function
-               =>
-               return (Access_Form  => Form,
-                       Attribute    => None,
-                       Name         => Nil_Element,
-                       Anon_Profile => new Profile_Descriptor'(Types_Profile (Def)));
-         end case;
-
-         -- Here, no more anonymous access types
-         if Expression_Kind (Def) = An_Attribute_Reference then
-            Good_Mark := Prefix (Def);
-
-            case Attribute_Kind (Def) is
-               when A_Base_Attribute =>
-                  Attribute := Base;
-               when A_Class_Attribute =>
-                  Attribute := Class;
-                  -- According to 3.9(14), T'Class'Class is allowed, and "is the same as" T'Class.
-                  -- They are even conformant (checked with Gnat).
-                  -- => Discard extra 'Class before they damage the rest of this algorithm
-                  Good_Mark := Simple_Name (Strip_Attributes (Good_Mark));
-               when others =>
-                  -- Impossible
-                  Impossible ("Attribute of Type_Profile = "
-                              & Attribute_Kinds'Wide_Image (Attribute_Kind (Def)),
-                              Declaration);
-            end case;
-
-         else
-            Good_Mark := Simple_Name (Def);
-            Attribute := None;
-         end if;
-
-         Decl := Corresponding_Name_Declaration (Good_Mark);
-         if Is_From_Limited_View (Decl) then
-            Decl := Get_Nonlimited_View (Decl);
-         end if;
-
-         case Declaration_Kind (Decl) is
-            when An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration =>
-               -- cannot take the Corresponding_First_Subtype of an incomplete type, go to the
-               -- full type first
-               --
-               -- Decl can be Nil_Element if the full context is not available. TBH, it should always be
-               -- available, and an enhancement request has been submitted to AdaCore about this.
-               -- In the meantime, let's take back the incomplete type, and forget about the first subtype
-               if Is_Nil (Decl) then
-                  Decl := Corresponding_Name_Declaration (Good_Mark);
-               else
-                  Decl := Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
-               end if;
-            when A_Formal_Incomplete_Type_Declaration =>
-               null;
-            when others =>
-               Decl := Corresponding_First_Subtype (Decl);
-         end case;
-         return (Access_Form  => Not_An_Access_Definition,
-                 Attribute    => Attribute,
-                 Name         => Names (Decl) (1),
-                 Anon_Profile => null);
-      end Build_Entry;
-
-      function Build_Profile (Parameters : Parameter_Specification_List) return Profile_Table is
-      -- Assert: parameters is not an empty list
-      -- This function is written to avoid recursivity if there is no other multiple
-      -- parameter declaration than the first one.
-
-         Names_1    : constant Name_List     := Names (Parameters (Parameters'First));
-         Entry_1    : constant Profile_Entry := Build_Entry (Object_Declaration_View
-                                                             (Parameters (Parameters'First)));
-         Result     : Profile_Table (List_Index range 1 .. Names_1'Length + Parameters'Length - 1);
-         Result_Inx : Asis.List_Index;
-      begin
-         for I in List_Index range 1 .. Names_1'Length loop
-            Result (I) := Entry_1;
-         end loop;
-
-         Result_Inx := Names_1'Length;
-         for I in List_Index range Parameters'First + 1 .. Parameters'Last loop
-            declare
-               Names_Rest : constant Name_List := Names (Parameters (I));
-            begin
-               if Names_Rest'Length /= 1 then
-                  return Result (1 .. Result_Inx) & Build_Profile (Parameters (I .. Parameters'Last));
-               end if;
-
-               Result_Inx := Result_Inx + 1;
-               Result (Result_Inx) := Build_Entry (Object_Declaration_View (Parameters (I)));
-            end;
-         end loop;
-         return Result;
-      end Build_Profile;
-
-      Result_Entry     : Profile_Entry;
-      Good_Declaration : Asis.Declaration := Declaration;
-      use Asis.Definitions;
-   begin  --  Types_Profile
-      if Declaration_Kind (Good_Declaration) in A_Generic_Instantiation then
-         -- We must get the profile from the corresponding generic element
-         Good_Declaration := Corresponding_Declaration (Good_Declaration);
-      end if;
-
-      case Declaration_Kind (Good_Declaration) is
-         when A_Function_Declaration
-            | An_Expression_Function_Declaration   -- Ada 2012
-            | A_Function_Body_Declaration
-            | A_Function_Renaming_Declaration
-            | A_Function_Body_Stub
-            | A_Generic_Function_Declaration
-            | A_Formal_Function_Declaration
-            =>
-            Result_Entry := Build_Entry (Result_Profile (Good_Declaration));
-
-         when An_Enumeration_Literal_Specification =>
-            -- Profile for an enumeration litteral
-            -- Like a parameterless function; go up two levels (type specification then type declaration)
-            -- to find the return type.
-            -- of the Enumaration_Literal_Specification
-            -- Return immediately, since we know there are no parameters, and Parameter_Profile
-            -- would choke on this.
-            return (Formals_Length => 0,
-                    Result_Type    => (Access_Form => Not_An_Access_Definition,
-                                       Attribute   => None,
-                                       Name        => Names (Enclosing_Element
-                                                             (Enclosing_Element (Good_Declaration))) (1),
-                                      Anon_Profile => null),
-                    Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
-         when Not_A_Declaration =>
-            if Definition_Kind (Good_Declaration) /= An_Access_Definition then
-               Impossible ("Types_Profile: bad declaration", Good_Declaration);
-            end if;
-
-            case Access_Definition_Kind (Good_Declaration) is
-               when An_Anonymous_Access_To_Procedure | An_Anonymous_Access_To_Protected_Procedure =>
-                  Result_Entry := (Access_Form  => Not_An_Access_Definition,
-                                   Attribute    => None,
-                                   Name         => Nil_Element,
-                                   Anon_Profile => null);
-               when An_Anonymous_Access_To_Function  | An_Anonymous_Access_To_Protected_Function  =>
-                  Result_Entry := Build_Entry (Access_To_Function_Result_Profile (Good_Declaration));
-               when others =>
-                  Impossible ("Types_Profile: bad access_definition", Good_Declaration);
-            end case;
-         when others => -- (generic) procedure or entry declaration
-            Result_Entry := (Access_Form  => Not_An_Access_Definition,
-                             Attribute    => None,
-                             Name         => Nil_Element,
-                             Anon_Profile => null);
-      end case;
-
-      declare
-         function All_Parameter_Profile (D : Asis.Element) return Asis.Parameter_Specification_List is
-         -- of course, an if-expression would do as well, but we still stick to Ada05
-         begin
-            if Element_Kind (D) = A_Declaration then
-               return Parameter_Profile (D);
-            else
-               return Access_To_Subprogram_Parameter_Profile (D);
-            end if;
-         end All_Parameter_Profile;
-
-         Parameters : constant Asis.Parameter_Specification_List := All_Parameter_Profile (Good_Declaration);
-      begin
-         if Parameters'Length = 0 then
-            return (Formals_Length => 0,
-                    Result_Type    => Result_Entry,
-                    Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
-         else
-            declare
-               Profile : constant Profile_Table := Build_Profile (Parameters);
-            begin
-               return (Formals_Length => Profile'Length,
-                       Result_Type    => Result_Entry,
-                       Formals        => Profile);
-            end;
-         end if;
-      end;
-   end Types_Profile;
-
    ------------------------------------------------------------------
    -- Exported subprograms                                         --
    ------------------------------------------------------------------
@@ -630,6 +376,222 @@ package body Thick_Queries is
       -- We have no way to get a profile. Sigh...
       return Nil_Element_List;
    end Called_Profile;
+
+   -------------------
+   -- Types_Profile --
+   -------------------
+
+   function Types_Profile (Declaration : in Asis.Element)  return Profile_Descriptor is
+   -- Declaration is a callable entity declaration, or an anonymous access to subprogram definition
+
+      function Build_Entry (Def : Asis.Element) return Profile_Entry is
+      -- Def is the parameter or result type definition
+         use Asis.Definitions, Asis.Expressions, Asis.Limited_Views;
+
+         Good_Mark : Asis.Element;
+         Attribute : Type_Attribute;
+         Decl      : Asis.Declaration;
+         Form      : constant Asis.Access_Definition_Kinds := Access_Definition_Kind (Def);
+      begin
+         case Form is
+            when Not_An_Access_Definition =>
+               -- Normal case
+               null;
+            when An_Anonymous_Access_To_Constant
+               | An_Anonymous_Access_To_Variable
+               =>
+               declare
+                  Ret_Val : Profile_Entry := Build_Entry (Anonymous_Access_To_Object_Subtype_Mark (Def));
+               begin
+                  Ret_Val.Access_Form := Form;
+                  return Ret_Val;
+               end;
+            when An_Anonymous_Access_To_Procedure
+               | An_Anonymous_Access_To_Protected_Procedure
+               =>
+               return (Access_Form  => Form,
+                       Attribute    => None,
+                       Name         => Nil_Element,
+                       Anon_Profile => new Profile_Descriptor'(Types_Profile (Def)));
+            when An_Anonymous_Access_To_Function
+               | An_Anonymous_Access_To_Protected_Function
+               =>
+               return (Access_Form  => Form,
+                       Attribute    => None,
+                       Name         => Nil_Element,
+                       Anon_Profile => new Profile_Descriptor'(Types_Profile (Def)));
+         end case;
+
+         -- Here, no more anonymous access types
+         if Expression_Kind (Def) = An_Attribute_Reference then
+            Good_Mark := Prefix (Def);
+
+            case Attribute_Kind (Def) is
+               when A_Base_Attribute =>
+                  Attribute := Base;
+               when A_Class_Attribute =>
+                  Attribute := Class;
+                  -- According to 3.9(14), T'Class'Class is allowed, and "is the same as" T'Class.
+                  -- They are even conformant (checked with Gnat).
+                  -- => Discard extra 'Class before they damage the rest of this algorithm
+                  Good_Mark := Simple_Name (Strip_Attributes (Good_Mark));
+               when others =>
+                  -- Impossible
+                  Impossible ("Attribute of Type_Profile = "
+                              & Attribute_Kinds'Wide_Image (Attribute_Kind (Def)),
+                              Declaration);
+            end case;
+
+         else
+            Good_Mark := Simple_Name (Def);
+            Attribute := None;
+         end if;
+
+         Decl := Corresponding_Name_Declaration (Good_Mark);
+         if Is_From_Limited_View (Decl) then
+            Decl := Get_Nonlimited_View (Decl);
+         end if;
+
+         case Declaration_Kind (Decl) is
+            when An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration =>
+               -- cannot take the Corresponding_First_Subtype of an incomplete type, go to the
+               -- full type first
+               --
+               -- Decl can be Nil_Element if the full context is not available. TBH, it should always be
+               -- available, and an enhancement request has been submitted to AdaCore about this.
+               -- In the meantime, let's take back the incomplete type, and forget about the first subtype
+               if Is_Nil (Decl) then
+                  Decl := Corresponding_Name_Declaration (Good_Mark);
+               else
+                  Decl := Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
+               end if;
+            when A_Formal_Incomplete_Type_Declaration =>
+               null;
+            when others =>
+               Decl := Corresponding_First_Subtype (Decl);
+         end case;
+         return (Access_Form  => Not_An_Access_Definition,
+                 Attribute    => Attribute,
+                 Name         => Names (Decl) (1),
+                 Anon_Profile => null);
+      end Build_Entry;
+
+      function Build_Profile (Parameters : Parameter_Specification_List) return Profile_Table is
+      -- Assert: parameters is not an empty list
+      -- This function is written to avoid recursivity if there is no other multiple
+      -- parameter declaration than the first one.
+
+         Names_1    : constant Name_List     := Names (Parameters (Parameters'First));
+         Entry_1    : constant Profile_Entry := Build_Entry (Object_Declaration_View
+                                                             (Parameters (Parameters'First)));
+         Result     : Profile_Table (List_Index range 1 .. Names_1'Length + Parameters'Length - 1);
+         Result_Inx : Asis.List_Index;
+      begin
+         for I in List_Index range 1 .. Names_1'Length loop
+            Result (I) := Entry_1;
+         end loop;
+
+         Result_Inx := Names_1'Length;
+         for I in List_Index range Parameters'First + 1 .. Parameters'Last loop
+            declare
+               Names_Rest : constant Name_List := Names (Parameters (I));
+            begin
+               if Names_Rest'Length /= 1 then
+                  return Result (1 .. Result_Inx) & Build_Profile (Parameters (I .. Parameters'Last));
+               end if;
+
+               Result_Inx := Result_Inx + 1;
+               Result (Result_Inx) := Build_Entry (Object_Declaration_View (Parameters (I)));
+            end;
+         end loop;
+         return Result;
+      end Build_Profile;
+
+      Result_Entry     : Profile_Entry;
+      Good_Declaration : Asis.Declaration := Declaration;
+      use Asis.Definitions;
+   begin  --  Types_Profile
+      if Declaration_Kind (Good_Declaration) in A_Generic_Instantiation then
+         -- We must get the profile from the corresponding generic element
+         Good_Declaration := Corresponding_Declaration (Good_Declaration);
+      end if;
+
+      case Declaration_Kind (Good_Declaration) is
+         when A_Function_Declaration
+            | An_Expression_Function_Declaration   -- Ada 2012
+            | A_Function_Body_Declaration
+            | A_Function_Renaming_Declaration
+            | A_Function_Body_Stub
+            | A_Generic_Function_Declaration
+            | A_Formal_Function_Declaration
+            =>
+            Result_Entry := Build_Entry (Result_Profile (Good_Declaration));
+
+         when An_Enumeration_Literal_Specification =>
+            -- Profile for an enumeration litteral
+            -- Like a parameterless function; go up two levels (type specification then type declaration)
+            -- to find the return type.
+            -- of the Enumaration_Literal_Specification
+            -- Return immediately, since we know there are no parameters, and Parameter_Profile
+            -- would choke on this.
+            return (Formals_Length => 0,
+                    Result_Type    => (Access_Form  => Not_An_Access_Definition,
+                                       Attribute    => None,
+                                       Name         => Names (Enclosing_Element
+                                         (Enclosing_Element (Good_Declaration))) (1),
+                                       Anon_Profile => null),
+                    Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
+         when Not_A_Declaration =>
+            if Definition_Kind (Good_Declaration) /= An_Access_Definition then
+               Impossible ("Types_Profile: bad declaration", Good_Declaration);
+            end if;
+
+            case Access_Definition_Kind (Good_Declaration) is
+               when An_Anonymous_Access_To_Procedure | An_Anonymous_Access_To_Protected_Procedure =>
+                  Result_Entry := (Access_Form  => Not_An_Access_Definition,
+                                   Attribute    => None,
+                                   Name         => Nil_Element,
+                                   Anon_Profile => null);
+               when An_Anonymous_Access_To_Function  | An_Anonymous_Access_To_Protected_Function  =>
+                  Result_Entry := Build_Entry (Access_To_Function_Result_Profile (Good_Declaration));
+               when others =>
+                  Impossible ("Types_Profile: bad access_definition", Good_Declaration);
+            end case;
+         when others => -- (generic) procedure or entry declaration
+            Result_Entry := (Access_Form  => Not_An_Access_Definition,
+                             Attribute    => None,
+                             Name         => Nil_Element,
+                             Anon_Profile => null);
+      end case;
+
+      declare
+         function All_Parameter_Profile (D : Asis.Element) return Asis.Parameter_Specification_List is
+         -- of course, an if-expression would do as well, but we still stick to Ada05
+         begin
+            if Element_Kind (D) = A_Declaration then
+               return Parameter_Profile (D);
+            else
+               return Access_To_Subprogram_Parameter_Profile (D);
+            end if;
+         end All_Parameter_Profile;
+
+         Parameters : constant Asis.Parameter_Specification_List := All_Parameter_Profile (Good_Declaration);
+      begin
+         if Parameters'Length = 0 then
+            return (Formals_Length => 0,
+                    Result_Type    => Result_Entry,
+                    Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
+         else
+            declare
+               Profile : constant Profile_Table := Build_Profile (Parameters);
+            begin
+               return (Formals_Length => Profile'Length,
+                       Result_Type    => Result_Entry,
+                       Formals        => Profile);
+            end;
+         end if;
+      end;
+   end Types_Profile;
 
    -----------------
    -- All_Formals --

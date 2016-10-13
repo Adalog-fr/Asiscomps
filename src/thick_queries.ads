@@ -1050,6 +1050,50 @@ package Thick_Queries is
    -- Appropriate Expression_Kinds:
    --    A_Function_Call
 
+
+   type Type_Attribute is (None, Base, Class);
+   type Profile_Descriptor (Formals_Length : Asis.ASIS_Natural);
+   type Profile_Access is access Profile_Descriptor;
+   type Profile_Entry is
+      record
+         Access_Form  : Asis.Access_Definition_Kinds;
+         Attribute    : Type_Attribute;
+         Name         : Asis.Defining_Name;
+         Anon_Profile : Profile_Access;
+      end record;
+   type Profile_Table is array (Asis.List_Index range <>) of Profile_Entry;
+   type Profile_Descriptor (Formals_Length : Asis.ASIS_Natural) is
+      record
+         Result_Type : Profile_Entry;
+         Formals     : Profile_Table (1 .. Formals_Length);
+      end record;
+
+   function Types_Profile (Declaration : in Asis.Element)  return Profile_Descriptor;
+   -- Given a callable entity declaration, returns a description of the profile
+   -- type Profile_Descriptor:
+   --    Result_Type describes the result *type* for a function, Nil_Element for other callable entities
+   --    Formals are (in order of declaration) the *types* of the parameters.
+   --       Multiple declarations are separated, i.e. "A,B : Integer" yields two entries in the table.
+   -- type Profile_Entry:
+   --    Access_Form : for anonymous access parameters: the kind of anonymous access (or Not_An_Access_Definition)
+   --    Attribute   : The kind of attribute used with the type name, if any
+   --    Name        : the type name, stripped off of any decoration (access, 'Base, 'Class)
+   --                  only for non-anonymous access types and anonymous access to object types (otherwise nil_element)
+   --    Anon_Profile: only for anonymour access to subprograms, the profile pointed to. Since these are supposed to be
+   --                  pretty (!) rare, we don't care about deallocating the corresponding structure
+   --                  (yes, it is a deliberate memory leak).
+   --
+   -- Note that Non-nil Name and Non-nil Anon_Profile are exclusive, but we didn't put them as variants,
+   -- because this would have required a discriminant (sometimes evaluated dynamically, preventing aggregates) and
+   -- would complicate making arrays of Profile_Entry... Too much burden to save a single word.
+   --
+   -- Appropriate Element_Kinds:
+   --   A_Declaration
+   --
+   -- Appropriate Declaration_Kinds:
+   --   Any (generic) callable entity declaration or body, or an anonymous access to subprogram definition
+
+
    function All_Formals (Profile : Asis.Parameter_Specification_List) return Asis.Defining_Name_List;
    -- Builds a list of all Defining_Name in the profile, "flattening" multiple declarations
 
