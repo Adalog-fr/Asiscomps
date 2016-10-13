@@ -190,6 +190,10 @@ package Thick_Queries is
    --    A_Selected_Component (checks the selector)
 
 
+   function Is_Handled_Sequence_Container (Element : in Asis.Element) return Boolean;
+   -- Returns True if Element is one of the elements that can contain a handled sequence of statements
+   -- Returns false otherwise
+
    function Declarative_Items (Element : in Asis.Element; Include_Pragmas : in Boolean := False)
                               return Asis.Declaration_List;
    -- Returns the declarative items of any construct with declarative items.

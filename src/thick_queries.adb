@@ -897,6 +897,43 @@ package body Thick_Queries is
    end Corresponding_Static_Exception_Handler;
 
 
+   -----------------------------------
+   -- Is_Handled_Sequence_Container --
+   -----------------------------------
+
+   function Is_Handled_Sequence_Container (Element : in Asis.Element) return Boolean is
+   begin
+      case Element_Kind (Element) is
+         when A_Declaration =>
+            case Declaration_Kind (Element) is
+               when A_Function_Body_Declaration
+                  | A_Procedure_Body_Declaration
+                  | A_Package_Body_Declaration
+                  | A_Task_Body_Declaration
+                  | An_Entry_Body_Declaration
+                  =>
+                  return True;
+               when others =>
+                  return False;
+            end case;
+
+         when A_Statement =>
+            case Statement_Kind (Element) is
+               when A_Block_Statement
+                  | An_Accept_Statement
+                  | An_Extended_Return_Statement
+                  =>
+                  return True;
+               when others =>
+                  return False;
+            end case;
+
+         when others =>
+            return False;
+      end case;
+   end Is_Handled_Sequence_Container;
+
+
    -----------------------
    -- Declarative_Items --
    -----------------------
