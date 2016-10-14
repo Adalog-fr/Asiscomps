@@ -2115,7 +2115,7 @@ package body Thick_Queries is
                   when A_Formal_Derived_Type_Definition =>
                      -- we can have progenitors here
                      return Decl_Aspects
-                       & Corresponding_Static_Predicates (Corresponding_Parent_Subtype (Def))
+                       & Corresponding_Static_Predicates (Strip_Attributes (Subtype_Simple_Name (Def)))
                        & Corresponding_Static_Predicates (Definition_Interface_List (Def));
                   when others =>
                      return Decl_Aspects;
@@ -4043,7 +4043,11 @@ package body Thick_Queries is
                end if;
                return Component_Definition_View (Array_Component_Definition (Def));
             when A_Function_Call =>
-               Def := Result_Profile (Corresponding_Name_Declaration (Simple_Name (Prefix (Local_Elem))));
+               Def := Corresponding_Name_Declaration (Simple_Name (Prefix (Local_Elem)));
+               if Declaration_Kind (Def) = A_Function_Instantiation then
+                  Def := Corresponding_Declaration (Def);
+               end if;
+               Def := Result_Profile (Def);
                if Definition_Kind (Def) = An_Access_Definition then -- ASIS 2005
                   -- Result type is an anonymous access type
                   return Def;

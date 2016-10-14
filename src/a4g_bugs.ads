@@ -51,7 +51,7 @@
 
 with
   Asis;
-package A4G_Bugs is
+package A4G_Bugs is  --##rule line off NAMING_CONVENTION -- This is an acronym for Asis For Gnat
 
    --
    -- From Asis.Compilation_Units

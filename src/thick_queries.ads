@@ -255,6 +255,7 @@ package Thick_Queries is
    -- Appropriate Statement_Kinds:
    --    An_Accept_Statement
    --    A_Block_Statement
+   --    An_Extended_Return_Statement
 
 
    -------------------------------------------------------------------------------------------------
