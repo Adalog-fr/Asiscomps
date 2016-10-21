@@ -3335,8 +3335,7 @@ package body Thick_Queries is
                      when An_Identifier | A_Selected_Component =>
                         -- Only these can be type names
                         declare
-                           Decl : constant Asis.Declaration
-                             := Corresponding_Name_Declaration (Simple_Name (Elem));
+                           Decl : constant Asis.Declaration := Corresponding_Name_Declaration (Simple_Name (Elem));
                         begin
                            if Declaration_Kind (Decl) = A_Task_Type_Declaration then
                               return A_Task_Type;
@@ -3466,7 +3465,7 @@ package body Thick_Queries is
             return Not_A_Type;
       end case;
 
-      -- At this point, Good_Elem is a type declaration, or Nil_Element in some weird cases
+      -- At this point, Good_Elem is a (formal) type declaration, or Nil_Element in some weird cases
       if Is_Nil (Good_Elem) then
          -- Special case: not a good ol' type.
          -- It could be universal fixed if the expression is a fixed point multiply/divide
@@ -3492,7 +3491,7 @@ package body Thick_Queries is
          end;
       end if;
 
-      -- At this point, Good_Elem is a type declaration
+      -- At this point, Good_Elem is a (formal) type declaration
       -- If an incomplete type, go to full type declaration   #0000041
       if Declaration_Kind (Good_Elem) in An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration then
          if Is_From_Limited_View (Good_Elem) then
@@ -3518,12 +3517,11 @@ package body Thick_Queries is
                         when A_Class_Attribute =>
                            return A_Tagged_Type;
                         when A_Base_Attribute =>
-                           Good_Elem := Prefix (Good_Elem);
+                           Good_Elem := Simple_Name (Prefix (Good_Elem));
                         when others =>
                            Impossible ("Bad attribute in Type_Category", Good_Elem);
                      end case;
-                     Good_Elem := Corresponding_First_Subtype
-                                   (Corresponding_Name_Declaration (Simple_Name (Good_Elem)));
+                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration (Good_Elem));
                   when An_Enumeration_Type_Definition =>
                      return An_Enumeration_Type;
                   when A_Signed_Integer_Type_Definition =>
@@ -3573,7 +3571,21 @@ package body Thick_Queries is
                   when A_Formal_Tagged_Private_Type_Definition =>
                      return A_Tagged_Type;
                   when A_Formal_Derived_Type_Definition =>
-                     return A_Derived_Type;
+                     if not Follow_Derived then
+                        return A_Derived_Type;
+                     end if;
+                     Good_Elem := Subtype_Simple_Name (Type_Declaration_View (Good_Elem));
+                     case Attribute_Kind (Good_Elem) is
+                        when Not_An_Attribute =>
+                           null;
+                        when A_Class_Attribute =>
+                           return A_Tagged_Type;
+                        when A_Base_Attribute =>
+                           Good_Elem := Simple_Name (Prefix (Good_Elem));
+                        when others =>
+                           Impossible ("Bad attribute in Type_Category", Good_Elem);
+                     end case;
+                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration (Good_Elem));
                   when A_Formal_Discrete_Type_Definition =>
                      return An_Enumeration_Type;
                   when A_Formal_Signed_Integer_Type_Definition =>
@@ -4662,6 +4674,7 @@ package body Thick_Queries is
 
       return Result;
    end Ultimate_Enclosing_Instantiation;
+
 
    ---------------------
    -- Is_Generic_Unit --

@@ -662,8 +662,8 @@ package Thick_Queries is
                            Separate_Extension : in Boolean := False) return Type_Categories;
    -- For private and derived types:
    --    If Follow_Derived (resp. Follow_Private) is True, returns the category of the
-   --    parent (full) type instead of A_Derived_Type (A_Private_Type). Formal derived (private)
-   --    types still return A_Derived_Type (A_Private_Type).
+   --    parent (full) type instead of A_Derived_Type (A_Private_Type).
+   --    Formal private types return A_Private_Type even if Follow_Private is True (no corresponding full declaration)
    --
    -- For (private) type extensions:
    --   if Separate_Extension is True, returns An_Extended_Tagged_Type, otherwise returns A_Tagged_Type.
