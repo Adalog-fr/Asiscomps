@@ -124,11 +124,14 @@ package Thick_Queries is
    --    An_Identifier
    --    A_Selected_Component (checks the selector)
 
+   function First_Enclosing_Instantiation (The_Element : Asis.Element) return Asis.Declaration;
+   -- For an entity which Is_Part_Of_Instance:
+   -- Return the first enclosing instantiation, which can itself be Is_Part_Of_Instance
+
    function Ultimate_Enclosing_Instantiation (The_Element : Asis.Element) return Asis.Declaration;
    -- For an entity which Is_Part_Of_Instance:
    -- Return the "true" instantiation, i.e. the one written by the user, going up instantiations
    -- that appear in generics.
-
 
    function Is_Generic_Unit (Element : in Asis.Element) return Boolean;
    -- Returns True if Element is the declaration or the body of a generic unit

@@ -4634,6 +4634,21 @@ package body Thick_Queries is
    end Association_Value;
 
 
+   -----------------------------------
+   -- First_Enclosing_Instantiation --
+   -----------------------------------
+
+   function First_Enclosing_Instantiation (The_Element : Asis.Element) return Asis.Declaration is
+      Result : Asis.Declaration := Enclosing_Element (The_Element);
+   begin
+      while Declaration_Kind (Result) not in A_Generic_Instantiation loop
+         Result := Enclosing_Element (Result);
+      end loop;
+
+      return Result;
+   end First_Enclosing_Instantiation;
+
+
    --------------------------------------
    -- Ultimate_Enclosing_Instantiation --
    --------------------------------------
