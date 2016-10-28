@@ -1925,7 +1925,15 @@ package body Thick_Queries is
                      | A_Formal_Object_Declaration
                      | An_Object_Renaming_Declaration
                      =>
-                     Decl := Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Decl)));
+                     Def := Object_Declaration_View (Decl);
+                     if Element_Kind (Def) = An_Expression then
+                        -- Should be a (possibly selected) name
+                        Decl := Corresponding_Name_Declaration (Simple_Name (Def));
+                     elsif Is_Access_Subtype (Def) then
+                        Decl := Access_Target_Type (Def);
+                     else
+                        Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Def));
+                     end if;
 
                   when A_Private_Type_Declaration | An_Incomplete_Type_Declaration =>
                      -- If this private (or incomplete) type was used as a range, it is necessarily from a place
@@ -5374,9 +5382,8 @@ package body Thick_Queries is
                   when A_Parameter_Specification
                      | A_Formal_Object_Declaration
                        =>
-                     -- No constraint allowed here, get bounds from the type
                      No_Unconstrained := True;
-                     Item             := Declaration_Subtype_Mark (Item);
+                     Item             := Object_Declaration_View (Item);
 
                   when An_Object_Renaming_Declaration =>
                      Item := Renamed_Entity (Item);
