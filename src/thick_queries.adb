@@ -2155,15 +2155,16 @@ package body Thick_Queries is
    -------------------
 
    Callable_Attributes : constant array (Asis.Attribute_Kinds) of Callable_Kinds
-     := (An_Adjacent_Attribute          | A_Ceiling_Attribute    | A_Compose_Attribute      |
-         A_Copy_Sign_Attribute          | An_Exponent_Attribute  | A_Floor_Attribute        |
-         A_Fraction_Attribute           | An_Image_Attribute     | A_Leading_Part_Attribute |
-         A_Machine_Attribute            | A_Max_Attribute        | A_Min_Attribute          |
-         A_Model_Attribute              | A_Pos_Attribute        | A_Pred_Attribute         |
-         A_Remainder_Attribute          | A_Round_Attribute      | A_Rounding_Attribute     |
-         A_Scaling_Attribute            | A_Succ_Attribute       | A_Truncation_Attribute   |
-         An_Unbiased_Rounding_Attribute | A_Val_Attribute        | A_Value_Attribute        |
-         A_Wide_Image_Attribute         | A_Wide_Value_Attribute
+     := (An_Adjacent_Attribute          | A_Ceiling_Attribute    | A_Compose_Attribute         |
+         A_Copy_Sign_Attribute          | An_Exponent_Attribute  | A_Floor_Attribute           |
+         A_Fraction_Attribute           | An_Image_Attribute     | A_Leading_Part_Attribute    |
+         A_Machine_Attribute            | A_Max_Attribute        | A_Min_Attribute             |
+         A_Model_Attribute              | A_Pos_Attribute        | A_Pred_Attribute            |
+         A_Remainder_Attribute          | A_Round_Attribute      | A_Rounding_Attribute        |
+         A_Scaling_Attribute            | A_Succ_Attribute       | A_Truncation_Attribute      |
+         An_Unbiased_Rounding_Attribute | A_Val_Attribute        | A_Value_Attribute           |
+         A_Wide_Image_Attribute         | A_Wide_Value_Attribute | A_Wide_Wide_Image_Attribute |
+         A_Wide_Wide_Value_Attribute
          => A_Function_Callable,
 
          An_Input_Attribute | An_Output_Attribute | A_Read_Attribute | A_Write_Attribute
