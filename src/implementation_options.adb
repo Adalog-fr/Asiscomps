@@ -37,10 +37,6 @@ with -- Standard Ada units
   Ada.Strings.Wide_Unbounded,
   Ada.Text_IO;
 
-with -- GNAT units
-  Gnatcoll.Projects,
-  Gnatcoll.VFS;
-
 package body Implementation_Options is
 
    -------------------------------------------------------------
@@ -96,31 +92,7 @@ package body Implementation_Options is
 
    -- This functions constructs a list of -I<name> options from
    -- the source_dirs indications in a Gnat .gpr project file
-
-   function I_Options_From_GPR_Project (Project_File : String) return Wide_String is
-      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
-      use Gnatcoll.Projects, Gnatcoll.VFS;
-
-      Tree   : Project_Tree;
-      Result : Unbounded_Wide_String;
-   begin    -- I_Options_From_GPR_Project
-      Load (Tree, Root_Project_Path => Create (+Project_File));
-
-      declare
-         Project_Dirs : constant File_Array := Source_Dirs (Root_Project (Tree), Recursive => True);
-      begin
-         for D in Project_Dirs'Range loop
-            Append (Result, " -I" & To_Wide_String (+Full_Name (Project_Dirs (D))));
-         end loop;
-      end;
-
-      return To_Wide_String (Result);
-
-   exception
-      when Invalid_Project =>
-         raise Implementation_Error with "Unknown or invalid GPR project: " & Project_File;
-   end I_Options_From_GPR_Project;
-
+   function I_Options_From_GPR_Project (Project_File : String) return Wide_String is separate;
 
    -------------------------------------------------------------
    -- Exported Elements                                       --
