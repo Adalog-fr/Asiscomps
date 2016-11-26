@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options.I_Options_From_GPR_Project - func. body  --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Implementation_Options.No_Project_File - Package specification  --
+--  Copyright (C) 2002-2016 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,31 +31,14 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-with -- GNAT units
-  Gnatcoll.Projects,
-  Gnatcoll.VFS;
 
-separate (Implementation_Options)
-function I_Options_From_GPR_Project (Project_File : String) return Wide_String is
-   use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
-   use Gnatcoll.Projects, Gnatcoll.VFS;
+package Implementation_Options.No_Project_File is
+-- Placeholder package to replace Implementation_Options.GPR_Project_File
+-- when support of .gpr files is not desired
 
-   Tree   : Project_Tree;
-   Result : Unbounded_Wide_String;
-begin    -- I_Options_From_GPR_Project
-   Load (Tree, Root_Project_Path => Create (+Project_File));
+   function Is_Appropriate (Project_Name : String) return Boolean;
+   -- always returns false
 
-   declare
-      Project_Dirs : constant File_Array := Source_Dirs (Root_Project (Tree), Recursive => True);
-   begin
-      for D in Project_Dirs'Range loop
-         Append (Result, " -I" & To_Wide_String (+Full_Name (Project_Dirs (D))));
-      end loop;
-   end;
-
-   return To_Wide_String (Result);
-
-exception
-   when Invalid_Project =>
-      raise Implementation_Error with "Unknown or invalid GPR project: " & Project_File;
-end I_Options_From_GPR_Project;
+   function I_Options (Project_Name : String) return Wide_String;
+   -- always returns ""
+end Implementation_Options.No_Project_File;

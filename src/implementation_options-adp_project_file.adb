@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options - Package body                           --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Implementation_Options.ADP_Project_File - Package body          --
+--  Copyright (C) 2002-2016 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,64 +31,71 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
+
+
 with -- Standard Ada units
-  Ada.Strings.Wide_Fixed,
-  Ada.Strings.Wide_Unbounded;
+   Ada.Characters.Handling,
+   Ada.Text_IO;
 
-with
-   Implementation_Options.ADP_Project_File,
-   Implementation_Options.Project_File;
-package body Implementation_Options is
+package body Implementation_Options.ADP_Project_File is
 
-   -----------------------
-   -- Initialize_String --
-   -----------------------
+   --------------------
+   -- Is_Appropriate --
+   --------------------
 
-   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
-      Default : constant Wide_String := "-ws -k -asis05";
+   function Is_Appropriate (Project_Name : String) return Boolean is
+      use Ada.Characters.Handling;
    begin
-      if Debug_Mode then
-         return Default;
-      else
-         return Default & " -nbb";   -- No Bug Box
-      end if;
-   end Initialize_String;
+      return Project_Name'Length >= 5
+        and then To_Upper (Project_Name (Project_Name'Last - 3 .. Project_Name'Last)) = ".ADP";
+   end Is_Appropriate;
 
-  -----------------------
-   -- Parameters_String --
-   -----------------------
+   ---------------
+   -- I_Options --
+   ---------------
 
-   function Parameters_String (Project_Name  : String := "";
-                               Other_Options : Wide_String := "") return Wide_String
-   is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
-      Default_Options : Unbounded_Wide_String;
-   begin
-      if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
-      end if;
-      if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
-      end if;
+   function I_Options (Project_Name : String) return Wide_String is
+      use Ada.Text_IO;
 
-      if Project_Name = "" then  -- No project file
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Other_Options;
-      elsif Project_File.Is_Appropriate (Project_Name) then
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Project_File.I_Options (Project_Name)
-           & ' ' & Other_Options;
-      elsif ADP_Project_File.Is_Appropriate (Project_Name) then
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & ADP_Project_File.I_Options (Project_Name)
-           & ' ' & Other_Options;
-      else
-         raise Implementation_Error with "Incorrect project file: " & Project_Name;
-      end if;
+      F   : File_Type;
+      Key : constant String := "src_dir=";
+      function Get_Next_Src return Wide_String is
+         use Ada.Characters.Handling;
 
-   end Parameters_String;
+         Buf  : String (1 .. 500);
+         Last : Natural;
+      begin
+         loop  -- Exit on End_Error
+            Get_Line (F, Buf, Last);
+            if Last > Key'Length and then
+              Buf (1 .. Key'Length) = Key
+            then
+               return "-I" & To_Wide_String (Buf (Key'Length + 1 .. Last)) & ' ' & Get_Next_Src;
+            end if;
+         end loop;
+      exception
+            -- It is better to catch End_Error than to check End_Of_File
+            -- in the case of malformed input files
+         when End_Error =>
+            return "";
+      end Get_Next_Src;
 
-end Implementation_Options;
+   begin    -- I_Options_From_ADP_Project
+      Open (F, In_File, Project_Name);
+      declare
+         Result : constant Wide_String := Get_Next_Src;
+      begin
+         Close (F);
+         return Result;
+      end;
+   exception
+      when Name_Error =>
+         raise Implementation_Error with "Unknown ADP project: " & Project_Name;
+      when others =>
+         if Is_Open (F) then
+            Close (F);
+         end if;
+         raise;
+   end I_Options;
+
+end Implementation_Options.ADP_Project_File;

@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options.I_Options_From_GPR_Project - func. body  --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Implementation_Options.No_Project_File - Package body           --
+--  Copyright (C) 2002-2016 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,9 +31,27 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-separate (Implementation_Options)
-function I_Options_From_GPR_Project (Project_File : String) return Wide_String is
-begin    -- I_Options_From_GPR_Project
-   raise Implementation_Error with "GPR project not supported in this version: " & Project_File;
-   return "";
-end I_Options_From_GPR_Project;
+
+package body Implementation_Options.No_Project_File is
+
+   --------------------
+   -- Is_Appropriate --
+   --------------------
+
+   function Is_Appropriate (Project_Name : String) return Boolean is
+      pragma Unreferenced (Project_Name);
+   begin
+      return False;
+   end Is_Appropriate;
+
+   ---------------
+   -- I_Options --
+   ---------------
+
+   function I_Options (Project_Name : String) return Wide_String is
+      pragma Unreferenced (Project_Name);
+   begin    -- I_Options_From_GPR_Project
+      return "";
+   end I_Options;
+
+end Implementation_Options.No_Project_File;

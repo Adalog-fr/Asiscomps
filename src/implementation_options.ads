@@ -38,7 +38,7 @@ package Implementation_Options is
 
    -- Parameters for ASIS
    function Initialize_String (Debug_Mode : Boolean := False) return Wide_String;
-   function Parameters_String (Project_File  : String := "";
+   function Parameters_String (Project_Name  : String := "";
                                Other_Options : Wide_String := "") return Wide_String;
    Default_C_Parameter : Wide_Character := 'A';   -- -CA
    Default_F_Parameter : Wide_Character := 'M';   -- -FM

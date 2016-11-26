@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options - Package body                           --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Implementation_Options.ADP_Project_File - Package specification --
+--  Copyright (C) 2002-2016 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,64 +31,12 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-with -- Standard Ada units
-  Ada.Strings.Wide_Fixed,
-  Ada.Strings.Wide_Unbounded;
 
-with
-   Implementation_Options.ADP_Project_File,
-   Implementation_Options.Project_File;
-package body Implementation_Options is
+package Implementation_Options.ADP_Project_File is
 
-   -----------------------
-   -- Initialize_String --
-   -----------------------
+   function Is_Appropriate (Project_Name : String) return Boolean;
 
-   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
-      Default : constant Wide_String := "-ws -k -asis05";
-   begin
-      if Debug_Mode then
-         return Default;
-      else
-         return Default & " -nbb";   -- No Bug Box
-      end if;
-   end Initialize_String;
-
-  -----------------------
-   -- Parameters_String --
-   -----------------------
-
-   function Parameters_String (Project_Name  : String := "";
-                               Other_Options : Wide_String := "") return Wide_String
-   is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
-      Default_Options : Unbounded_Wide_String;
-   begin
-      if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
-      end if;
-      if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
-      end if;
-
-      if Project_Name = "" then  -- No project file
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Other_Options;
-      elsif Project_File.Is_Appropriate (Project_Name) then
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Project_File.I_Options (Project_Name)
-           & ' ' & Other_Options;
-      elsif ADP_Project_File.Is_Appropriate (Project_Name) then
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & ADP_Project_File.I_Options (Project_Name)
-           & ' ' & Other_Options;
-      else
-         raise Implementation_Error with "Incorrect project file: " & Project_Name;
-      end if;
-
-   end Parameters_String;
-
-end Implementation_Options;
+   -- Constructs a list of -I<name> options from
+   -- the source_dirs indications in an Emacs .adp project file
+   function I_Options (Project_Name : String) return Wide_String;
+end Implementation_Options.ADP_Project_File;
