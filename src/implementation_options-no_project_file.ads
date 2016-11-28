@@ -41,4 +41,7 @@ package Implementation_Options.No_Project_File is
 
    function I_Options (Project_Name : String) return Wide_String;
    -- always returns ""
+
+   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
+   -- always returns ""
 end Implementation_Options.No_Project_File;

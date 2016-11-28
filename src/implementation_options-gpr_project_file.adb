@@ -38,6 +38,7 @@ with -- Standard Ada units
    Ada.Strings.Wide_Unbounded;
 
 with -- GNAT units
+   Gnat.Strings,
    Gnatcoll.Projects,
    Gnatcoll.VFS;
 
@@ -82,4 +83,34 @@ package body Implementation_Options.GPR_Project_File is
          raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
    end I_Options;
 
+   -----------------
+   -- Tool_Switch --
+   -----------------
+
+   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String is
+      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
+      use Gnatcoll.Projects, Gnatcoll.VFS;
+      use type Gnat.Strings.String_List_Access;
+
+      Tree   : Project_Tree;
+   begin    -- I_Options_From_GPR_Project
+      Load (Tree, Root_Project_Path => Create (+Project_Name));
+      declare
+         Attributes : constant GNAT.Strings.String_List_Access
+           := Attribute_Value (Project      => Root_Project (Tree),
+                               Attribute    => Build (Ide_Package, "Default_Switches"),
+                               Index        => Tool,
+                               Use_Extended => True);
+      begin
+         if Attributes = null then
+            return "";
+         end if;
+         for I in Attributes'Range loop
+            if Attributes (I).all = After then
+               return Attributes (I+1).all;
+            end if;
+         end loop;
+         return "";
+      end;
+   end Tool_Switch;
 end Implementation_Options.GPR_Project_File;

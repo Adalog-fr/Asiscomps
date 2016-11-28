@@ -36,7 +36,11 @@ package Implementation_Options.GPR_Project_File is
 
    function Is_Appropriate (Project_Name : String) return Boolean;
 
+   function I_Options (Project_Name : String) return Wide_String;
    -- Constructs a list of -I<name> options from
    -- the source_dirs indications in a Gnat .gpr project file
-   function I_Options (Project_Name : String) return Wide_String;
+
+   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
+   -- From Default_Switches of package IDE:
+   -- returns the value of the parameter that follows After
 end Implementation_Options.GPR_Project_File;

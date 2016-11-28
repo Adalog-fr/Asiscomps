@@ -54,4 +54,10 @@ package body Implementation_Options.No_Project_File is
       return "";
    end I_Options;
 
+   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String is
+      pragma Unreferenced (Project_Name, Tool, After);
+   begin
+      return "";
+   end Tool_Switch;
+
 end Implementation_Options.No_Project_File;
