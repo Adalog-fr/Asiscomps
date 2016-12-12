@@ -92,25 +92,32 @@ package body Implementation_Options.GPR_Project_File is
       use Gnatcoll.Projects, Gnatcoll.VFS;
       use type Gnat.Strings.String_List_Access;
 
-      Tree   : Project_Tree;
+      Tree       : Project_Tree;
+      Attributes : GNAT.Strings.String_List_Access;
+
+      -- Not clear whether the value is named "Switches" or "Default_Switches"... Try both
    begin    -- I_Options_From_GPR_Project
       Load (Tree, Root_Project_Path => Create (+Project_Name));
-      declare
-         Attributes : constant GNAT.Strings.String_List_Access
-           := Attribute_Value (Project      => Root_Project (Tree),
-                               Attribute    => Build (Ide_Package, "Default_Switches"),
-                               Index        => Tool,
-                               Use_Extended => True);
-      begin
+
+      Attributes := Attribute_Value (Project      => Root_Project (Tree),
+                                     Attribute    => Build (Ide_Package, "Default_Switches"),
+                                     Index        => Tool,
+                                     Use_Extended => True);
+      if Attributes = null then
+         Attributes := Attribute_Value (Project      => Root_Project (Tree),
+                                        Attribute    => Build (Ide_Package, "Switches"),
+                                        Index        => Tool,
+                                        Use_Extended => True);
          if Attributes = null then
             return "";
          end if;
-         for I in Attributes'Range loop
-            if Attributes (I).all = After then
-               return Attributes (I+1).all;
-            end if;
-         end loop;
-         return "";
-      end;
+      end if;
+
+      for I in Attributes'Range loop
+         if Attributes (I).all = After then
+            return Attributes (I + 1).all;
+         end if;
+      end loop;
+      return "";
    end Tool_Switch;
 end Implementation_Options.GPR_Project_File;
