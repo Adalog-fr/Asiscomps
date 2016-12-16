@@ -2843,6 +2843,61 @@ package body Thick_Queries is
       return Is_Equal (Element, Unit_Declaration (Enclosing_Compilation_Unit (Element)));
    end Is_Compilation_Unit;
 
+   -------------------
+   -- Is_Controlled --
+   -------------------
+
+   function Is_Controlled (The_Element : Asis.Element) return Boolean is
+      The_Subtype : Asis.Declaration := The_Element;
+      -- TBH: will be the subtype's declaration after resolving other forms
+   begin
+      loop
+         case Element_Kind (The_Subtype) is
+            when A_Declaration =>
+               case Declaration_Kind (The_Subtype) is
+                  when A_Type_Declaration =>
+                     exit;
+                  when A_Subtype_Declaration =>
+                     The_Subtype := Corresponding_First_Subtype (The_Subtype);
+                  when A_Variable_Declaration
+                     | A_Constant_Declaration
+                     | A_Deferred_Constant_Declaration
+                     | A_Component_Declaration
+                     | A_Parameter_Specification
+                     | A_Return_Variable_Specification
+                     | A_Return_Constant_Specification
+                     | A_Formal_Object_Declaration
+                     | An_Object_Renaming_Declaration
+                     =>
+                     The_Subtype := Object_Declaration_View (The_Subtype);
+                     if Definition_Kind (The_Subtype) /= A_Subtype_Indication then
+                        -- Anonymous stuff cannot be controlled
+                        return False;
+                     end if;
+                     The_Subtype := Subtype_Simple_Name (The_Subtype);
+                  when others =>
+                     return False;
+               end case;
+            when A_Definition | A_Defining_Name =>
+               The_Subtype := Enclosing_Element (The_Subtype);
+            when An_Expression =>
+               The_Subtype := Corresponding_Expression_Type_Definition (The_Subtype);
+            when others =>
+               Impossible ("Is_Controlled: bad element", The_Element);
+         end case;
+      end loop;
+
+      -- Here we have a type declaration
+      declare
+         Ultimate_Ancestor : constant Wide_String := To_Upper (Full_Name_Image
+                                                               (Names (Ultimate_Type_Declaration (The_Subtype)) (1)));
+      begin
+         return Ultimate_Ancestor = "ADA.FINALIZATION.CONTROLLED"
+           or else Ultimate_Ancestor = "ADA.FINALIZATION.LIMITED_CONTROLLED";
+      end;
+   end Is_Controlled;
+
+
    ----------------
    -- Is_Limited --
    ----------------

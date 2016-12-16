@@ -467,6 +467,22 @@ package Thick_Queries is
    --    A_Selected_Component (applies on selector)
    --    An_Attribute_Reference
 
+   function Is_Controlled (The_Element : Asis.Element) return Boolean;
+   -- Returns True if The_Element is a defining_name, declaration or definition of a controlled
+   -- type, of an object of a controlled type, or an expression whose type is controlled.
+   -- Returns False in all other cases
+   --
+   -- Appropriate Element_Kinds
+   --   A_Declaration
+   --   A_Definition
+   --   A_Defining_Name
+   --   An_Expression
+   --
+   --  Appropriate Expression_Kinds:
+   --       An_Identifier
+   --       An_Operator_Symbol
+   --       A_Selected_Component (applies to selector)
+
    function Is_Limited (The_Element : Asis.Element) return Boolean;
    -- Returns True if The_Element is a defining_name, declaration or definition of an (explicit or implicit)
    -- limited type, of an object of a limited type, or an expression whose type is limited.
