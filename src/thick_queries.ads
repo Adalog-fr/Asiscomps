@@ -582,9 +582,15 @@ package Thick_Queries is
 
 
    function Contains_Type_Declaration_Kind (The_Subtype : Asis.Declaration;
-                                            The_Kind    : Asis.Declaration_Kinds) return Boolean;
+                                            The_Kind    : Asis.Declaration_Kinds;
+                                            The_Type    : Asis.Type_Kinds := Asis.Not_A_Type_Definition) return Boolean;
    -- Like Is_Type_Declaration_Kind, but for composite types, returns True if any subcomponent is
-   -- of the given kind.
+   -- of the given declaration kind and type kind.
+   -- The_Type = Not_A_Type_Definition really means "ignore type kind", wich is of course the only sensible value
+   --   if The_Kind /= An_Ordinary_Type_Declaration
+   -- If The_Kind = An_Ordinary_Type_Declaration and The_Type = An_Access_Type_Definition, the function returns
+   --    True if any subcomponent is of an anonymous access type (which, strictly speaking, is not
+   --    An_Ordinary_Type_Declaration)
    --
    -- Appropriate Declaration_Kinds:
    --       An_Ordinary_Type_Declaration

@@ -3709,7 +3709,8 @@ package body Thick_Queries is
    ------------------------------------
 
    function Contains_Type_Declaration_Kind (The_Subtype : Asis.Declaration;
-                                            The_Kind    : Asis.Declaration_Kinds) return Boolean
+                                            The_Kind    : Asis.Declaration_Kinds;
+                                            The_Type    : Asis.Type_Kinds := Asis.Not_A_Type_Definition) return Boolean
    is
       use Asis.Definitions, Asis.Expressions;
 
@@ -3722,14 +3723,21 @@ package body Thick_Queries is
                when A_Declaration =>
                   -- A_Component_Declaration
                   Def := Component_Definition_View (Object_Declaration_View (Components (I)));
-                  if Definition_Kind (Def) /= An_Access_Definition then -- Anonymous access types have no declaration
+                  if Definition_Kind (Def) = An_Access_Definition then
+                     -- Just to be rigorous, consider anonymous access types as An_Ordinary_Type_Declaration
+                     if The_Kind = An_Ordinary_Type_Declaration
+                       and (The_Type = An_Access_Type_Definition or The_Type = Not_A_Type_Definition)
+                     then
+                        return True;
+                     end if;
+                  else
                      Name := Subtype_Simple_Name (Def);
                      if Expression_Kind (Name) = An_Attribute_Reference then
                         -- A record component can't be 'Class, must be 'Base
                         Name := Simple_Name (Prefix (Name));
                      end if;
-                     if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (Name), The_Kind) then
-                        return True;
+                     if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (Name), The_Kind, The_Type) then
+                        return Type_Kind (Def) = The_Type or Type_Kind (Def) = Not_A_Type_Definition;
                      end if;
                   end if;
                when A_Definition =>
@@ -3768,7 +3776,7 @@ package body Thick_Queries is
                if Definition_Kind (Object_Declaration_View (Discrs (I))) = An_Access_Definition then
                   -- Just to be rigorous, consider anonymous access types as An_Ordinary_Type_Declaration
                   if The_Kind = An_Ordinary_Type_Declaration then
-                     return True;
+                     return The_Type = An_Access_Type_Definition or The_Type = Not_A_Type_Definition;
                   end if;
                else
                   SM := Declaration_Subtype_Mark (Discrs (I));
@@ -3785,7 +3793,7 @@ package body Thick_Queries is
                      Impossible ("Wrong declaration_subtype_mark", SM);
                   end case;
 
-                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (SM), The_Kind) then
+                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (SM), The_Kind, The_Type) then
                      return True;
                   end if;
                end if;
@@ -3804,7 +3812,10 @@ package body Thick_Queries is
          Def  := Type_Declaration_View (Decl);
       end if;
 
-      if Declaration_Kind (Decl) = The_Kind then
+      if Declaration_Kind (Decl) = The_Kind
+        and then (Type_Kind (Def) = The_Type or Type_Kind (Def) = Not_A_Type_Definition)
+      then
+         -- We have (not yet) anonymous types at that point
          return True;
       end if;
 
@@ -3818,7 +3829,8 @@ package body Thick_Queries is
                                                           (Subtype_Simple_Name
                                                            (Component_Definition_View
                                                             (Array_Component_Definition (Def))))),
-                                                         The_Kind);
+                                                         The_Kind,
+                                                         The_Type);
 
                when A_Record_Type_Definition | A_Tagged_Record_Type_Definition =>
                   if Definition_Kind (Asis.Definitions.Record_Definition (Def)) /= A_Null_Record_Definition
@@ -3832,7 +3844,8 @@ package body Thick_Queries is
                when A_Derived_Record_Extension_Definition =>
                   if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
                                                      (Subtype_Simple_Name (Parent_Subtype_Indication (Def))),
-                                                    The_Kind)
+                                                     The_Kind,
+                                                     The_Type)
                   then
                      return True;
                   end if;
@@ -3864,7 +3877,8 @@ package body Thick_Queries is
                                                              (Subtype_Simple_Name
                                                               (Component_Definition_View
                                                                (Object_Declaration_View (Decls (I))))),
-                                                             The_Kind)
+                                                             The_Kind,
+                                                             The_Type)
                   then
                      return True;
                   end if;
@@ -3875,7 +3889,8 @@ package body Thick_Queries is
          when A_Private_Extension_Declaration =>
             if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
                                                (Subtype_Simple_Name (Ancestor_Subtype_Indication (Def))),
-                                              The_Kind)
+                                               The_Kind,
+                                               The_Type)
             then
                return True;
             end if;
