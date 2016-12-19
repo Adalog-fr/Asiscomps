@@ -3473,7 +3473,7 @@ package body Thick_Queries is
                      when A_Class_Attribute =>
                         return A_Tagged_Type;
                      when A_Base_Attribute =>
-                        Good_Elem := Corresponding_Name_Declaration (Prefix (Good_Elem));
+                        Good_Elem := Corresponding_Name_Declaration (Simple_Name (Prefix (Good_Elem)));
                      when others =>
                         Impossible ("Type category: attribute should be type", Good_Elem);
                   end case;
@@ -3525,6 +3525,34 @@ package body Thick_Queries is
             end case;
          when A_Defining_Name =>
             Good_Elem := Enclosing_Element (Elem);
+            if Declaration_Kind (Good_Elem) = A_Deferred_Constant_Declaration then
+               Good_Elem := Corresponding_Constant_Declaration (Good_Elem);
+            end if;
+            if Declaration_Kind (Good_Elem) in A_Variable_Declaration .. A_Single_Protected_Declaration then
+               case Declaration_Kind (Good_Elem) is
+                  when A_Variable_Declaration | A_Constant_Declaration =>
+                     Good_Elem := Object_Declaration_View (Good_Elem);
+                     if Definition_Kind (Good_Elem) = An_Access_Definition then
+                        return An_Access_Type;
+                     end if;
+                     if Type_Kind (Good_Elem) in An_Unconstrained_Array_Definition .. A_Constrained_Array_Definition
+                     then
+                        return An_Array_Type;
+                     end if;
+                     Good_Elem := Corresponding_Name_Declaration (Simple_Name
+                                                                  (Strip_Attributes
+                                                                   (Subtype_Simple_Name (Good_Elem))));
+                  when A_Deferred_Constant_Declaration =>
+                     Impossible ("A_Deferred_Constant_Declaration", Good_Elem);
+                  when A_Single_Task_Declaration =>
+                     return A_Task_Type;
+                  when A_Single_Protected_Declaration =>
+                     return A_Protected_Type;
+                  when others =>
+                     -- Assume a type
+                     null;
+               end case;
+            end if;
          when others =>
             return Not_A_Type;
       end case;
