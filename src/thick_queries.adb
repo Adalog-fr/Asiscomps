@@ -2848,6 +2848,7 @@ package body Thick_Queries is
    -------------------
 
    function Is_Controlled (The_Element : Asis.Element) return Boolean is
+      use Asis.Expressions;
       The_Subtype : Asis.Declaration := The_Element;
       -- TBH: will be the subtype's declaration after resolving other forms
    begin
@@ -2881,13 +2882,29 @@ package body Thick_Queries is
             when A_Definition | A_Defining_Name =>
                The_Subtype := Enclosing_Element (The_Subtype);
             when An_Expression =>
-               The_Subtype := Corresponding_Expression_Type_Definition (The_Subtype);
+               if Expression_Kind (The_Subtype) = An_Identifier
+                 and then Declaration_Kind (Corresponding_Name_Declaration (The_Subtype))
+                          in An_Ordinary_Type_Declaration .. A_Subtype_Declaration
+               then
+                  -- This identifier is a (sub)type name
+                  The_Subtype := Corresponding_Name_Declaration (The_Subtype);
+               else
+                  -- Real expression
+                  The_Subtype := Corresponding_Expression_Type_Definition (The_Subtype);
+               end if;
+            when Not_An_Element =>
+               -- we hit some strange beast, like fixed point multiplication, etc...
+               -- anyway, can't be controlled
+               return False;
             when others =>
                Impossible ("Is_Controlled: bad element", The_Element);
          end case;
       end loop;
 
-      -- Here we have a type declaration
+      -- Here we have a type declaration, but beware of root and universal types (certainly not controlled)
+      if Type_Kind (Type_Declaration_View (The_Subtype)) = A_Root_Type_Definition then
+         return False;
+      end if;
       declare
          Ultimate_Ancestor : constant Wide_String := To_Upper (Full_Name_Image
                                                                (Names (Ultimate_Type_Declaration (The_Subtype)) (1)));
