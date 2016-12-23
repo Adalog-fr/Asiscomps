@@ -32,7 +32,7 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 pragma Ada_05;
---## Rule off Use_Img_Function ## This package should not depend on utilities
+--## Rule off Use_Img_Function ## This package should not depend on Utilities
 with   -- Standard Ada units
   Ada.Characters.Handling,
   Ada.Exceptions,
@@ -5341,6 +5341,7 @@ package body Thick_Queries is
                            end if;
 
                            -- Assignment: the bounds are the same as the LHS
+                           --  TBSL: is that really true (sliding)?
                            Item_Def := Corresponding_Expression_Type_Definition
                                           (Assignment_Variable_Name
                                            (Enclosing_Element (Item)));
@@ -5377,6 +5378,8 @@ package body Thick_Queries is
                                  elsif Expression_Kind (Encl) = A_Qualified_Expression then
                                     return Discrete_Constraining_Bounds
                                             (Converted_Or_Qualified_Subtype_Mark (Encl));
+                                 elsif Declaration_Kind (Encl) in A_Variable_Declaration .. A_Constant_Declaration then
+                                    return Discrete_Constraining_Bounds (Encl);
                                  end if;
                               else
                                  if Assocs'Length = 1 and then Array_Component_Choices (Assocs (1))'Length = 1 then
@@ -5422,6 +5425,26 @@ package body Thick_Queries is
                      =>
                      -- Easy: use the given type!
                      Item := Converted_Or_Qualified_Subtype_Mark (Item);
+
+                  when A_Parenthesized_Expression =>
+                     Item := Expression_Parenthesized (Item);
+
+                  when An_If_Expression
+                     | A_Case_Expression
+                     =>
+                     -- These are always dynamic, since different paths may have different constraints
+                     -- Get the dimensionality from the first path, and replace all bounds with Nil_Element
+                     declare
+                        Path1_Bounds : Asis.Element_List := Discrete_Constraining_Bounds
+                                                             (Dependent_Expression (Expression_Paths (Item) (1)),
+                                                              Follow_Access);
+                     begin
+                        for P in Path1_Bounds'Range loop
+                           Path1_Bounds (P) := Nil_Element;
+                        end loop;
+                        return Path1_Bounds;
+                     end;
+
                   when others =>
                      -- Assume it's a name, but it can be a type name, therefore
                      -- we cannot take directly Corresponding_Expression_Type
