@@ -323,12 +323,13 @@ package body Units_List is
       Ignored_Units : String_List.Queue;
       Separators    : constant Wide_Character_Set := To_Set ("+-");
 
+      procedure Raise_Specification_Error (Mess : String);
+      pragma No_Return (Raise_Specification_Error);
       procedure Raise_Specification_Error (Mess : String) is
          use Ada.Exceptions;
       begin
          Raise_Exception (Specification_Error'Identity, Mess);
       end Raise_Specification_Error;
-      pragma No_Return (Raise_Specification_Error);
 
       function Must_Ignore (Name : Wide_String) return Boolean is
          -- Check if unit name is either ignored, or a child (or a subunit) of an ignored unit

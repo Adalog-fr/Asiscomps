@@ -69,6 +69,8 @@ package body Thick_Queries is
 
    User_Error_Proc : Error_Procedure := null;
 
+   procedure Impossible (Message : Wide_String; E : Asis.Element);
+   pragma No_Return (Impossible);
    procedure Impossible (Message : Wide_String; E : Asis.Element) is
       use Ada.Exceptions, Ada.Characters.Handling, Asis.Text;
       S : constant Span := Element_Span (E);
@@ -85,7 +87,6 @@ package body Thick_Queries is
                          " at" & Line_Number'Image (S.First_Line) &
                          ":"   & Character_Position'Image (S.First_Column));
    end Impossible;
-   pragma No_Return (Impossible);
 
    --------------
    -- To_Upper --
