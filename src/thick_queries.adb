@@ -6487,6 +6487,40 @@ package body Thick_Queries is
                   return "";
             end case;
 
+         when An_If_Expression =>
+            declare
+               If_Paths : constant Asis.Path_List := Expression_Paths (Expression);
+               Has_Else : constant Boolean        := Path_Kind (If_Paths (If_Paths'Last)) = An_Else_Expression_Path;
+               Last     : List_Index;
+            begin
+               if Has_Else then
+                  Last := If_Paths'Last - 1;
+               else
+                  Last := If_Paths'Last;
+               end if;
+               for P in If_Paths'First .. Last loop
+                  declare
+                     Cond_Str : constant Wide_String := Static_Expression_Value_Image
+                                                        (Condition_Expression (If_Paths (P)));
+                  begin
+                     if Cond_Str = "" then
+                        -- non static condition
+                        return "";
+                     elsif Cond_Str = "1" then
+                        return Static_Expression_Value_Image (Dependent_Expression (If_Paths (P)));
+                     end if;
+                  end;
+               end loop;
+
+               if Has_Else then
+                  return Static_Expression_Value_Image (Dependent_Expression (If_Paths (If_Paths'Last)));
+               end if;
+
+               -- An else expression path can be omitted only if the expression is boolean, and the default is
+               -- False whose 'Pos is 0
+               return "0";
+            end;
+
          when others =>
             -- Including Not_An_Expression
             return "";
