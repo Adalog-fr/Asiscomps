@@ -3947,6 +3947,254 @@ package body Thick_Queries is
       end case;
    end Contains_Type_Declaration_Kind;
 
+
+   -----------------------------
+   -- Traverse_Data_Structure --
+   -----------------------------
+
+   procedure Traverse_Data_Structure (Element : in     Asis.Definition;
+                                      Control : in out Asis.Traverse_Control;
+                                      State   : in out State_Information)
+   is
+
+      procedure Counting_Traverse (Element : in     Asis.Definition;
+                                   Control : in out Asis.Traverse_Control;
+                                   State   : in out State_Information;
+                                   Depth   : in     Asis.Asis_Positive)
+      is
+         -- This is the real traversal, the enclosing one is just used to initialize Depth.
+         use Asis.Definitions, Asis.Expressions;
+         Good_Def  : Asis.Definition;
+         Good_Decl : Asis.Declaration;
+
+         procedure Traverse_Components_List (Components : Asis.Record_Component_List) is
+            Name : Asis.Expression;
+            Def  : Asis.Definition;
+         begin
+            for I in Components'Range loop
+               case Element_Kind (Components (I)) is
+                  when A_Declaration =>
+                     -- A_Component_Declaration
+                     Def := Component_Definition_View (Object_Declaration_View (Components (I)));
+                     if Definition_Kind (Def) = An_Access_Definition then
+                        Counting_Traverse (Def, Control, State, Depth + 1);
+                     else
+                        Name := Subtype_Simple_Name (Def);
+                        if Expression_Kind (Name) = An_Attribute_Reference then
+                           -- A record component can't be 'Class, must be 'Base
+                           Name := Simple_Name (Prefix (Name));
+                        end if;
+                        Counting_Traverse (Type_Declaration_View (Corresponding_Name_Declaration (Name)),
+                                           Control,
+                                           State,
+                                           Depth + 1);
+                     end if;
+                     case Control is
+                        when Continue =>
+                           null;
+                        when Abandon_Children =>
+                           Impossible ("Traverse_Data_Structure: Abandon_Children (3)", Name);
+                        when Abandon_Siblings | Terminate_Immediately =>
+                           return;
+                     end case;
+                  when A_Definition =>
+                     if Definition_Kind (Components (I)) = A_Variant_Part then -- else it is A_Null_Component
+                        declare
+                           V_List : constant Asis.Variant_List := Variants (Components (I));
+                        begin
+                           for V in V_List'Range loop
+                              Traverse_Components_List (Record_Components (V_List (V)));
+                              case Control is
+                                 when Continue =>
+                                    null;
+                                 when Abandon_Children =>
+                                    Impossible ("Traverse_Data_Structure: Abandon_Children", Components (I));
+                                 when Abandon_Siblings | Terminate_Immediately =>
+                                    return;
+                              end case;
+                           end loop;
+                        end;
+                     end if;
+                  when others =>
+                     -- pragma, clause
+                     null;
+               end case;
+            end loop;
+         end Traverse_Components_List;
+      begin  -- Counting_Traverse
+         -- Perform Operation on the definition itself
+         Pre_Operation (Element, Control, State, Depth);
+         case Control is
+            when Continue =>
+               null;
+            when Abandon_Children =>
+               Control := Continue;
+               Post_Operation (Element, Control, State, Depth);
+               if Control = Abandon_Children then
+                  Control := Continue;
+               end if;
+               return;
+            when Abandon_Siblings | Terminate_Immediately =>
+               -- Keep same Control for next level
+               -- According to the doc for Traverse_Element,
+               -- Post_Operation is not executed if Pre returns Abandon_Siblings
+               return;
+         end case;
+
+         -- To recurse ignoring privacy, get rid of (possible) incomplete declarations
+         -- Go to first named subtype, and eliminate derivations (we are only interested in the actual structure)
+         Good_Def  := Element;
+         Good_Decl := Enclosing_Element (Good_Def);
+         loop
+            case Declaration_Kind (Good_Decl) is
+               when An_Ordinary_Type_Declaration =>
+                  case Type_Kind (Good_Def) is
+                     when A_Derived_Type_Definition =>
+                        Good_Decl := Corresponding_Root_Type (Good_Def);
+                        Good_Def  := Type_Declaration_View (Good_Decl);
+                     when others =>
+                        exit;
+                  end case;
+               when An_Incomplete_Type_Declaration
+                  | A_Tagged_Incomplete_Type_Declaration
+                  | A_Private_Type_Declaration
+                  | A_Private_Extension_Declaration
+                  =>
+                  Good_Decl := Corresponding_Full_Type_Declaration (Good_Decl);
+                  Good_Def  := Type_Declaration_View (Good_Decl);
+               when A_Subtype_Declaration =>
+                  Good_Decl := Corresponding_First_Subtype (Good_Decl);
+                  Good_Def  := Type_Declaration_View (Good_Decl);
+               when others =>
+                  exit;
+            end case;
+         end loop;
+
+         -- Now, recurse into children
+         -- Discriminants
+         case Declaration_Kind (Good_Decl) is
+            when A_Type_Declaration | A_Formal_Type_Declaration =>
+               declare
+                  Discr_Part : constant Asis.Definition := Discriminant_Part (Good_Decl);
+               begin
+                  if not Is_Nil (Discr_Part) and then Definition_Kind (Discr_Part) /= An_Unknown_Discriminant_Part then
+                     declare
+                        Discrs : constant Asis.Discriminant_Specification_List := Discriminants (Discr_Part);
+                     begin
+                        for D in Discrs'Range loop
+                           Counting_Traverse (Type_Declaration_View
+                                              (Corresponding_Name_Declaration
+                                                 (Simple_Name
+                                                    (Strip_Attributes
+                                                       (Declaration_Subtype_Mark (Discrs (D)))))),
+                                              Control,
+                                              State,
+                                              Depth + 1);
+                           case Control is
+                              when Continue =>
+                                 null;
+                              when Abandon_Children =>
+                                 Impossible ("Traverse_Data_Structure: Abandon_Children (1)", Discrs (D));
+                              when Abandon_Siblings =>
+                                 Control := Continue;
+                                 return;
+                              when Terminate_Immediately =>
+                                 return;
+                           end case;
+                        end loop;
+                     end;
+                  end if;
+               end;
+            when others =>
+               null;
+         end case;
+
+         -- Other components
+         case Type_Kind (Good_Def) is
+            when An_Unconstrained_Array_Definition | A_Constrained_Array_Definition =>
+               -- Get rid of 'Base if any (cannot be 'Class)
+               Counting_Traverse (Type_Declaration_View
+                                  (Corresponding_Name_Declaration
+                                     (Strip_Attributes
+                                        (Subtype_Simple_Name
+                                           (Component_Definition_View
+                                              (Array_Component_Definition (Good_Def)))))),
+                                  Control,
+                                  State,
+                                  Depth + 1);
+               case Control is
+                  when Continue =>
+                     null;
+                  when Abandon_Children =>
+                     Impossible ("Traverse_Data_Structure: Abandon_Children (2)", Good_Def);
+                  when Abandon_Siblings =>
+                     Control := Continue;
+                     return;
+                  when Terminate_Immediately =>
+                     return;
+               end case;
+            when A_Record_Type_Definition | A_Tagged_Record_Type_Definition =>
+               if Definition_Kind (Asis.Definitions.Record_Definition (Good_Def)) /= A_Null_Record_Definition then
+                  Traverse_Components_List (Record_Components (Asis.Definitions.Record_Definition (Good_Def)));
+                  case Control is
+                     when Continue =>
+                        null;
+                     when Abandon_Children =>
+                        Impossible ("Traverse_Data_Structure: Abandon_Children (1)", Good_Def);
+                     when Abandon_Siblings =>
+                        Control := Continue;
+                        return;
+                     when Terminate_Immediately =>
+                        return;
+                  end case;
+               end if;
+            when A_Derived_Record_Extension_Definition =>
+               Counting_Traverse (Type_Declaration_View
+                                  (Corresponding_Name_Declaration
+                                     (Subtype_Simple_Name
+                                        (Parent_Subtype_Indication (Good_Def)))),
+                                  Control,
+                                  State,
+                                  Depth + 1);
+               case Control is
+                  when Continue =>
+                     if Definition_Kind (Asis.Definitions.Record_Definition (Good_Def)) /= A_Null_Record_Definition then
+                        Traverse_Components_List (Record_Components (Asis.Definitions.Record_Definition (Good_Def)));
+                        case Control is
+                           when Continue =>
+                              null;
+                           when Abandon_Children =>
+                              Impossible ("Traverse_Data_Structure: Abandon_Children (4)", Good_Def);
+                           when Abandon_Siblings =>
+                              Control := Continue;
+                              return;
+                           when Terminate_Immediately =>
+                              return;
+                        end case;
+                     end if;
+                  when Abandon_Children =>
+                     Impossible ("Traverse_Data_Structure: Abandon_Children (5)", Good_Def);
+                  when Abandon_Siblings =>
+                     Control := Continue;
+                     return;
+                  when Terminate_Immediately =>
+                     return;
+               end case;
+            when others =>
+               null;
+         end case;
+
+         Post_Operation (Element, Control, State, Depth);
+         if Control /= Terminate_Immediately then
+            Control := Continue;
+         end if;
+      end Counting_Traverse;
+
+   begin -- Traverse_Data_Structure
+      Counting_Traverse (Element, Control, State, 1);
+   end Traverse_Data_Structure;
+
+
    ----------------------------
    -- Discriminant_Part_Kind --
    ----------------------------

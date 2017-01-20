@@ -602,6 +602,30 @@ package Thick_Queries is
    --       A_Subtype_Declaration
    --       A_Formal_Type_Declaration
 
+   generic
+      type State_Information is limited private;
+
+      with procedure Pre_Operation  (Element : in     Asis.Definition;
+                                     Control : in out Asis.Traverse_Control;
+                                     State   : in out State_Information;
+                                     Depth   : in     Asis.ASIS_Positive) is null;
+      with procedure Post_Operation (Element : in     Asis.Definition;
+                                     Control : in out Asis.Traverse_Control;
+                                     State   : in out State_Information;
+                                     Depth   : in     Asis.ASIS_Positive) is null;
+   procedure Traverse_Data_Structure (Element : in     Asis.Definition;
+                                      Control : in out Asis.Traverse_Control;
+                                      State   : in out State_Information);
+   -- Calls Pre_Operation on Element, a (possibly anonymous) type definition, and recursively
+   -- to all type definitions of its subcomponents, then Post_Operation on Element.
+   -- The element passed to Pre/Post operations is the type definition of the subtype indication of each component.
+   -- Control works exactly as defined for Asis.Iterator.Traverse_Element.
+   -- Recursion ignores privacy (i.e. we recurse through components of private types), but the Pre_Operation can return
+   --    Ignore_Children on private types, thus stopping privacy breaks.
+   -- Depth is the structural depth of the component: 1 for the initial Element, 2 for components of the corresponding
+   --     type, etc.
+
+
    type Discriminant_Part_Kinds is (No_Discriminant_Part,          A_Nondefaulted_Discriminant_Part,
                                     A_Defaulted_Discriminant_Part, An_Unknown_Discriminant_Part);
    function Discriminant_Part_Kind (Elem : Asis.Element) return Discriminant_Part_Kinds;
