@@ -6498,7 +6498,7 @@ package body Thick_Queries is
                else
                   Last := If_Paths'Last;
                end if;
-               for P in If_Paths'First .. Last loop
+               for P in List_Index range If_Paths'First .. Last loop
                   declare
                      Cond_Str : constant Wide_String := Static_Expression_Value_Image
                                                         (Condition_Expression (If_Paths (P)));

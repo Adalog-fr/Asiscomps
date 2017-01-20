@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------
---  Implementation_Options.Project_Fil - Package specification      --
+--  Implementation_Options.Project_File - Package specification     --
 --  Copyright (C) 2002-2016 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --

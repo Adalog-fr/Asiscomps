@@ -64,7 +64,7 @@ package Thick_Queries is
    subtype Discrete_Type_Kinds is Asis.Type_Kinds
    range Asis.An_Enumeration_Type_Definition .. Asis.A_Modular_Type_Definition;
    subtype Fixed_Type_Kinds    is Asis.Type_Kinds
-   range Asis.An_Ordinary_Fixed_Point_Definition .. Asis.A_Decimal_Fixed_Point_Definition;
+      range Asis.An_Ordinary_Fixed_Point_Definition .. Asis.A_Decimal_Fixed_Point_Definition;
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
@@ -403,12 +403,13 @@ package Thick_Queries is
 
    function Is_Access_Subtype (The_Subtype : Asis.Element) return Boolean;
    -- Returns True if The_Subtype is a declaration of an access type or of a formal access type
+   -- or an access definition
    -- Returns False in all other cases
    --
    -- Appropriate Element_Kinds:
-   --    A_Declaration
-   --    A_Definition
-   --    A_Defining_Name
+   --    A_Declaration (of a (sub)type)
+   --    A_Definition  (of a (sub)type, or an access definition)
+   --    A_Defining_Name (of a (sub)type)
 
    function Is_Array_Subtype (The_Subtype : Asis.Element) return Boolean;
    -- Returns True if The_Subtype is a declaration (or a definition) of an array type, or a name of an array type
