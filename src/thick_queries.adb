@@ -3758,193 +3758,54 @@ package body Thick_Queries is
                                             The_Kind    : Asis.Declaration_Kinds;
                                             The_Type    : Asis.Type_Kinds := Asis.Not_A_Type_Definition) return Boolean
    is
-      use Asis.Definitions, Asis.Expressions;
-
-      function Components_Contain_Type_Declaration_Kind (Components : Asis.Record_Component_List) return Boolean is
-         Name : Asis.Expression;
-         Def  : Asis.Definition;
+      type Null_State is null record;
+      procedure Pre_Declaration_Kind (Element : in     Asis.Definition;
+                                      Control : in out Asis.Traverse_Control;
+                                      State   : in out Null_State;
+                                      Depth   : in     Asis.ASIS_Positive)
+      is
+         use Asis.Expressions;
+         Decl : Asis.Declaration;
       begin
-         for I in Components'Range loop
-            case Element_Kind (Components (I)) is
-               when A_Declaration =>
-                  -- A_Component_Declaration
-                  Def := Component_Definition_View (Object_Declaration_View (Components (I)));
-                  if Definition_Kind (Def) = An_Access_Definition then
-                     -- Just to be rigorous, consider anonymous access types as An_Ordinary_Type_Declaration
-                     if The_Kind = An_Ordinary_Type_Declaration
-                       and (The_Type = An_Access_Type_Definition or The_Type = Not_A_Type_Definition)
-                     then
-                        return True;
-                     end if;
-                  else
-                     Name := Subtype_Simple_Name (Def);
-                     if Expression_Kind (Name) = An_Attribute_Reference then
-                        -- A record component can't be 'Class, must be 'Base
-                        Name := Simple_Name (Prefix (Name));
-                     end if;
-                     if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (Name), The_Kind, The_Type) then
-                        return Type_Kind (Def) = The_Type or Type_Kind (Def) = Not_A_Type_Definition;
-                     end if;
-                  end if;
-               when A_Definition =>
-                  if Definition_Kind (Components (I)) = A_Variant_Part then
-                     declare
-                        V_List : constant Asis.Variant_List := Variants (Components (I));
-                     begin
-                        for J in V_List'Range loop
-                           if Components_Contain_Type_Declaration_Kind (Record_Components (V_List (J))) then
-                              return True;
-                           end if;
-                        end loop;
-                     end;
-                  -- else it is A_Null_Component or an access definition
-                  end if;
-               when others =>
-                  -- pragma, clause
-                  null;
-            end case;
-         end loop;
-
-         return False;
-      end Components_Contain_Type_Declaration_Kind;
-
-      function Discriminants_Contain_Type_Declaration_Kind (Discr_Part : Asis.Definition) return Boolean is
-      begin
-         if Is_Nil (Discr_Part) or else Definition_Kind (Discr_Part) = An_Unknown_Discriminant_Part then
-            return False;
-         end if;
-
-         declare
-            Discrs : constant Asis.Discriminant_Specification_List := Discriminants (Discr_Part);
-            SM     : Expression;
-         begin
-            for I in Discrs'Range loop
-               if Definition_Kind (Object_Declaration_View (Discrs (I))) = An_Access_Definition then
-                  -- Just to be rigorous, consider anonymous access types as An_Ordinary_Type_Declaration
-                  if The_Kind = An_Ordinary_Type_Declaration then
-                     return The_Type = An_Access_Type_Definition or The_Type = Not_A_Type_Definition;
-                  end if;
-               else
-                  SM := Declaration_Subtype_Mark (Discrs (I));
-                  case Expression_Kind (SM) is
-                  when A_Selected_Component =>
-                     SM := Selector (SM);
-                  when An_Attribute_Reference =>
-                     -- Cannot be 'Class since it is discrete.
-                     -- The kind of 'Base is the same as the one of the type itself.
-                     SM := Prefix (SM);
-                  when An_Identifier =>
-                     null;
-                  when others =>
-                     Impossible ("Wrong declaration_subtype_mark", SM);
-                  end case;
-
-                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration (SM), The_Kind, The_Type) then
-                     return True;
+         case Definition_Kind (Element) is
+            when Not_A_Definition =>
+               -- Special case: Task type without a definition
+               if The_Kind = A_Task_Type_Declaration then
+                  Control := Terminate_Immediately;
+               end if;
+            when An_Access_Definition =>
+               if The_Kind = An_Ordinary_Type_Declaration and then The_Type = An_Access_Type_Definition then
+                  Control := Terminate_Immediately;
+               end if;
+            when A_Subtype_Indication =>
+               -- Check first subtype instead
+               Pre_Declaration_Kind (Type_Declaration_View
+                                     (Corresponding_First_Subtype
+                                      (Corresponding_Name_Declaration
+                                       (Strip_Attributes
+                                        (Subtype_Simple_Name (Element))))),
+                                     Control,
+                                     State,
+                                     Depth);
+            when others =>
+               Decl := Enclosing_Element (Element);
+               if Is_Type_Declaration_Kind (Decl, The_Kind) then
+                  if        The_Type = Not_A_Type_Definition
+                    or else The_Type = Type_Kind (Element)
+                  then
+                     Control := Terminate_Immediately;
                   end if;
                end if;
-            end loop;
-         end;
-         return False;
-      end Discriminants_Contain_Type_Declaration_Kind;
+         end case;
+      end Pre_Declaration_Kind;
 
-      Decl : Asis.Declaration := The_Subtype;
-      Def  : Asis.Definition;
+      procedure Traverse_For_Declaration_Kind is new Traverse_Data_Structure (Null_State,
+                                                                              Pre_Declaration_Kind);
+      Control : Traverse_Control := Continue;
+      State   : Null_State;
    begin  -- Contains_Type_Declaration_Kind
-      Decl := Corresponding_First_Subtype (Decl);
-      Def  := Type_Declaration_View (Decl);
-      if Type_Kind (Def) = A_Derived_Type_Definition then
-         Decl := Corresponding_Root_Type (Type_Declaration_View (Decl));
-         Def  := Type_Declaration_View (Decl);
-      end if;
-
-      if Declaration_Kind (Decl) = The_Kind
-        and then (Type_Kind (Def) = The_Type or Type_Kind (Def) = Not_A_Type_Definition)
-      then
-         -- We have (not yet) anonymous types at that point
-         return True;
-      end if;
-
-      case Declaration_Kind (Decl) is
-         when An_Ordinary_Type_Declaration =>
-            case Type_Kind (Def) is
-               when An_Unconstrained_Array_Definition | A_Constrained_Array_Definition =>
-                  -- Get rid of 'Base if any (cannot be 'Class)
-                  return Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                                         (Strip_Attributes
-                                                          (Subtype_Simple_Name
-                                                           (Component_Definition_View
-                                                            (Array_Component_Definition (Def))))),
-                                                         The_Kind,
-                                                         The_Type);
-
-               when A_Record_Type_Definition | A_Tagged_Record_Type_Definition =>
-                  if Definition_Kind (Asis.Definitions.Record_Definition (Def)) /= A_Null_Record_Definition
-                    and then Components_Contain_Type_Declaration_Kind (Record_Components
-                                                                       (Asis.Definitions.Record_Definition (Def)))
-                  then
-                     return True;
-                  end if;
-                  return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-               when A_Derived_Record_Extension_Definition =>
-                  if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                                     (Subtype_Simple_Name (Parent_Subtype_Indication (Def))),
-                                                     The_Kind,
-                                                     The_Type)
-                  then
-                     return True;
-                  end if;
-                  if Definition_Kind (Asis.Definitions.Record_Definition (Def)) /= A_Null_Record_Definition
-                    and then Components_Contain_Type_Declaration_Kind (Record_Components
-                                                                       (Asis.Definitions.Record_Definition (Def)))
-                  then
-                     return True;
-                  end if;
-                  return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-               when others =>
-                  return False;
-            end case;
-
-
-         when A_Task_Type_Declaration =>
-            -- Tasks contain no components
-            return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-         when A_Protected_Type_Declaration =>
-            -- Only the private part can contain components
-            declare
-               Decls : constant Asis.Declarative_Item_List := Private_Part_Items (Def);
-            begin
-               for I in Decls'Range loop
-                  if Declaration_Kind (Decls (I)) = A_Component_Declaration
-                    and then Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                                             (Subtype_Simple_Name
-                                                              (Component_Definition_View
-                                                               (Object_Declaration_View (Decls (I))))),
-                                                             The_Kind,
-                                                             The_Type)
-                  then
-                     return True;
-                  end if;
-               end loop;
-            end;
-            return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-         when A_Private_Extension_Declaration =>
-            if Contains_Type_Declaration_Kind (Corresponding_Name_Declaration
-                                               (Subtype_Simple_Name (Ancestor_Subtype_Indication (Def))),
-                                               The_Kind,
-                                               The_Type)
-            then
-               return True;
-            end if;
-            return Discriminants_Contain_Type_Declaration_Kind (Discriminant_Part (Decl));
-
-         when others =>
-            return False;
-      end case;
+      Traverse_For_Declaration_Kind (The_Subtype, Control, State);
+      return Control = Terminate_Immediately;    -- We terminate immediately iff the subtype is found
    end Contains_Type_Declaration_Kind;
 
 
@@ -3952,24 +3813,31 @@ package body Thick_Queries is
    -- Traverse_Data_Structure --
    -----------------------------
 
-   procedure Traverse_Data_Structure (Element : in     Asis.Definition;
+   procedure Traverse_Data_Structure (Element : in     Asis.Element;
                                       Control : in out Asis.Traverse_Control;
                                       State   : in out State_Information)
    is
 
-      procedure Counting_Traverse (Element : in     Asis.Definition;
-                                   Control : in out Asis.Traverse_Control;
-                                   State   : in out State_Information;
-                                   Depth   : in     Asis.Asis_Positive)
+      procedure Counting_Traverse (Elem_Decl        : in     Asis.Declaration;
+                                   Elem_Def         : in     Asis.Definition;
+                                   Counting_Control : in out Asis.Traverse_Control;
+                                   Counting_State   : in out State_Information;
+                                   Depth            : in     Asis.Asis_Positive)
+        -- Elem_Decl and Elem_Def are corresponding declaration and definition
+        -- We have to pass both, because anonymous types have a definition without a declaration,
+        -- and simple tasks (task T;) have a declaration without a definition
       is
          -- This is the real traversal, the enclosing one is just used to initialize Depth.
          use Asis.Definitions, Asis.Expressions;
-         Good_Def  : Asis.Definition;
          Good_Decl : Asis.Declaration;
+         Good_Def  : Asis.Definition;
+         Comp_Decl : Asis.Declaration;
+         Comp_Def  : Asis.Definition;
 
          procedure Traverse_Components_List (Components : Asis.Record_Component_List) is
             Name : Asis.Expression;
             Def  : Asis.Definition;
+            Decl : Asis.Declaration;
          begin
             for I in Components'Range loop
                case Element_Kind (Components (I)) is
@@ -3977,19 +3845,18 @@ package body Thick_Queries is
                      -- A_Component_Declaration
                      Def := Component_Definition_View (Object_Declaration_View (Components (I)));
                      if Definition_Kind (Def) = An_Access_Definition then
-                        Counting_Traverse (Def, Control, State, Depth + 1);
+                        Counting_Traverse (Nil_Element, Def, Counting_Control, Counting_State, Depth + 1);
                      else
                         Name := Subtype_Simple_Name (Def);
                         if Expression_Kind (Name) = An_Attribute_Reference then
                            -- A record component can't be 'Class, must be 'Base
                            Name := Simple_Name (Prefix (Name));
                         end if;
-                        Counting_Traverse (Type_Declaration_View (Corresponding_Name_Declaration (Name)),
-                                           Control,
-                                           State,
-                                           Depth + 1);
+                        Decl := Corresponding_Name_Declaration (Name);
+                        -- Def is nil for a task declaration without task definition (i.e. task T; )
+                        Counting_Traverse (Decl, Type_Declaration_View(Decl), Counting_Control, Counting_State, Depth + 1);
                      end if;
-                     case Control is
+                     case Counting_Control is
                         when Continue =>
                            null;
                         when Abandon_Children =>
@@ -4004,7 +3871,7 @@ package body Thick_Queries is
                         begin
                            for V in V_List'Range loop
                               Traverse_Components_List (Record_Components (V_List (V)));
-                              case Control is
+                              case Counting_Control is
                                  when Continue =>
                                     null;
                                  when Abandon_Children =>
@@ -4023,15 +3890,15 @@ package body Thick_Queries is
          end Traverse_Components_List;
       begin  -- Counting_Traverse
          -- Perform Operation on the definition itself
-         Pre_Operation (Element, Control, State, Depth);
-         case Control is
+         Pre_Operation (Elem_Def, Counting_Control, Counting_State, Depth);
+         case Counting_Control is
             when Continue =>
                null;
             when Abandon_Children =>
-               Control := Continue;
-               Post_Operation (Element, Control, State, Depth);
-               if Control = Abandon_Children then
-                  Control := Continue;
+               Counting_Control := Continue;
+               Post_Operation (Elem_Def, Counting_Control, Counting_State, Depth);
+               if Counting_Control = Abandon_Children then
+                  Counting_Control := Continue;
                end if;
                return;
             when Abandon_Siblings | Terminate_Immediately =>
@@ -4043,8 +3910,8 @@ package body Thick_Queries is
 
          -- To recurse ignoring privacy, get rid of (possible) incomplete declarations
          -- Go to first named subtype, and eliminate derivations (we are only interested in the actual structure)
-         Good_Def  := Element;
-         Good_Decl := Enclosing_Element (Good_Def);
+         Good_Def  := Elem_Def;
+         Good_Decl := Elem_Decl;
          loop
             case Declaration_Kind (Good_Decl) is
                when An_Ordinary_Type_Declaration =>
@@ -4082,21 +3949,25 @@ package body Thick_Queries is
                         Discrs : constant Asis.Discriminant_Specification_List := Discriminants (Discr_Part);
                      begin
                         for D in Discrs'Range loop
-                           Counting_Traverse (Type_Declaration_View
-                                              (Corresponding_Name_Declaration
-                                                 (Simple_Name
-                                                    (Strip_Attributes
-                                                       (Declaration_Subtype_Mark (Discrs (D)))))),
-                                              Control,
-                                              State,
-                                              Depth + 1);
-                           case Control is
+                           Comp_Def := Object_Declaration_View (Discrs (D));
+                           if Definition_Kind (Comp_Def) = An_Access_Definition then
+                              -- access discriminant
+                              Counting_Traverse (Nil_Element, Comp_Def, Counting_Control, Counting_State, Depth + 1);
+                           else
+                              Comp_Decl := Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Comp_Def)));
+                              Counting_Traverse (Comp_Decl,
+                                                 Type_Declaration_View (Comp_Decl),
+                                                 Counting_Control,
+                                                 Counting_State,
+                                                 Depth + 1);
+                           end if;
+                           case Counting_Control is
                               when Continue =>
                                  null;
                               when Abandon_Children =>
                                  Impossible ("Traverse_Data_Structure: Abandon_Children (1)", Discrs (D));
                               when Abandon_Siblings =>
-                                 Control := Continue;
+                                 Counting_Control := Continue;
                                  return;
                               when Terminate_Immediately =>
                                  return;
@@ -4113,22 +3984,18 @@ package body Thick_Queries is
          case Type_Kind (Good_Def) is
             when An_Unconstrained_Array_Definition | A_Constrained_Array_Definition =>
                -- Get rid of 'Base if any (cannot be 'Class)
-               Counting_Traverse (Type_Declaration_View
-                                  (Corresponding_Name_Declaration
-                                     (Strip_Attributes
-                                        (Subtype_Simple_Name
-                                           (Component_Definition_View
-                                              (Array_Component_Definition (Good_Def)))))),
-                                  Control,
-                                  State,
-                                  Depth + 1);
-               case Control is
+               Comp_Decl := Corresponding_Name_Declaration (Strip_Attributes
+                                                            (Subtype_Simple_Name
+                                                             (Component_Definition_View
+                                                              (Array_Component_Definition (Good_Def)))));
+               Counting_Traverse (Comp_Decl, Type_Declaration_View (Comp_Decl), Counting_Control, Counting_State, Depth + 1);
+               case Counting_Control is
                   when Continue =>
                      null;
                   when Abandon_Children =>
                      Impossible ("Traverse_Data_Structure: Abandon_Children (2)", Good_Def);
                   when Abandon_Siblings =>
-                     Control := Continue;
+                     Counting_Control := Continue;
                      return;
                   when Terminate_Immediately =>
                      return;
@@ -4136,37 +4003,33 @@ package body Thick_Queries is
             when A_Record_Type_Definition | A_Tagged_Record_Type_Definition =>
                if Definition_Kind (Asis.Definitions.Record_Definition (Good_Def)) /= A_Null_Record_Definition then
                   Traverse_Components_List (Record_Components (Asis.Definitions.Record_Definition (Good_Def)));
-                  case Control is
+                  case Counting_Control is
                      when Continue =>
                         null;
                      when Abandon_Children =>
                         Impossible ("Traverse_Data_Structure: Abandon_Children (1)", Good_Def);
                      when Abandon_Siblings =>
-                        Control := Continue;
+                        Counting_Control := Continue;
                         return;
                      when Terminate_Immediately =>
                         return;
                   end case;
                end if;
             when A_Derived_Record_Extension_Definition =>
-               Counting_Traverse (Type_Declaration_View
-                                  (Corresponding_Name_Declaration
-                                     (Subtype_Simple_Name
-                                        (Parent_Subtype_Indication (Good_Def)))),
-                                  Control,
-                                  State,
-                                  Depth + 1);
-               case Control is
+               Comp_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                            (Parent_Subtype_Indication (Good_Def)));
+               Counting_Traverse (Comp_Decl, Type_Declaration_View (Comp_Decl), Counting_Control, Counting_State, Depth + 1);
+               case Counting_Control is
                   when Continue =>
                      if Definition_Kind (Asis.Definitions.Record_Definition (Good_Def)) /= A_Null_Record_Definition then
                         Traverse_Components_List (Record_Components (Asis.Definitions.Record_Definition (Good_Def)));
-                        case Control is
+                        case Counting_Control is
                            when Continue =>
                               null;
                            when Abandon_Children =>
                               Impossible ("Traverse_Data_Structure: Abandon_Children (4)", Good_Def);
                            when Abandon_Siblings =>
-                              Control := Continue;
+                              Counting_Control := Continue;
                               return;
                            when Terminate_Immediately =>
                               return;
@@ -4175,7 +4038,7 @@ package body Thick_Queries is
                   when Abandon_Children =>
                      Impossible ("Traverse_Data_Structure: Abandon_Children (5)", Good_Def);
                   when Abandon_Siblings =>
-                     Control := Continue;
+                     Counting_Control := Continue;
                      return;
                   when Terminate_Immediately =>
                      return;
@@ -4184,14 +4047,28 @@ package body Thick_Queries is
                null;
          end case;
 
-         Post_Operation (Element, Control, State, Depth);
-         if Control /= Terminate_Immediately then
-            Control := Continue;
+         Post_Operation (Elem_Def, Counting_Control, Counting_State, Depth);
+         if Counting_Control /= Terminate_Immediately then
+            Counting_Control := Continue;
          end if;
       end Counting_Traverse;
 
+      Decl : Asis.Declaration;
    begin -- Traverse_Data_Structure
-      Counting_Traverse (Element, Control, State, 1);
+      case Element_Kind (Element) is
+         when A_Declaration =>
+            Counting_Traverse (Element, Type_Declaration_View (Element), Control, State, 1);
+         when A_Definition =>
+            Decl := Enclosing_Element (Element);
+            if Declaration_Kind (Decl) not in A_Type_Declaration then
+               -- Definition comes from an anonymous type
+               Counting_Traverse (Nil_Element, Element, Control, State, 1);
+            else
+               Counting_Traverse (Decl, Element, Control, State, 1);
+            end if;
+         when others =>
+            Impossible ("Traverse_Data_Structure: bad Element", Element);
+      end case;
    end Traverse_Data_Structure;
 
 

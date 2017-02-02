@@ -613,17 +613,18 @@ package Thick_Queries is
                                      Control : in out Asis.Traverse_Control;
                                      State   : in out State_Information;
                                      Depth   : in     Asis.ASIS_Positive) is null;
-   procedure Traverse_Data_Structure (Element : in     Asis.Definition;
+   procedure Traverse_Data_Structure (Element : in     Asis.Element;
                                       Control : in out Asis.Traverse_Control;
                                       State   : in out State_Information);
-   -- Calls Pre_Operation on Element, a (possibly anonymous) type definition, and recursively
-   -- to all type definitions of its subcomponents, then Post_Operation on Element.
+   -- Calls Pre_Operation on the definition of Element, a type declaration or  a (possibly anonymous) type definition,
+   -- and recursively to all type definitions of its subcomponents, then Post_Operation on the definition of Element.
    -- The element passed to Pre/Post operations is the type definition of the subtype indication of each component.
    -- Control works exactly as defined for Asis.Iterator.Traverse_Element.
    -- Recursion ignores privacy (i.e. we recurse through components of private types), but the Pre_Operation can return
    --    Ignore_Children on private types, thus stopping privacy breaks.
    -- Depth is the structural depth of the component: 1 for the initial Element, 2 for components of the corresponding
    --     type, etc.
+   -- WARNING: Element is Nil_Element for the non-existent definition of a Task_Declaration without a Task_Definition
 
 
    type Discriminant_Part_Kinds is (No_Discriminant_Part,          A_Nondefaulted_Discriminant_Part,
