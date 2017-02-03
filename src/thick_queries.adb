@@ -6027,10 +6027,6 @@ package body Thick_Queries is
    -- Size_Value_Image --
    ----------------------
 
-   ----------------------
-   -- Size_Value_Image --
-   ----------------------
-
    function Size_Value_Image (Name : Asis.Element) return Wide_String is
       use Asis.Clauses, Asis.Definitions, Asis.Expressions;
 

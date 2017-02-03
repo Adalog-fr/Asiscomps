@@ -580,7 +580,8 @@ package Thick_Queries is
    --       A_Private_Extension_Declaration
    --       A_Subtype_Declaration
    --       A_Formal_Type_Declaration
-
+   -- Appropriate Definition_Kinds:
+   --       all definitions corresponding to the above
 
    function Contains_Type_Declaration_Kind (The_Subtype : Asis.Declaration;
                                             The_Kind    : Asis.Declaration_Kinds;
