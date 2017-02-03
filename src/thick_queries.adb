@@ -3500,7 +3500,10 @@ package body Thick_Queries is
                                                                (Component_Definition_View
                                                                 (Object_Declaration_View (Elem))));
                when A_Discriminant_Specification =>
-                  Good_Elem := Corresponding_Name_Declaration (Simple_Name (Declaration_Subtype_Mark (Elem)));
+                  -- Object_Declaration_View returns a name. If attribute, cannot be 'Class, and we ignore 'Base
+                  Good_Elem := Corresponding_Name_Declaration (Strip_Attributes
+                                                               (Simple_Name (Object_Declaration_View (Elem))));
+
                when An_Ordinary_Type_Declaration
                   | A_Task_Type_Declaration
                   | A_Protected_Type_Declaration
@@ -4337,8 +4340,6 @@ package body Thick_Queries is
          when A_Variable_Declaration
             | A_Constant_Declaration
             | A_Deferred_Constant_Declaration
-            | A_Discriminant_Specification
-            | A_Parameter_Specification
               =>
             Def := Object_Declaration_View (Local_Elem);
             case Definition_Kind (Def) is
@@ -4354,6 +4355,14 @@ package body Thick_Queries is
                                                  (Strip_Attributes   -- Ignore 'Base and 'Class if any
                                                   (Subtype_Simple_Name (Def)))));
             end case;
+         when A_Discriminant_Specification
+            | A_Parameter_Specification
+            =>
+            Def := Object_Declaration_View (Local_Elem);
+            if Definition_Kind (Def) = An_Access_Definition then
+               return Def;
+            end if;
+            return Type_Declaration_View (Corresponding_Name_Declaration (Strip_Attributes (Simple_Name (Def))));
          when A_Formal_Object_Declaration =>
             if Definition_Kind (Object_Declaration_View (Local_Elem)) = An_Access_Definition then
                -- Must be an anonymous formal type
@@ -4368,10 +4377,7 @@ package body Thick_Queries is
                -- A component whose type is an anonymous access type
                return Def;
             else
-               return Type_Declaration_View (Corresponding_Name_Declaration
-                                             (Simple_Name
-                                              (Strip_Attributes
-                                               (Subtype_Simple_Name (Def)))));
+               return Type_Declaration_View (Corresponding_Name_Declaration (Strip_Attributes (Simple_Name (Def))));
             end if;
          when A_Single_Protected_Declaration
             | A_Single_Task_Declaration
@@ -4384,6 +4390,7 @@ package body Thick_Queries is
       end case;
 
    end Corresponding_Expression_Type_Definition;
+
 
    ------------------------------
    -- Corresponding_Components --
