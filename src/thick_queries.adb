@@ -953,6 +953,8 @@ package body Thick_Queries is
                  | An_Entry_Body_Declaration
                  =>
                   return Body_Declarative_Items (Element, Include_Pragmas);
+               when A_Null_Procedure_Declaration =>
+                  return Nil_Element_List;
                when A_Package_Declaration
                  | A_Generic_Package_Declaration
                  =>
@@ -3857,7 +3859,11 @@ package body Thick_Queries is
                         end if;
                         Decl := Corresponding_Name_Declaration (Name);
                         -- Def is nil for a task declaration without task definition (i.e. task T; )
-                        Counting_Traverse (Decl, Type_Declaration_View(Decl), Counting_Control, Counting_State, Depth + 1);
+                        Counting_Traverse (Decl,
+                                           Type_Declaration_View (Decl),
+                                           Counting_Control,
+                                           Counting_State,
+                                           Depth + 1);
                      end if;
                      case Counting_Control is
                         when Continue =>
@@ -3991,7 +3997,11 @@ package body Thick_Queries is
                                                             (Subtype_Simple_Name
                                                              (Component_Definition_View
                                                               (Array_Component_Definition (Good_Def)))));
-               Counting_Traverse (Comp_Decl, Type_Declaration_View (Comp_Decl), Counting_Control, Counting_State, Depth + 1);
+               Counting_Traverse (Comp_Decl,
+                                  Type_Declaration_View (Comp_Decl),
+                                  Counting_Control,
+                                  Counting_State,
+                                  Depth + 1);
                case Counting_Control is
                   when Continue =>
                      null;
@@ -4021,7 +4031,11 @@ package body Thick_Queries is
             when A_Derived_Record_Extension_Definition =>
                Comp_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
                                                             (Parent_Subtype_Indication (Good_Def)));
-               Counting_Traverse (Comp_Decl, Type_Declaration_View (Comp_Decl), Counting_Control, Counting_State, Depth + 1);
+               Counting_Traverse (Comp_Decl,
+                                  Type_Declaration_View (Comp_Decl),
+                                  Counting_Control,
+                                  Counting_State,
+                                  Depth + 1);
                case Counting_Control is
                   when Continue =>
                      if Definition_Kind (Asis.Definitions.Record_Definition (Good_Def)) /= A_Null_Record_Definition then
@@ -4695,7 +4709,6 @@ package body Thick_Queries is
                return Matching_Name (Def, Other_Decl);
             end if;
          when A_Procedure_Declaration
-            | A_Null_Procedure_Declaration   -- Ada 2005
             | A_Function_Declaration
             | An_Entry_Declaration
             | A_Package_Declaration
@@ -4704,6 +4717,7 @@ package body Thick_Queries is
               =>
             return Def;
          when A_Procedure_Body_Declaration
+            | A_Null_Procedure_Declaration
             | A_Function_Body_Declaration
             | An_Expression_Function_Declaration   -- Ada 2012
             | A_Procedure_Renaming_Declaration
@@ -5814,6 +5828,8 @@ package body Thick_Queries is
                   | A_Task_Body_Declaration
                  =>
                   return Body_Statements (Element, Include_Pragmas);
+               when A_Null_Procedure_Declaration =>
+                  return Nil_Element_List;
                when others =>
                   Impossible ("Statements: invalid declaration kind", Element);
             end case;
