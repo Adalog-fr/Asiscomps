@@ -47,6 +47,9 @@ package Producer is
    -- Print some text at the current position
    procedure Print (Item : Wide_String);
 
+   -- Start a new (output) line. If conditional = True, do nothing if already in column 1
+   procedure Next_Line (Conditional : Boolean := False);
+
    -- Inserts a full line in the output.
    -- Does not change the current point.
    -- Text starts at column In_Col (current column if = 0)

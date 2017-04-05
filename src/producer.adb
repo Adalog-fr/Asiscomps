@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
 --  Producer - Package body                                         --
---  Copyright (C) 2002 Adalog                                       --
+--  Copyright (C) 2002-2017 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -44,7 +44,6 @@ with   -- Standard Ada units
 with   -- Application specific units
   Utilities;
 package body Producer is
-  -- use Utilities;
 
    -- Positions from source
    Last_Printed_Line   : Line_Number := 1;
@@ -87,7 +86,6 @@ package body Producer is
    procedure Put       (Item : Wide_String);
    procedure Set_Col   (To : in Character_Position);
    function  Col       return Character_Position;
-   procedure Next_Line (Conditional : Boolean := False; Counting_Inserts : Boolean := In_Rewind_Span);
 
    ---------
    -- Col --
@@ -168,7 +166,8 @@ package body Producer is
    -- Next_Line --
    ---------------
 
-   procedure Next_Line (Conditional : Boolean := False; Counting_Inserts : Boolean := In_Rewind_Span) is
+   procedure Next_Line (Conditional : Boolean := False)
+   is
    begin
       if not Conditional or else Col /= 1 then
          if Buffer = null then
