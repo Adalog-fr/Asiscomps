@@ -293,6 +293,11 @@ package Thick_Queries is
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
 
+   function Element_List_Image (List : Asis.Element_List) return Wide_String;
+   -- Like Element_Image, but for an element list
+   -- Concatenates elements images, separated by ", "
+
+
    function Attribute_Name_Image (Attribute : Asis.Expression) return Wide_String;
    --  Like Pragma_Name_Image, but for an Attribute_Reference
    --
