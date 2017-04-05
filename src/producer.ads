@@ -94,4 +94,15 @@ package Producer is
    -- Where are we in the output file ?
    function Output_Line return Line_Number;
 
+   -- Switch the source to another unit. Everything printed from Push_Source to Pop_Source is considered
+   -- an insertiong. Push_Source/Pop_Source can be nested.
+   type State is private;
+   procedure Push_Source (Into : out State; From_Line : Line_Number := 1; From_Col : Character_Position := 0);
+   procedure Pop_Source  (From : in  State);
+private
+   type State is
+      record
+         Last_Printed_Line   : Line_Number := 1;
+         Last_Printed_Column : Character_Position := 0;
+      end record;
 end Producer;

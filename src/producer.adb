@@ -46,8 +46,7 @@ with   -- Application specific units
 package body Producer is
 
    -- Positions from source
-   Last_Printed_Line   : Line_Number := 1;
-   Last_Printed_Column : Character_Position := 0;
+   Current_State : State;
 
    -- Position in output
    Current_Line : Line_Number := 1;
@@ -69,6 +68,7 @@ package body Producer is
    Col_At_Insert         : Character_Position;
    Line_At_Rewind        : Line_Number;
    In_Rewind_Span        : Boolean := False;
+   Push_Count            : Natural := 0;
 
    ---------------------------------------------------------------------------------
    -----------------------------  Internal utilities  ------------------------------
@@ -123,9 +123,9 @@ package body Producer is
    procedure Finish_Inserts is
       -- If lines were inserted, provide the --CHANGED line if necessary.
    begin
-      if In_Rewind_Span then
+      if In_Rewind_Span or Push_Count > 0 then
          -- Everything is considered as inserted lines when inside the
-         -- rewind span. Do nothing until we're outside.
+         -- rewind span, or not at basic push level. Do nothing until we're outside.
          return;
       end if;
 
@@ -178,7 +178,7 @@ package body Producer is
             In_Comment := False;
          end if;
          Current_Line := Current_Line + 1;
-         if Counting_Inserts then
+         if In_Rewind_Span or Push_Count > 0 then   -- Count inserts
             Insert_Count := Insert_Count + 1;
          end if;
       end if;
@@ -189,25 +189,25 @@ package body Producer is
    --------------------
 
    procedure Print_Comments (Image : Wide_String) is
-      type State is (String, Comment, Outside);
-      Current_State : State := Outside;
+      type Parsing_State is (String, Comment, Outside);
+      Current_Parsing_State : Parsing_State := Outside;
    begin
       for I in Image'Range loop
-         case Current_State is
+         case Current_Parsing_State is
             when String =>
                if Image (I) = '"' then
-                  Current_State := Outside;
+                  Current_Parsing_State := Outside;
                end if;
             when Comment =>
                Put (Image (I));
             when Outside =>
                case Image (I) is
                   when '"' =>
-                     Current_State := String;
+                     Current_Parsing_State := String;
                   when '-' =>
                      if I /= Image'Last and then Image (I+1) = '-' then
                         Put ('-');
-                        Current_State := Comment;
+                        Current_Parsing_State := Comment;
                      end if;
                   when others =>
                      null;
@@ -340,7 +340,7 @@ package body Producer is
 
       declare
          The_Lines : constant Line_List := Lines (The_Element,
-                                                  First_Line => Last_Printed_Line,
+                                                  First_Line => Current_State.Last_Printed_Line,
                                                   Last_Line  => Advance_Last_Line);
       begin
          There_Is_Substitution := True;
@@ -351,16 +351,18 @@ package body Producer is
             -- However, it is safer in the case of strange spans, and it is harmless to
             -- call it anyway
             Print_Comments (Line_Image (The_Lines (The_Lines'First))
-                          (Last_Printed_Column+1 .. Advance_Last_Column));
+                            (Current_State.Last_Printed_Column+1 .. Advance_Last_Column));
          else
             Print_Comments (Line_Image (The_Lines (The_Lines'First))
-                         (Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
+                            (Current_State.Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
             New_Line_And_Comment (The_Lines (The_Lines'First));
 
             if In_Rewind_Span and then Line_At_Rewind <= The_Lines'First then
                -- we just exited the rewind span
                In_Rewind_Span := False;
-               Finish_Inserts;
+               if Push_Count = 0 then
+                  Finish_Inserts;
+               end if;
             end if;
 
             for I in Positive range The_Lines'First+1 .. The_Lines'Last-1 loop
@@ -371,7 +373,9 @@ package body Producer is
                if In_Rewind_Span and then Line_At_Rewind <= I then
                   -- we just exited the rewind span
                   In_Rewind_Span := False;
-                  Finish_Inserts;
+                  if Push_Count = 0 then
+                     Finish_Inserts;
+                  end if;
                end if;
             end loop;
 
@@ -381,8 +385,8 @@ package body Producer is
          end if;
       end;
 
-      Last_Printed_Line   := Advance_Last_Line;
-      Last_Printed_Column := Advance_Last_Column;
+      Current_State := (Last_Printed_Line   => Advance_Last_Line,
+                        Last_Printed_Column => Advance_Last_Column);
    end Advance;
 
    ----------------
@@ -443,8 +447,8 @@ package body Producer is
          Col_At_Insert := Col;
       end if;
 
-      if Last_Printed_Line /= 1 or Last_Printed_Column /= 0 then
-         -- Do not call Next_Line is nothing has been printed yet
+      if Current_State.Last_Printed_Line /= 1 or Current_State.Last_Printed_Column /= 0 then
+         -- Do not call Next_Line if nothing has been printed yet
          Next_Line;
       end if;
 
@@ -556,18 +560,18 @@ package body Producer is
 
       -- Check that we do not move backward (null move is OK)
       -- This is a very important check, as most of client's bugs are trapped here!
-      Assert (Last_Line > Last_Printed_Line or else (Last_Line = Last_Printed_Line and
-                                                     Last_Column >= Last_Printed_Column),
+      Assert (Last_Line > Current_State.Last_Printed_Line or else (Last_Line = Current_State.Last_Printed_Line and
+                                                                   Last_Column >= Current_State.Last_Printed_Column),
               "Illegal span in Print_Up_To ("
-              & Line_Number'Wide_Image (Last_Printed_Line) & ','
-              & Character_Position'Wide_Image (Last_Printed_Column) & ") ("
+              & Line_Number'Wide_Image (Current_State.Last_Printed_Line) & ','
+              & Character_Position'Wide_Image (Current_State.Last_Printed_Column) & ") ("
               & Line_Number'Wide_Image (Last_Line) & ','
               & Character_Position'Wide_Image (Last_Column) & ')',
               The_Element
              );
 
-      if Last_Line   = Last_Printed_Line   and
-         Last_Column = Last_Printed_Column and  -- Everything already printed
+      if Last_Line   = Current_State.Last_Printed_Line   and
+         Last_Column = Current_State.Last_Printed_Column and  -- Everything already printed
          not Final    -- If final = True, the new_line (and commented original line)
       then            -- must still be printed
          return;
@@ -577,22 +581,24 @@ package body Producer is
 
       declare
          The_Lines : constant Line_List := Lines (The_Element,
-                                                  First_Line => Last_Printed_Line,
+                                                  First_Line => Current_State.Last_Printed_Line,
                                                   Last_Line  => Last_Line);
       begin
          if The_Lines'Length = 1 then
             -- Everything fits on same line as previous element
             Print_Substituted (Line_Image (The_Lines (The_Lines'First))
-                             (Last_Printed_Column+1 .. Last_Column));
+                               (Current_State.Last_Printed_Column+1 .. Last_Column));
          else
             Print_Substituted (Line_Image (The_Lines (The_Lines'First))
-                               (Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
+                               (Current_State.Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
             New_Line_And_Comment (The_Lines (The_Lines'First));
 
             if In_Rewind_Span and then Line_At_Rewind <= The_Lines'First then
                -- we just exited the rewind span
                In_Rewind_Span := False;
-               Finish_Inserts;
+               if Push_Count = 0 then
+                  Finish_Inserts;
+               end if;
             end if;
 
             for I in Positive range The_Lines'First+1 .. The_Lines'Last-1 loop
@@ -609,10 +615,10 @@ package body Producer is
             -- Since it should never be outside the line range, taking the 'min prevents
             -- some stupid Constraint_Error...
             Print_Substituted (Line_Image (The_Lines (The_Lines'Last))
-                             (1 .. Character_Position'Min (Last_Column,
-                                                           Line_Image (The_Lines (The_Lines'Last))'Last)
-                             )
-                            );
+                               (1 .. Character_Position'Min (Last_Column,
+                                                             Line_Image (The_Lines (The_Lines'Last))'Last)
+                               )
+                              );
          end if;
          if Final then
             -- Case of the final line of a unit
@@ -622,8 +628,8 @@ package body Producer is
          end if;
       end;
 
-      Last_Printed_Line   := Last_Line;
-      Last_Printed_Column := Last_Column;
+      Current_State := (Last_Printed_Line   => Last_Line,
+                        Last_Printed_Column => Last_Column);
    end Print_Up_To;
 
    --------------------------------
@@ -676,11 +682,11 @@ package body Producer is
       end if;
 
       -- Rewind is not allowed to advance...
-      Assert (Last_Line < Last_Printed_Line or else (Last_Line = Last_Printed_Line and
-                                                     Last_Column <= Last_Printed_Column),
+      Assert (Last_Line < Current_State.Last_Printed_Line or else (Last_Line = Current_State.Last_Printed_Line and
+                                                                   Last_Column <= Current_State.Last_Printed_Column),
               "Illegal span in Rewind (" &
-              Line_Number'Wide_Image (Last_Printed_Line) & ',' &
-              Character_Position'Wide_Image (Last_Printed_Column) & ") (" &
+              Line_Number'Wide_Image (Current_State.Last_Printed_Line) & ',' &
+              Character_Position'Wide_Image (Current_State.Last_Printed_Column) & ") (" &
               Line_Number'Wide_Image (Last_Line) & ',' &
               Character_Position'Wide_Image (Last_Column) & ')'
              );
@@ -692,10 +698,10 @@ package body Producer is
 
       if not In_Rewind_Span then
          In_Rewind_Span := True;
-         Line_At_Rewind := Last_Printed_Line;
+         Line_At_Rewind := Current_State.Last_Printed_Line;
       end if;
-      Last_Printed_Line   := Last_Line;
-      Last_Printed_Column := Last_Column;
+      Current_State := (Last_Printed_Line   => Last_Line,
+                        Last_Printed_Column => Last_Column);
    end Rewind;
 
    ------------
@@ -707,10 +713,34 @@ package body Producer is
       Had_Changes := Global_Changes;
 
       -- Reset variables for next unit
-      Last_Printed_Line     := 1;
-      Last_Printed_Column   := 0;
+      Current_State         := (Last_Printed_Line   => 1,
+                                Last_Printed_Column => 0);
       There_Is_Substitution := False;
       Global_Changes        := False;
    end Finish;
+
+   -----------------
+   -- Push_Source --
+   -----------------
+
+   procedure Push_Source (Into : out State; From_Line : Line_Number := 1; From_Col : Character_Position := 0) is
+   begin
+      Push_Count    := Push_Count + 1;
+      Into          := Current_State;
+      Current_State := (Last_Printed_Line   => From_Line,
+                        Last_Printed_Column => From_Col-1);
+   end Push_Source;
+
+   ----------------
+   -- Pop_Source --
+   ----------------
+
+   procedure Pop_Source  (From : in State) is
+      use Utilities;
+   begin
+      Assert (Push_Count > 0, "Unmatched push count");
+      Push_Count    := Push_Count - 1;
+      Current_State := From;
+   end Pop_Source;
 
 end Producer;
