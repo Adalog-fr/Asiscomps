@@ -39,6 +39,49 @@ with -- Standard Ada units
 
 package body Implementation_Options.ADP_Project_File is
 
+   function Options (Project_Name : String; Option : String; Key : String) return Wide_String is
+      use Ada.Text_IO;
+
+      F : File_Type;
+      function Get_Next_Src return Wide_String is
+         use Ada.Characters.Handling;
+
+         Buf  : String (1 .. 500);
+         Last : Natural;
+      begin
+         loop  -- Exit on End_Error
+            Get_Line (F, Buf, Last);
+            if Last > Key'Length and then
+              Buf (1 .. Key'Length) = Key
+            then
+               return To_Wide_String (Option) & To_Wide_String (Buf (Key'Length + 1 .. Last)) & ' ' & Get_Next_Src;
+            end if;
+         end loop;
+      exception
+            -- It is better to catch End_Error than to check End_Of_File
+            -- in the case of malformed input files
+         when End_Error =>
+            return "";
+      end Get_Next_Src;
+
+   begin    -- Options
+      Open (F, In_File, Project_Name);
+      declare
+         Result : constant Wide_String := Get_Next_Src;
+      begin
+         Close (F);
+         return Result;
+      end;
+   exception
+      when Name_Error =>
+         raise Implementation_Error with "Unknown ADP project: " & Project_Name;
+      when others =>
+         if Is_Open (F) then
+            Close (F);
+         end if;
+         raise;
+   end Options;
+
    --------------------
    -- Is_Appropriate --
    --------------------
@@ -55,47 +98,17 @@ package body Implementation_Options.ADP_Project_File is
    ---------------
 
    function I_Options (Project_Name : String) return Wide_String is
-      use Ada.Text_IO;
-
-      F   : File_Type;
-      Key : constant String := "src_dir=";
-      function Get_Next_Src return Wide_String is
-         use Ada.Characters.Handling;
-
-         Buf  : String (1 .. 500);
-         Last : Natural;
-      begin
-         loop  -- Exit on End_Error
-            Get_Line (F, Buf, Last);
-            if Last > Key'Length and then
-              Buf (1 .. Key'Length) = Key
-            then
-               return "-I" & To_Wide_String (Buf (Key'Length + 1 .. Last)) & ' ' & Get_Next_Src;
-            end if;
-         end loop;
-      exception
-            -- It is better to catch End_Error than to check End_Of_File
-            -- in the case of malformed input files
-         when End_Error =>
-            return "";
-      end Get_Next_Src;
-
-   begin    -- I_Options_From_ADP_Project
-      Open (F, In_File, Project_Name);
-      declare
-         Result : constant Wide_String := Get_Next_Src;
-      begin
-         Close (F);
-         return Result;
-      end;
-   exception
-      when Name_Error =>
-         raise Implementation_Error with "Unknown ADP project: " & Project_Name;
-      when others =>
-         if Is_Open (F) then
-            Close (F);
-         end if;
-         raise;
+   begin
+      return Options (Project_Name, Option => "-I", Key => "src_dir=");
    end I_Options;
+
+   ---------------
+   -- T_Options --
+   ---------------
+
+   function T_Options (Project_Name : String) return Wide_String is
+   begin
+      return Options (Project_Name, Option => "-T", Key => "obj_dir=");
+   end T_Options;
 
 end Implementation_Options.ADP_Project_File;

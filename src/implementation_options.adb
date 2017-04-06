@@ -79,6 +79,7 @@ package body Implementation_Options is
          return
            To_Wide_String (Default_Options)
            & ' ' & Project_File.I_Options (Project_Name)
+           & ' ' & Project_File.T_Options (Project_Name)
            & ' ' & Other_Options;
       elsif ADP_Project_File.Is_Appropriate (Project_Name) then
          return

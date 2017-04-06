@@ -36,7 +36,12 @@ package Implementation_Options.ADP_Project_File is
 
    function Is_Appropriate (Project_Name : String) return Boolean;
 
-   -- Constructs a list of -I<name> options from
-   -- the source_dirs indications in an Emacs .adp project file
    function I_Options (Project_Name : String) return Wide_String;
+   -- Constructs a list of -I<name> options from
+   -- the src_dir indications in an Emacs .adp project file
+
+   function T_Options (Project_Name : String) return Wide_String;
+   -- Constructs a list of -T<name> options from
+   -- the obj_dir indications in an Emacs .adp project file
+
 end Implementation_Options.ADP_Project_File;

@@ -50,9 +50,23 @@ package body Implementation_Options.No_Project_File is
 
    function I_Options (Project_Name : String) return Wide_String is
       pragma Unreferenced (Project_Name);
-   begin    -- I_Options_From_GPR_Project
+   begin    -- I_Options
       return "";
    end I_Options;
+
+   ---------------
+   -- T_Options --
+   ---------------
+
+   function T_Options (Project_Name : String) return Wide_String is
+      pragma Unreferenced (Project_Name);
+   begin    -- T_Options
+      return "";
+   end T_Options;
+
+   -----------------
+   -- Tool_Switch --
+   -----------------
 
    function Tool_Switch (Project_Name : String; Tool : String; After : String) return String is
       pragma Unreferenced (Project_Name, Tool, After);

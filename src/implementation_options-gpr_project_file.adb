@@ -65,7 +65,7 @@ package body Implementation_Options.GPR_Project_File is
 
       Tree   : Project_Tree;
       Result : Unbounded_Wide_String;
-   begin    -- I_Options_From_GPR_Project
+   begin    -- I_Options
       Load (Tree, Root_Project_Path => Create (+Project_Name));
 
       declare
@@ -83,12 +83,39 @@ package body Implementation_Options.GPR_Project_File is
          raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
    end I_Options;
 
+   ---------------
+   -- T_Options --
+   ---------------
+
+   function T_Options (Project_Name : String) return Wide_String is
+      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
+      use Gnatcoll.Projects, Gnatcoll.VFS;
+
+      Tree   : Project_Tree;
+      Result : Unbounded_Wide_String;
+   begin    -- T_Options
+      Load (Tree, Root_Project_Path => Create (+Project_Name));
+
+      declare
+         Project_Dirs : constant File_Array := Object_Path (Root_Project (Tree), Recursive => True);
+      begin
+         for D in Project_Dirs'Range loop
+            Append (Result, " -T" & To_Wide_String (+Full_Name (Project_Dirs (D))));
+         end loop;
+      end;
+
+      return To_Wide_String (Result);
+
+   exception
+      when Invalid_Project =>
+         raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
+   end T_Options;
+
    -----------------
    -- Tool_Switch --
    -----------------
 
    function Tool_Switch (Project_Name : String; Tool : String; After : String) return String is
-      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
       use Gnatcoll.Projects, Gnatcoll.VFS;
       use type Gnat.Strings.String_List_Access;
 
@@ -96,7 +123,7 @@ package body Implementation_Options.GPR_Project_File is
       Attributes : GNAT.Strings.String_List_Access;
 
       -- Not clear whether the value is named "Switches" or "Default_Switches"... Try both
-   begin    -- I_Options_From_GPR_Project
+   begin    -- Tool_Switch
       Load (Tree, Root_Project_Path => Create (+Project_Name));
 
       Attributes := Attribute_Value (Project      => Root_Project (Tree),
