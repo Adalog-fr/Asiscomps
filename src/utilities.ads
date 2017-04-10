@@ -65,6 +65,7 @@ package Utilities is
    procedure User_Log     (Message : Wide_String := ""; Stay_On_Line : Boolean := False);
    -- Output only if Verbose_Option
 
+   function Format_Duration (How_Long : Duration) return Wide_String;
 
    --
    --  String facilities

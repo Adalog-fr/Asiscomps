@@ -381,6 +381,25 @@ package body Utilities is
       end if;
    end User_Log;
 
+   ---------------------
+   -- Format_Duration --
+   ---------------------
+
+   function Format_Duration (How_Long : Duration) return Wide_String is
+      Seconds_Tenth : constant Integer := Integer (How_Long * 10); -- Duration in tenth of seconds
+      Hours         : constant Integer := Seconds_Tenth / (3600 * 10);
+      Mins          : constant Integer := Seconds_Tenth rem (3600 * 10) / (60 * 10);
+      Secs          : constant Integer := Seconds_Tenth rem (60 * 10) / 10;
+      Tens          : constant Integer := Seconds_Tenth rem 10;
+   begin
+
+      -- We don't return tenths if > 1 min
+      return Choose (Hours /= 0, Integer_Img (Hours) & "h ", "")
+           & Choose (Mins  /= 0, Integer_Img (Mins)  & "mn ", "")
+           & Integer_Img (Secs)
+           & Choose (Mins = 0, '.' & Integer_Img (Tens), "") & "s.";
+   end Format_Duration;
+
    ------------------
    -- User_Message --
    ------------------
@@ -444,8 +463,7 @@ package body Utilities is
             use Ada.Exceptions;
          begin
             Raise_Exception (Exception_Identity (Occur),
-                             Message => "Error opening " & Name &
-                                        " for " & Open_Mode'Image (Mode));
+                             Message => "Error opening " & Name & " for " & Open_Mode'Image (Mode));
          end;
    end Safe_Open;
 
