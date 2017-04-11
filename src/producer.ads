@@ -84,13 +84,6 @@ package Producer is
    -- the element are discarded, but comments and line breaks are printed.
    procedure Advance (The_Element : Element; Included : Boolean := True);
 
-   -- Returns current point to the start (if Included) or the end (if not Included)
-   -- of the given element.
-   -- Everything generated from this point until the current point will be considered
-   -- an insertion (since it has already been produced once).
-   -- Multiple Rewind are allowed.
-   procedure Rewind (The_Element : Element; Included : Boolean := False);
-
    -- Where are we in the output file ?
    function Output_Line return Line_Number;
 

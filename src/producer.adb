@@ -66,8 +66,6 @@ package body Producer is
    Insert_Count          : Line_Number := 0;
    Global_Changes        : Boolean := False;
    Col_At_Insert         : Character_Position;
-   Line_At_Rewind        : Line_Number;
-   In_Rewind_Span        : Boolean := False;
    Push_Count            : Natural := 0;
 
    ---------------------------------------------------------------------------------
@@ -123,7 +121,7 @@ package body Producer is
    procedure Finish_Inserts is
       -- If lines were inserted, provide the --CHANGED line if necessary.
    begin
-      if In_Rewind_Span or Push_Count > 0 then
+      if Push_Count > 0 then
          -- Everything is considered as inserted lines when inside the
          -- rewind span, or not at basic push level. Do nothing until we're outside.
          return;
@@ -178,7 +176,7 @@ package body Producer is
             In_Comment := False;
          end if;
          Current_Line := Current_Line + 1;
-         if In_Rewind_Span or Push_Count > 0 then   -- Count inserts
+         if Push_Count > 0 then   -- Count inserts
             Insert_Count := Insert_Count + 1;
          end if;
       end if;
@@ -357,26 +355,10 @@ package body Producer is
                             (Current_State.Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
             New_Line_And_Comment (The_Lines (The_Lines'First));
 
-            if In_Rewind_Span and then Line_At_Rewind <= The_Lines'First then
-               -- we just exited the rewind span
-               In_Rewind_Span := False;
-               if Push_Count = 0 then
-                  Finish_Inserts;
-               end if;
-            end if;
-
             for I in Positive range The_Lines'First+1 .. The_Lines'Last-1 loop
                There_Is_Substitution := True;
                Print_Comments (Line_Image (The_Lines (I)));
                New_Line_And_Comment (The_Lines (I), Conditional => True);
-
-               if In_Rewind_Span and then Line_At_Rewind <= I then
-                  -- we just exited the rewind span
-                  In_Rewind_Span := False;
-                  if Push_Count = 0 then
-                     Finish_Inserts;
-                  end if;
-               end if;
             end loop;
 
             There_Is_Substitution := True;
@@ -593,22 +575,9 @@ package body Producer is
                                (Current_State.Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
             New_Line_And_Comment (The_Lines (The_Lines'First));
 
-            if In_Rewind_Span and then Line_At_Rewind <= The_Lines'First then
-               -- we just exited the rewind span
-               In_Rewind_Span := False;
-               if Push_Count = 0 then
-                  Finish_Inserts;
-               end if;
-            end if;
-
             for I in Positive range The_Lines'First+1 .. The_Lines'Last-1 loop
                Print_Substituted (Line_Image (The_Lines (I)));
                New_Line_And_Comment (The_Lines (I));
-               if In_Rewind_Span and then Line_At_Rewind <= I then
-                  -- we just exited the rewind span
-                  In_Rewind_Span := False;
-                  Finish_Inserts;
-               end if;
            end loop;
 
             -- Last_Column seems unreliable in some cases.
@@ -654,55 +623,6 @@ package body Producer is
          Print_Up_To (The_List (The_List'First), Included, Changing, Into, Final);
       end if;
    end Print_Up_To;
-
-   ------------
-   -- Rewind --
-   ------------
-
-   procedure Rewind (The_Element : Element; Included : Boolean := False) is
-      -- Note that every line in the span from where we are returning to where
-      -- we are currently must be considered as "changed".
-      use Utilities;
-
-      The_Span    : constant Span := Element_Span (The_Element);
-      Last_Line   : Line_Number;
-      Last_Column : Character_Position;
-   begin
-      -- Get rid of annoying special case
-      if Is_Nil (The_Span) then
-         return;
-      end if;
-
-      if Included then
-         Last_Line   := The_Span.First_Line;
-         Last_Column := The_Span.First_Column - 1;
-      else
-         Last_Line   := The_Span.Last_Line;
-         Last_Column := The_Span.Last_Column;
-      end if;
-
-      -- Rewind is not allowed to advance...
-      Assert (Last_Line < Current_State.Last_Printed_Line or else (Last_Line = Current_State.Last_Printed_Line and
-                                                                   Last_Column <= Current_State.Last_Printed_Column),
-              "Illegal span in Rewind (" &
-              Line_Number'Wide_Image (Current_State.Last_Printed_Line) & ',' &
-              Character_Position'Wide_Image (Current_State.Last_Printed_Column) & ") (" &
-              Line_Number'Wide_Image (Last_Line) & ',' &
-              Character_Position'Wide_Image (Last_Column) & ')'
-             );
-
-      if Insert_Count = 0 then
-         -- First insert
-         Col_At_Insert := Col;
-      end if;
-
-      if not In_Rewind_Span then
-         In_Rewind_Span := True;
-         Line_At_Rewind := Current_State.Last_Printed_Line;
-      end if;
-      Current_State := (Last_Printed_Line   => Last_Line,
-                        Last_Printed_Column => Last_Column);
-   end Rewind;
 
    ------------
    -- Finish --
