@@ -213,7 +213,7 @@ package body Thick_Queries is
    -- Element_List_Image --
    ------------------------
 
-   function Element_List_Image (List : Asis.Element_List) return Wide_String is
+   function Element_List_Image (List : Asis.Element_List; Separator : Wide_Character) return Wide_String is
       use Asis.Text;
    begin
       case List'Length is
@@ -222,7 +222,10 @@ package body Thick_Queries is
          when 1 =>
             return Element_Image (List (List'First));
          when others =>
-            return Element_Image (List (List'First)) & Element_List_Image (List (List'First + 1 .. List'Last));
+            return
+              Element_Image (List (List'First))
+              & Separator
+              & Element_List_Image (List (List'First + 1 .. List'Last), Separator);
       end case;
    end Element_List_Image;
 
