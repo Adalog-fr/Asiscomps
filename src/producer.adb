@@ -624,6 +624,51 @@ package body Producer is
       end if;
    end Print_Up_To;
 
+   --------------------------------
+   -- Print_Up_To  (Wide_String) --
+   --------------------------------
+
+   procedure Print_Up_To (The_Word : Wide_String; Included : Boolean; Ref_Elem : Element) is
+      use Utilities;
+   begin
+      loop
+         declare
+            The_Line : constant Program_Text := Line_Image (Lines
+                                                            (Ref_Elem,
+                                                             First_Line => Current_State.Last_Printed_Line,
+                                                             Last_Line  => Current_State.Last_Printed_Line)
+                                                            (Current_State.Last_Printed_Line));
+         begin
+            for I in Positive range Current_State.Last_Printed_Column + 1 .. The_Line'Last loop
+               -- We use a "for" loop here, but we always exit through the "exit" below:
+               if I > The_Line'Last - The_Word'Length + 1    -- Not enough remaining space for The_Word
+                 or else (I <= The_Line'Last - 1 and then (The_Line (I) = '-' and The_Line (I + 1) = '-')) -- Comment
+               then
+                  exit;
+
+               elsif Set_Casing (The_Line (I .. I + The_Word'Length - 1), Upper_Case) = The_Word -- The_Word found
+                 and then (I = The_Line'First
+                           or else Is_Delimiter (The_Line (I - 1)))
+                 and then (I + The_Word'Length - 1 = The_Line'Last
+                           or else Is_Delimiter (The_Line (I + The_Word'Length)))
+               then
+                  if Included then
+                     Put (The_Line (I .. I + The_Word'Length - 1));
+                     Current_State.Last_Printed_Column := I + The_Word'Length - 1;
+                  end if;
+                  return;
+               else
+                  Put (The_Line (I));
+                  Current_State.Last_Printed_Column := I;
+               end if;
+            end loop;
+            Put (The_Line (Current_State.Last_Printed_Column + 1 .. The_Line'Last));
+            Next_Line;
+            Current_State := (Last_Printed_Line => Current_State.Last_Printed_Line + 1, Last_Printed_Column => 0);
+         end;
+      end loop;
+   end Print_Up_To;
+
    ------------
    -- Finish --
    ------------

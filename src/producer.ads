@@ -78,6 +78,14 @@ package Producer is
                           Into        : Wide_String := "";
                           Final       : Boolean     := False);
 
+   -- Print program text up to just before (Included=False) or just
+   -- after (Included=True) the given word.
+   -- Word must be given in upper-case, and appear in the program text between separators
+   -- Ref_Elem is not used per-se, it just identifies the unit that is being printed from.
+   procedure Print_Up_To (The_Word : Wide_String;
+                          Included : Boolean;
+                          Ref_Elem : Element);
+
    -- Advances current point until just before (Included=False) or just after(Included=True)
    -- the given element.
    -- Ada elements between the current source position and the begining (respectively end) of
