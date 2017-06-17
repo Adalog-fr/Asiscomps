@@ -96,7 +96,7 @@ package Producer is
    function Output_Line return Line_Number;
 
    -- Switch the source to another unit. Everything printed from Push_Source to Pop_Source is considered
-   -- an insertiong. Push_Source/Pop_Source can be nested.
+   -- an insertion. Push_Source/Pop_Source can be nested.
    type State is private;
    procedure Push_Source (Into : out State; From_Line : Line_Number := 1; From_Col : Character_Position := 0);
    procedure Pop_Source  (From : in  State);

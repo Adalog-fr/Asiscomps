@@ -74,7 +74,7 @@ package body Scoped_Store is
    Head           : Link;  -- Head (textually last) declaration
    Parents_Head   : Link;  -- Where Head was after restoring parent units context
    Unit_Spec_Head : Link;  -- Where Head was when a compilation unit package body is entered
-   -- (After restoring parents and spec)
+                           -- (After restoring parents and spec)
 
    type Spec_Kind is (Public_Library, Private_Library, Not_Library);
    type Spec_Save is
@@ -104,19 +104,10 @@ package body Scoped_Store is
    -- Invariant: Current is the current element of the iterator
    --            Current never designates a deleted node (whose Content is null)
    Previous     : Link;
+   -- Invariant: Previous designates the node before Current (or null if Current = Head)
+   --            May designate a deleted node
    Current_Mode : Iterator_Mode;
    Final_Scope  : Scope_Range;
-
-
-   --------------
-   -- To_Upper --
-   --------------
-
-   function To_Upper (Item : in Wide_String) return Wide_String is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Maps.Wide_Constants;
-   begin
-      return Translate (Item, Upper_Case_Map);
-   end To_Upper;
 
 
    ----------
@@ -518,6 +509,7 @@ package body Scoped_Store is
             raise Not_Present with "Parent not found in Restore_Parent_Context for unit " & To_String (Unit_Name);
       end Restore_Parent_Context;
 
+      use Ada.Wide_Characters.Handling;
       use Asis.Compilation_Units, Asis.Elements;
    begin  -- Enter_Unit
       Head := null;

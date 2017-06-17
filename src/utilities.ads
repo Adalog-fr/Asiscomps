@@ -76,11 +76,11 @@ package Utilities is
    function Set_Casing (Item : in Wide_String; To : in Casing) return Wide_String;
 
    function To_Lower (Item : in Wide_String) return Wide_String;
-   --  The language provides this only for String, this is the same for Wide_String
+   --  The language provides this only for String, this is the same for Wide_String (fixed in 2012)
    pragma Inline (To_Lower);
 
    function To_Upper (Item : in Wide_String) return Wide_String;
-   --  The language provides this only for String, this is the same for Wide_String
+   --  The language provides this only for String, this is the same for Wide_String (fixed in 2012)
    pragma Inline (To_Upper);
 
    function To_Title (Item : in Wide_String) return Wide_String;
