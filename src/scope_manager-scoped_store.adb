@@ -36,19 +36,15 @@
 with
   Ada.Characters.Handling,
   Ada.Strings.Wide_Fixed,
-  Ada.Strings.Wide_Maps.Wide_Constants,
-  Ada.Strings.Wide_Unbounded,
   Ada.Unchecked_Deallocation;
 
 -- Adalog
 with
-  Binary_Map,
-  Thick_Queries;
+  Binary_Map;
 
 -- Asis
 with
   Asis.Compilation_Units,
-  Asis.Declarations,
   Asis.Elements;
 
 separate (Scope_Manager)
@@ -60,8 +56,6 @@ package body Scoped_Store is
    type Data_Access is access Data;
 
    -- Linked list of Data, LIFO order
-   type Node;
-   type Link is access Node;
    type Node is
       record
          Next    : Link;
@@ -125,6 +119,34 @@ package body Scoped_Store is
       Real_Free (Ptr);
    end Free;
 
+   -------------------
+   -- Last_Of_Scope --
+   -------------------
+
+   function Last_Of_Scope (Min_Scope : Scope_Range) return Link is
+   -- returns a pointer to the last (deepest) node whose scope is >= Min_Scope
+   -- That's the place to insert if FIFO order is desired
+      use Thick_Queries;
+      Ptr : Link := Head;
+   begin
+      if Min_Scope > Scope_Top then
+         Report_Error ("Min_Scope too high:" & Scope_Range'Wide_Image (Min_Scope));
+      end if;
+
+      if Ptr = null or else Ptr.Scope < Min_Scope then
+         -- nothing in required scope, chain at Head
+         return null;
+      end if;
+
+      while Ptr.Next /= null
+        and then (Ptr.Next.Content = null       -- a deleted node
+                  or Ptr.Next.Scope >= Min_Scope)
+      loop
+         Ptr := Ptr.Next;
+      end loop;
+
+      return Ptr;
+   end Last_Of_Scope;
 
    ----------
    -- Push --
@@ -147,32 +169,75 @@ package body Scoped_Store is
    --------------------
 
    procedure Push_Enclosing (Info : in Data) is
-      Insert_Ptr    : Link := Head;
       Before_Insert : Link := null;
    begin
       if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
 
-      while Insert_Ptr /= null
-        and then (Insert_Ptr.Content = null       -- a deleted node
-                  or Insert_Ptr.Scope = Scope_Top)
-      loop
-         Before_Insert := Insert_Ptr;
-         Insert_Ptr    := Insert_Ptr.Next;
-      end loop;
-      if Insert_Ptr = Head then
+      Before_Insert := Last_Of_Scope (Scope_Top);
+      if Before_Insert = null then
          Head := new Node'(Next    => Head,
                            Scope   => Scope_Top - 1,
                            Origin  => Same_Unit,
                            Content => new Data'(Info));
       else
-         Before_Insert.Next := new Node'(Next    => Insert_Ptr,
+         Before_Insert.Next := new Node'(Next    => Before_Insert.Next,
                                          Scope   => Scope_Top - 1,
                                          Origin  => Same_Unit,
                                          Content => new Data'(Info));
       end if;
    end Push_Enclosing;
+
+   -------------
+   -- Prepend --
+   -------------
+
+   procedure Prepend (Info : in Data) is
+      Before_Insert : Link := null;
+   begin
+      if not Is_Activated then
+         raise Program_Error with Inactive_Message;
+      end if;
+
+      Before_Insert := Last_Of_Scope (Scope_Top);
+      if Before_Insert = null then
+         Head := new Node'(Next    => Head,
+                           Scope   => Scope_Top,
+                           Origin  => Same_Unit,
+                           Content => new Data'(Info));
+      else
+         Before_Insert.Next := new Node'(Next    => Before_Insert.Next,
+                                         Scope   => Scope_Top,
+                                         Origin  => Same_Unit,
+                                         Content => new Data'(Info));
+      end if;
+   end Prepend;
+
+   -----------------------
+   -- Prepend_Enclosing --
+   -----------------------
+
+   procedure Prepend_Enclosing (Info : in Data) is
+      Before_Insert : Link := null;
+   begin
+      if not Is_Activated then
+         raise Program_Error with Inactive_Message;
+      end if;
+
+      Before_Insert := Last_Of_Scope (Scope_Top-1);
+      if Before_Insert = null then
+         Head := new Node'(Next    => Head,
+                           Scope   => Scope_Top - 1,
+                           Origin  => Same_Unit,
+                           Content => new Data'(Info));
+      else
+         Before_Insert.Next := new Node'(Next    => Before_Insert.Next,
+                                         Scope   => Scope_Top - 1,
+                                         Origin  => Same_Unit,
+                                         Content => new Data'(Info));
+      end if;
+   end Prepend_Enclosing;
 
    -----------
    -- Reset --
@@ -185,8 +250,19 @@ package body Scoped_Store is
       end if;
 
       Current_Mode := Mode;
-      Current      := Head;
-      Previous     := null;
+
+      case Mode is
+         when All_Scopes | Unit_Scopes | Current_Scope_Only =>
+            Current      := Head;
+            Previous     := null;
+         when Enclosing_Scope_Only =>
+            Previous := Last_Of_Scope (Scope_Top);
+            if Previous = null then
+               Current := Head;
+            else
+               Current := Previous.Next;
+            end if;
+      end case;
       while Current /= null and then Current.Content = null loop -- Skip deleted nodes
          Previous := Current;
          Current  := Current.Next;
@@ -207,6 +283,8 @@ package body Scoped_Store is
             while not Scope_Stack (Final_Scope).Is_Unit loop
                Final_Scope := Final_Scope - 1;
             end loop;
+         when Enclosing_Scope_Only =>
+            Final_Scope := Scope_Top-1;
          when Current_Scope_Only =>
             Final_Scope := Scope_Top;
       end case;
@@ -222,9 +300,20 @@ package body Scoped_Store is
          raise Program_Error with Inactive_Message;
       end if;
 
-      Current      := Head;
-      Previous     := null;
       Current_Mode := Mode;
+      case Mode is
+         when All_Scopes | Unit_Scopes | Current_Scope_Only =>
+            Current      := Head;
+            Previous     := null;
+         when Enclosing_Scope_Only =>
+            Previous := Last_Of_Scope (Scope_Top);
+            if Previous = null then
+               Current := Head;
+            else
+               Current := Previous.Next;
+            end if;
+      end case;
+
       while Current /= null
         and then (Current.Content = null    -- a deleted node
                   or else not Equivalent_Keys (Info, Current.Content.all))
@@ -255,6 +344,8 @@ package body Scoped_Store is
                while not Scope_Stack (Final_Scope).Is_Unit loop
                   Final_Scope := Final_Scope - 1;
                end loop;
+            when Enclosing_Scope_Only =>
+               Final_Scope := Scope_Top - 1;
             when Current_Scope_Only =>
                Final_Scope := Current.Scope;
          end case;
@@ -323,22 +414,10 @@ package body Scoped_Store is
 
    procedure Next is
    begin
-      if not Is_Activated then
-         raise Program_Error with Inactive_Message;
-      end if;
-
-      if Current = null then
+      -- Data_Available checks Is_Activated:
+      if not Data_Available then
          raise Constraint_Error;
       end if;
-
-      case Current_Mode is
-         when All_Scopes =>
-            null;
-         when Unit_Scopes | Current_Scope_Only =>
-            if Current.Scope < Final_Scope then
-               raise Constraint_Error;
-            end if;
-      end case;
 
       loop
          Previous := Current;
@@ -365,7 +444,7 @@ package body Scoped_Store is
          when All_Scopes =>
             return True;
 
-         when Unit_Scopes | Current_Scope_Only =>
+         when Unit_Scopes | Enclosing_Scope_Only | Current_Scope_Only =>
             return Current.Scope >= Final_Scope;
       end case;
    end Data_Available;
@@ -399,7 +478,6 @@ package body Scoped_Store is
       if not Is_Activated then
          raise Program_Error with Inactive_Message;
       end if;
-
       Free (Deleted_Node.Content);
 
       Current := Current.Next;
@@ -531,8 +609,7 @@ package body Scoped_Store is
    -----------------
 
    procedure Enter_Scope (Scope : Asis.Element) is   --## rule line off LOCAL_HIDING ## same name intentional
-      use Asis, Asis.Declarations, Asis.Elements;
-      use Thick_Queries;
+      use Asis, Asis.Elements;
 
       Cur_Link   : Link;
    begin   -- Enter_Scope
@@ -545,8 +622,7 @@ package body Scoped_Store is
             declare
                use Spec_Maps;
                Info       : Spec_Save;
-               Scope_Name : constant Unbounded_Wide_String
-                 := To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Names (Scope) (1), With_Profile => True)));
+               Scope_Name : constant Unbounded_Wide_String := Scope_Key (Scope);
             begin
                if Is_Present (Spec_Store, Scope_Name) then
                   Info := Fetch (Spec_Store, Scope_Name);
@@ -595,9 +671,7 @@ package body Scoped_Store is
             -- These certainly have no private part!
             declare
                use Spec_Maps;
-               Scope_Name : constant Unbounded_Wide_String
-                 := To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Names (Scope) (1),
-                                                                         With_Profile => True)));
+               Scope_Name : constant Unbounded_Wide_String := Scope_Key (Scope);
                Info : Spec_Save;
             begin
                if Is_Present (Spec_Store, Scope_Name) then
@@ -634,7 +708,7 @@ package body Scoped_Store is
 
       procedure Restore_Parent_Private_Context (Unit_Name : in Wide_String) is
          -- Copy context from parent private part if any
-         use Spec_Maps, Ada.Strings, Ada.Strings.Wide_Fixed, Ada.Characters.Handling;
+         use Spec_Maps, Ada.Strings, Ada.Strings.Wide_Fixed, Ada.Characters.Handling, Ada.Wide_Characters.Handling;
 
          Inx_Dot     : constant Natural := Index (Unit_Name, ".", Going => Backward);
          Parent_Name : constant Wide_String := To_Upper (Unit_Name (Unit_Name'First .. Inx_Dot - 1));
@@ -677,6 +751,7 @@ package body Scoped_Store is
       -- This is called only for compilation units
       -- Note that the scope is necessarily a [generic] package here,
       -- since these are the only compilation units with a private part.
+
       if Head /= null and then Head.Origin = Same_Unit then
          Unit_Info.Visible_Head := Head;
       else
@@ -696,7 +771,7 @@ package body Scoped_Store is
    ----------------
 
    procedure Exit_Scope (Scope : Asis.Element) is   --## rule line off LOCAL_HIDING ## same name intentional
-      use Asis, Asis.Declarations, Asis.Elements, Thick_Queries, Spec_Maps;
+      use Asis, Asis.Elements, Spec_Maps;
 
       procedure Delete_Data (Stop_At : Link) is
          -- Stop_At = pointer to first node to keep
@@ -704,7 +779,6 @@ package body Scoped_Store is
          Cur_Link        : Link := Head;
          Local_Scope_Top : Scope_Range := Scope_Top;
       begin
-
          -- Data linked to (pseudo) scope 0 must be deleted together with
          -- data from scope 1.
          if Scope_Top = 1 then
@@ -723,6 +797,7 @@ package body Scoped_Store is
       end Delete_Data;
 
       Cur_Link   : Link;
+      Old_Head   : Link;
       Scope_Kind : constant Asis.Declaration_Kinds := Declaration_Kind (Scope);
    begin  -- Exit_Scope
       case Scope_Kind is
@@ -775,12 +850,9 @@ package body Scoped_Store is
                   loop
                      Unit_Info.Visible_Tail := Unit_Info.Visible_Tail.Next;
                   end loop;
+                  Unit_Info.Visible_Tail.Next := null;   -- Close the list cleanly
                end if;
-               Add (To    => Spec_Store,
-                    Key   => To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Names (Scope) (1),
-                                                                                  With_Profile => True))),
-                    Value => Unit_Info);
-
+               Add (To => Spec_Store, Key => Scope_Key (Scope), Value => Unit_Info);
             else -- Not a library package spec
                if Head = null or else Head.Scope /= Scope_Top then
                   -- No data => nothing to do
@@ -797,14 +869,13 @@ package body Scoped_Store is
                loop
                   Cur_Link := Cur_Link.Next;
                end loop;
-               Add (To    => Spec_Store,
-                    Key   => To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Names (Scope) (1),
-                                                                                  With_Profile => True))),
-                    Value => (Kind         => Not_Library,
-                              Visible_Head => Head,
-                              Visible_Tail => Cur_Link,
-                              others       => null));
-               Head := Cur_Link.Next;
+               Old_Head      := Head;
+               Head          := Cur_Link.Next;
+               Cur_Link.Next := null; -- close the list cleanly
+               Add (To => Spec_Store, Key => Scope_Key (Scope), Value => (Kind         => Not_Library,
+                                                                          Visible_Head => Old_Head,
+                                                                          Visible_Tail => Cur_Link,
+                                                                          others       => null));
             end if;
 
          when A_Package_Body_Declaration =>
@@ -860,4 +931,100 @@ package body Scoped_Store is
 
       Is_Activated := True;
    end Activate;
+
+   --------------------
+   -- Current_Cursor --
+   --------------------
+
+   function Current_Cursor return Cursor is
+   begin
+      return (Current, Previous, Current_Mode, Final_Scope);
+   end Current_Cursor;
+
+   -------------
+   -- Restore --
+   -------------
+
+   procedure Restore (Curs : in  Cursor)is
+      use Thick_Queries;
+   begin
+      -- Make sure that we restore an existing state, and that previous is good
+      Previous := null;
+      if Curs.Current = null then
+         Current := null;
+         return;
+      end if;
+
+      Current := Head;
+      while Current /= null loop
+         if Current = Curs.Current then -- found
+            if Current.Content = null then
+               Report_Error ("Restore of deleted node");
+            end if;
+            Current_Mode := Curs.Current_Mode;
+            Final_Scope  := Curs.Final_Scope;
+            return;
+         end if;
+         Previous := Current;
+         Current  := Current.Next;
+      end loop;
+
+      -- Not found
+      Report_Error ("Restore of a non-existing state");
+   end Restore;
+
+   -------------------
+   -- Create_Cursor --
+   -------------------
+
+   procedure Create_Cursor (Curs : out Cursor; On : Asis.Declaration) is
+      use Spec_Maps;
+      Info       : Spec_Save;
+      Scope_Name : constant Unbounded_Wide_String := Scope_Key (On);
+   begin
+      if Is_Present (Spec_Store, Scope_Name) then
+         Info := Fetch (Spec_Store, Scope_Name);
+         Curs := (Current  => Info.Visible_Head,
+                  Previous     => null,
+                  Current_Mode => Current_Scope_Only,
+                  Final_Scope  => 0);
+      else
+         Curs := (Current      => null,
+                  Previous     => null,
+                  Current_Mode => Current_Scope_Only,
+                  Final_Scope  => 0);
+      end if;
+   end Create_Cursor;
+
+   ----------
+   -- Next --
+   ----------
+
+   procedure Next (Curs : in out Cursor) is
+   begin
+      loop
+         Curs.Previous := Curs.Current;
+         Curs.Current  := Curs.Current.Next;
+         exit when Curs.Current = null or else Curs.Current.Content /= null;
+      end loop;
+   end Next;
+
+   --------------------
+   -- Data_Available --
+   --------------------
+
+   function Data_Available (Curs : in Cursor) return Boolean is
+   begin
+      return Curs.Current /= null;
+   end Data_Available;
+
+   ------------------
+   -- Current_Data --
+   ------------------
+
+   function  Current_Data (Curs : in Cursor) return Data is
+   begin
+      return Curs.Current.Content.all;
+   end Current_Data;
+
 end Scoped_Store;

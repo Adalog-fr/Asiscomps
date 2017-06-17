@@ -34,12 +34,18 @@
 
 -- Ada
 with
-  Ada.Unchecked_Deallocation;
+  Ada.Unchecked_Deallocation,
+  Ada.Wide_Characters.Handling;
 
 -- Asis
 with
+  Asis.Declarations,
   Asis.Elements,
   Asis.Compilation_Units;
+
+-- Adalog
+with
+   Thick_Queries;
 
 package body Scope_Manager is
 
@@ -213,6 +219,18 @@ package body Scope_Manager is
       end loop;
       return False;
    end Is_Active;
+
+   -----------------
+   -- Default_Key --
+   -----------------
+
+   function Default_Key (Scope : Asis.Element) return Ada.Strings.Wide_Unbounded.Unbounded_Wide_String is
+      use Ada.Strings.Wide_Unbounded, Ada.Wide_Characters.Handling;
+      use Asis.Declarations;
+      use Thick_Queries;
+   begin
+      return To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Names (Scope) (1), With_Profile => True)));
+   end Default_Key;
 
    ------------------
    -- Scoped_Store --

@@ -34,7 +34,8 @@
 
 -- Asis
 with
-  Asis;
+   Ada.Strings.Wide_Unbounded,
+   Asis;
 
 package Scope_Manager is
    --  This package provides facilities for applications that need to manage
@@ -120,16 +121,20 @@ package Scope_Manager is
    -- Management of user data associated to scopes                                  --
    -----------------------------------------------------------------------------------
 
-   type Iterator_Mode is (All_Scopes, Unit_Scopes, Current_Scope_Only);
+   type Iterator_Mode is (All_Scopes, Unit_Scopes, Enclosing_Scope_Only, Current_Scope_Only);
 
    type Scoping_Procedure is access procedure (Scope : Asis.Element);
    -- This declaration is for use in the private part of Scoped_Store,
    -- no use for the users of this package. (No harm either).
 
+   function Default_Key (Scope : Asis.Element) return Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
+
    generic
       type Data (<>) is private;
       with function Equivalent_Keys (L, R : Data) return Boolean is "=";
       with procedure Clear (Item : in out Data) is null;
+      with function Scope_Key (Scope : Asis.Element) return Ada.Strings.Wide_Unbounded.Unbounded_Wide_String
+        is Default_Key;
    package Scoped_Store is
       -- This package manages user data that are to be associated to a scope.
       -- It is managed as a stack. Data associated to a scope are automatically
@@ -152,12 +157,21 @@ package Scope_Manager is
 
       procedure Push (Info : in Data);
       -- Adds Info on top of stack, associated to current scope
+      -- Position of the iterator is not modified
 
       procedure Push_Enclosing (Info : in Data);
       -- Adds Info associated to the enclosing scope of the current scope
       -- If Current_Scope is a library unit, the info is associated to the scope level 0,
       -- and the corresponding Current_Data_Scope returns Nil_Element
+      -- Position of the iterator is not modified
 
+      procedure Prepend (Info : in Data);
+      -- Like Push, but inserts at the last position for current scope (will be retrieved in FIFO order)
+      -- Position of the iterator is not modified
+
+      procedure Prepend_Enclosing (Info : in Data);
+      -- Like Push_Enclosing, but inserts at the last position for enclosing scope (will be retrieved in FIFO order)
+      -- Position of the iterator is not modified
 
       --
       -- Iterator
@@ -170,8 +184,8 @@ package Scope_Manager is
       -- It is possible to add new data with Push while iterating; since they are added
       -- on top (i.e. above the current position of the iterator), it does not
       -- change the behaviour of the iterator.
-      -- The same does not hold when adding data with Push_Enclosing, which should therefore
-      -- not be used while iterating.
+      -- The same does not hold when adding data with Push_Enclosing or Prepend_Enclosing,
+      -- which should therefore not be used while iterating.
 
       function  Data_Available     return Boolean;
       -- False when iterator is exhausted (or empty)
@@ -209,6 +223,22 @@ package Scope_Manager is
       -- Removes current data from the store
       -- After a call to Delete_Current, the iterator moves to the next position.
 
+      -- Save and restore the global iterator
+      -- Useful if you want to start another iteration while already iterating
+      -- The other cursor should not delete elements, or be otherwise evil to the stack!
+      -- (i.e. this is not protected by tampering checks)
+
+      type Cursor is private;
+
+      function  Current_Cursor return Cursor;
+      procedure Restore (Curs : in  Cursor);
+
+      procedure Create_Cursor (Curs : out Cursor; On : Asis.Declaration);
+      -- Creates a cursor for the saved data of the spec whose body is On
+      procedure Next (Curs : in out Cursor);
+      function  Data_Available (Curs : in Cursor) return Boolean;
+      function  Current_Data   (Curs : in Cursor) return Data;
+
    private
       -- The following declarations are here because they are not allowed
       -- in a generic body.
@@ -226,6 +256,16 @@ package Scope_Manager is
       Private_Access : constant Scoping_Procedure := Enter_Private'Access;
       Exit_Access    : constant Scoping_Procedure := Exit_Scope'Access;
       Clear_Access   : constant Scoping_Procedure := Clear_All'Access;
+
+      type Node;
+      type Link is access Node;
+      type Cursor is
+         record
+            Current      : Link;
+            Previous     : Link;
+            Current_Mode : Iterator_Mode;
+            Final_Scope  : Scope_Range;
+         end record;
    end Scoped_Store;
 
 
@@ -253,6 +293,10 @@ package Scope_Manager is
    procedure Enter_Scope (Scope : in Asis.Element);
    -- To be called each time a scope is entered (see what it means in the body of Is_Scope),
    -- after processing the Scope globally (i.e., after calling Enter_Scope, you are inside the entity)
+   -- A possibility is to start the pre-procedure with:
+   --   if Is_Scope (Element) then
+   --      Scope_Manager.Enter_Scope (Element);
+   --   end if;
 
    procedure Enter_Private_Part;
    -- To be called between the traversal of the visible part of an entity with a private part
@@ -261,5 +305,11 @@ package Scope_Manager is
 
    procedure Exit_Scope  (Scope : in Asis.Element);
    -- To be called each time a scope is left (see what it means in the body of Is_Scope)
+   -- A possibility is to end the post-procedure with:
+   --   if Is_Scope (Element) then
+   --      Scope_Manager.Exit_Scope (Element);
+   --   end if;
+   -- but beware that if you end the pre-procedure with a control of Abandon_Children, the post-procedure
+   -- is /not/ called!
 
 end Scope_Manager;
