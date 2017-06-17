@@ -69,9 +69,7 @@ package body Thick_Queries is
 
    User_Error_Proc : Error_Procedure := null;
 
-   procedure Impossible (Message : Wide_String; E : Asis.Element);
-   pragma No_Return (Impossible);
-   procedure Impossible (Message : Wide_String; E : Asis.Element) is
+   procedure Report_Error (Message : Wide_String; E : Asis.Element := Nil_Element) is
       use Ada.Exceptions, Ada.Characters.Handling, Asis.Text;
       S : constant Span := Element_Span (E);
    begin
@@ -86,7 +84,7 @@ package body Thick_Queries is
                        Message => To_String (Message) &
                          " at" & Line_Number'Image (S.First_Line) &
                          ":"   & Character_Position'Image (S.First_Column));
-   end Impossible;
+   end Report_Error;
 
    --------------
    -- To_Upper --
@@ -164,7 +162,7 @@ package body Thick_Queries is
          when A_Declaration =>
             Good_Def := Type_Declaration_View (The_Subtype);
          when others =>
-            Impossible ("Inappropriate element kind in Access_Target_Subtype", The_Subtype);
+            Report_Error ("Inappropriate element kind in Access_Target_Subtype", The_Subtype);
       end case;
 
       case Definition_Kind (Good_Def) is
@@ -460,7 +458,7 @@ package body Thick_Queries is
                   Good_Mark := Simple_Name (Strip_Attributes (Good_Mark));
                when others =>
                   -- Impossible
-                  Impossible ("Attribute of Type_Profile = "
+                  Report_Error ("Attribute of Type_Profile = "
                               & Attribute_Kinds'Wide_Image (Attribute_Kind (Def)),
                               Declaration);
             end case;
@@ -566,7 +564,7 @@ package body Thick_Queries is
                     Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
          when Not_A_Declaration =>
             if Definition_Kind (Good_Declaration) /= An_Access_Definition then
-               Impossible ("Types_Profile: bad declaration", Good_Declaration);
+               Report_Error ("Types_Profile: bad declaration", Good_Declaration);
             end if;
 
             case Access_Definition_Kind (Good_Declaration) is
@@ -578,7 +576,7 @@ package body Thick_Queries is
                when An_Anonymous_Access_To_Function  | An_Anonymous_Access_To_Protected_Function  =>
                   Result_Entry := Build_Entry (Access_To_Function_Result_Profile (Good_Declaration));
                when others =>
-                  Impossible ("Types_Profile: bad access_definition", Good_Declaration);
+                  Report_Error ("Types_Profile: bad access_definition", Good_Declaration);
             end case;
          when others => -- (generic) procedure or entry declaration
             Result_Entry := (Access_Form  => Not_An_Access_Definition,
@@ -725,7 +723,7 @@ package body Thick_Queries is
       end loop;
 
       -- Index must be found, by construction
-      Impossible ("Formal_Name: Association not found in association list", Assoc);
+      Report_Error ("Formal_Name: Association not found in association list", Assoc);
    end Formal_Name;
 
    --------------------------
@@ -748,7 +746,7 @@ package body Thick_Queries is
          end;
       end loop;
       -- Not found here
-      Impossible ("Matching_Formal_Name: not found", Name);
+      Report_Error ("Matching_Formal_Name: not found", Name);
    end Matching_Formal_Name;
 
    -----------------------
@@ -851,7 +849,7 @@ package body Thick_Queries is
                            return Nil_Element;
                         end if;
                      when others =>
-                        Impossible ("wrong result from Exception_Choices", Choices (C));
+                        Report_Error ("wrong result from Exception_Choices", Choices (C));
                   end case;
                end loop;
             end;
@@ -985,7 +983,7 @@ package body Thick_Queries is
                when A_Protected_Body_Declaration =>
                   return Protected_Operation_Items (Element, Include_Pragmas);
                when others =>
-                  Impossible ("Declarative_Items: invalid declaration kind", Element);
+                  Report_Error ("Declarative_Items: invalid declaration kind", Element);
             end case;
 
          when A_Statement =>
@@ -993,10 +991,10 @@ package body Thick_Queries is
                when A_Block_Statement =>
                   return Block_Declarative_Items (Element, Include_Pragmas);
                when others =>
-                  Impossible ("Declarative_Items: invalid statement kind", Element);
+                  Report_Error ("Declarative_Items: invalid statement kind", Element);
             end case;
          when others =>
-            Impossible ("Declarative_Items: invalid element kind", Element);
+            Report_Error ("Declarative_Items: invalid element kind", Element);
       end case;
    end Declarative_Items;
 
@@ -1150,7 +1148,7 @@ package body Thick_Queries is
                end if;
                case Mode_Kind (Enclosing_Element (Formal)) is
                   when Not_A_Mode =>
-                     Impossible ("Wrong mode in Usage_Kind", Formal_Name (Elem, I));
+                     Report_Error ("Wrong mode in Usage_Kind", Formal_Name (Elem, I));
                   when A_Default_In_Mode | An_In_Mode =>
                      return Read;
                   when An_Out_Mode =>
@@ -1221,7 +1219,7 @@ package body Thick_Queries is
                      end if;
 
                   when An_Identifier =>
-                     Impossible ("enclosing element is an identifier", Elem);
+                     Report_Error ("enclosing element is an identifier", Elem);
 
                   when An_Indexed_Component
                     | A_Slice
@@ -1340,7 +1338,7 @@ package body Thick_Queries is
                   if Silent_If_Inappropriate then
                      return "";
                   end if;
-                  Impossible ("Not a name in Extended_Name_Image", Name_Elem);
+                  Report_Error ("Not a name in Extended_Name_Image", Name_Elem);
             end case;
          when A_Defining_Name =>
             return Defining_Name_Image (Name_Elem);
@@ -1350,7 +1348,7 @@ package body Thick_Queries is
             if Silent_If_Inappropriate then
                return "";
             end if;
-            Impossible ("Not a name in Extended_Name_Image", Name_Elem);
+            Report_Error ("Not a name in Extended_Name_Image", Name_Elem);
       end case;
    end Extended_Name_Image;
 
@@ -1374,7 +1372,7 @@ package body Thick_Queries is
             when A_Requeue_Statement | A_Requeue_Statement_With_Abort =>
                Name := Requeue_Entry_Name (Call);
             when others =>
-               Impossible ("not a callable entity or requeue in External_Call_Target", Call);
+               Report_Error ("not a callable entity or requeue in External_Call_Target", Call);
          end case;
       end if;
 
@@ -1656,7 +1654,7 @@ package body Thick_Queries is
          when A_Type_Conversion | A_Qualified_Expression =>
             return Includes_Renaming (Converted_Or_Qualified_Subtype_Mark (Path));
          when others =>
-            Impossible ("Includes_Renaming called on " &
+            Report_Error ("Includes_Renaming called on " &
                         Expression_Kinds'Wide_Image (Expression_Kind (Path)),
                         Path);
       end case;
@@ -1874,7 +1872,7 @@ package body Thick_Queries is
    begin  -- Range_Ultimate_Name
       case Discrete_Range_Kind (Range_Def) is
          when Not_A_Discrete_Range =>
-            Impossible ("Index_Subtype_Names: Not a discrete range", Range_Def);
+            Report_Error ("Index_Subtype_Names: Not a discrete range", Range_Def);
 
          when A_Discrete_Subtype_Indication =>
             return Corresponding_Name_Definition (Subtype_Simple_Name (Range_Def));
@@ -1967,7 +1965,7 @@ package body Thick_Queries is
                      Decl := Corresponding_Full_Type_Declaration (Decl);
 
                   when others =>
-                     Impossible ("Range_Ultimate_Name: unexpected declaration", Decl);
+                     Report_Error ("Range_Ultimate_Name: unexpected declaration", Decl);
                end case;
             end loop;
 
@@ -2044,7 +2042,7 @@ package body Thick_Queries is
          end;
 
       else
-         Impossible ("Index_Subtypes_Names: not an array definition", Type_Def);
+         Report_Error ("Index_Subtypes_Names: not an array definition", Type_Def);
       end if;
    end Index_Subtypes_Names;
 
@@ -2155,7 +2153,7 @@ package body Thick_Queries is
                end case;
 
             when others =>
-               Impossible ("Corresponding_Static_Predicates: unexpected declaration", Decl);
+               Report_Error ("Corresponding_Static_Predicates: unexpected declaration", Decl);
          end case;
          --## Rule on Avoid_Query
       end;
@@ -2223,7 +2221,7 @@ package body Thick_Queries is
                when An_Attribute_Reference =>
                   return Callable_Attributes (Attribute_Kind (Element));
                when others =>
-                  Impossible ("Is_Callable_Construct called on "
+                  Report_Error ("Is_Callable_Construct called on "
                               & Expression_Kinds'Wide_Image (Expression_Kind (Element)),
                               Element);
             end  case;
@@ -2231,7 +2229,7 @@ package body Thick_Queries is
             return Not_A_Callable;
          when others =>
             -- Impossible
-            Impossible ("Callable_Kind called on "
+            Report_Error ("Callable_Kind called on "
                         & Element_Kinds'Wide_Image (Element_Kind (Element)),
                         Element);
       end case;
@@ -2593,7 +2591,7 @@ package body Thick_Queries is
                ST := Corresponding_Name_Declaration (Simple_Name (The_Subtype));
             end if;
          when others =>
-            Impossible ("Wrong element kind in First_Subtype_Name", The_Subtype);
+            Report_Error ("Wrong element kind in First_Subtype_Name", The_Subtype);
       end case;
       if Declaration_Kind (ST) /= A_Subtype_Declaration then
          -- The_Subtype was already the first named subtype
@@ -2627,10 +2625,10 @@ package body Thick_Queries is
                   when A_Class_Attribute =>
                      return Mark;
                   when others =>
-                     Impossible ("First_Subtype_Name: unexpected attribute", Mark);
+                     Report_Error ("First_Subtype_Name: unexpected attribute", Mark);
                end case;
             when others =>
-               Impossible ("First_Subtype_Name: unexpected mark", Mark);
+               Report_Error ("First_Subtype_Name: unexpected mark", Mark);
          end case;
       end loop;
    end First_Subtype_Name;
@@ -2677,7 +2675,7 @@ package body Thick_Queries is
          when A_Declaration =>
             Decl := The_Subtype;
          when others =>
-            Impossible ("Is_Access_Subtype: inappropriate element kind", The_Subtype);
+            Report_Error ("Is_Access_Subtype: inappropriate element kind", The_Subtype);
       end case;
 
       Good_Def  := Type_Declaration_View (Ultimate_Type_Declaration (Decl));
@@ -2922,7 +2920,7 @@ package body Thick_Queries is
                -- anyway, can't be controlled
                return False;
             when others =>
-               Impossible ("Is_Controlled: bad element", The_Element);
+               Report_Error ("Is_Controlled: bad element", The_Element);
          end case;
       end loop;
 
@@ -3000,11 +2998,11 @@ package body Thick_Queries is
                               end loop;
                            end;
                         when others =>
-                           Impossible ("Wrong component definition kind", Components (I));
+                           Report_Error ("Wrong component definition kind", Components (I));
                      end case;
                   when others =>
                      -- We didn't ask for pragmas, and we shouldn't get An_Attribute_Definition_Clause...
-                     Impossible ("Wrong component element kind", Components (I));
+                     Report_Error ("Wrong component element kind", Components (I));
                end case;
             end loop;
          end;
@@ -3191,7 +3189,7 @@ package body Thick_Queries is
                end if;
                Result.Ultimate_Type := Corresponding_First_Subtype (Result.Ultimate_Type);
             when others =>
-               Impossible ("Corresponding_Derivation_Description: bad kind", Result.Ultimate_Type);
+               Report_Error ("Corresponding_Derivation_Description: bad kind", Result.Ultimate_Type);
          end case;
       end loop;
 
@@ -3287,7 +3285,7 @@ package body Thick_Queries is
                            -- a strange thing to do...
                            return Nil_Element;
                         when others =>
-                           Impossible ("unexpected attribute", Good_Name);
+                           Report_Error ("unexpected attribute", Good_Name);
                      end case;
                   when others =>
                      exit;
@@ -3295,7 +3293,7 @@ package body Thick_Queries is
             end loop;
             Decl := Corresponding_Name_Declaration (Good_Name);
          when others =>
-            Impossible ("Attribute_Clause_Expression: Incorrect parameter", Elem);
+            Report_Error ("Attribute_Clause_Expression: Incorrect parameter", Elem);
       end case;
 
       if Declaration_Kind (Decl) = An_Ordinary_Type_Declaration then
@@ -3500,7 +3498,7 @@ package body Thick_Queries is
                   case Definition_Kind (Good_Elem) is
                      when A_Type_Definition =>
                         if Type_Kind (Good_Elem) /= A_Constrained_Array_Definition then
-                           Impossible ("Type_Category: anonymous type not array", Good_Elem);
+                           Report_Error ("Type_Category: anonymous type not array", Good_Elem);
                         end if;
                         return An_Array_Type;
                      when An_Access_Definition =>
@@ -3517,7 +3515,7 @@ package body Thick_Queries is
                      when A_Base_Attribute =>
                         Good_Elem := Corresponding_Name_Declaration (Simple_Name (Prefix (Good_Elem)));
                      when others =>
-                        Impossible ("Type category: attribute should be type", Good_Elem);
+                        Report_Error ("Type category: attribute should be type", Good_Elem);
                   end case;
                when A_Component_Declaration =>
                   Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
@@ -3566,7 +3564,7 @@ package body Thick_Queries is
                   =>
                   Good_Elem := Enclosing_Element (Elem);
                when others =>
-                  Impossible ("Type category: wrong definition_kind", Elem);
+                  Report_Error ("Type category: wrong definition_kind", Elem);
             end case;
          when A_Defining_Name =>
             Good_Elem := Enclosing_Element (Elem);
@@ -3588,7 +3586,7 @@ package body Thick_Queries is
                                                                   (Strip_Attributes
                                                                    (Subtype_Simple_Name (Good_Elem))));
                   when A_Deferred_Constant_Declaration =>
-                     Impossible ("A_Deferred_Constant_Declaration", Good_Elem);
+                     Report_Error ("A_Deferred_Constant_Declaration", Good_Elem);
                   when A_Single_Task_Declaration =>
                      return A_Task_Type;
                   when A_Single_Protected_Declaration =>
@@ -3656,7 +3654,7 @@ package body Thick_Queries is
                         when A_Base_Attribute =>
                            Good_Elem := Simple_Name (Prefix (Good_Elem));
                         when others =>
-                           Impossible ("Bad attribute in Type_Category", Good_Elem);
+                           Report_Error ("Bad attribute in Type_Category", Good_Elem);
                      end case;
                      Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration (Good_Elem));
                   when An_Enumeration_Type_Definition =>
@@ -3668,7 +3666,7 @@ package body Thick_Queries is
                   when A_Root_Type_Definition =>
                      case Root_Type_Kind (Type_Declaration_View (Good_Elem)) is
                         when Not_A_Root_Type_Definition =>
-                           Impossible ("Not a root type", Good_Elem);
+                           Report_Error ("Not a root type", Good_Elem);
                         when A_Root_Integer_Definition | A_Universal_Integer_Definition =>
                            return A_Signed_Integer_Type;
                         when A_Root_Real_Definition | A_Universal_Real_Definition =>
@@ -3720,7 +3718,7 @@ package body Thick_Queries is
                         when A_Base_Attribute =>
                            Good_Elem := Simple_Name (Prefix (Good_Elem));
                         when others =>
-                           Impossible ("Bad attribute in Type_Category", Good_Elem);
+                           Report_Error ("Bad attribute in Type_Category", Good_Elem);
                      end case;
                      Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration (Good_Elem));
                   when A_Formal_Discrete_Type_Definition =>
@@ -3891,7 +3889,7 @@ package body Thick_Queries is
                         when Continue =>
                            null;
                         when Abandon_Children =>
-                           Impossible ("Traverse_Data_Structure: Abandon_Children (3)", Name);
+                           Report_Error ("Traverse_Data_Structure: Abandon_Children (3)", Name);
                         when Abandon_Siblings | Terminate_Immediately =>
                            return;
                      end case;
@@ -3906,7 +3904,7 @@ package body Thick_Queries is
                                  when Continue =>
                                     null;
                                  when Abandon_Children =>
-                                    Impossible ("Traverse_Data_Structure: Abandon_Children", Components (I));
+                                    Report_Error ("Traverse_Data_Structure: Abandon_Children", Components (I));
                                  when Abandon_Siblings | Terminate_Immediately =>
                                     return;
                               end case;
@@ -3996,7 +3994,7 @@ package body Thick_Queries is
                               when Continue =>
                                  null;
                               when Abandon_Children =>
-                                 Impossible ("Traverse_Data_Structure: Abandon_Children (1)", Discrs (D));
+                                 Report_Error ("Traverse_Data_Structure: Abandon_Children (1)", Discrs (D));
                               when Abandon_Siblings =>
                                  Counting_Control := Continue;
                                  return;
@@ -4028,7 +4026,7 @@ package body Thick_Queries is
                   when Continue =>
                      null;
                   when Abandon_Children =>
-                     Impossible ("Traverse_Data_Structure: Abandon_Children (2)", Good_Def);
+                     Report_Error ("Traverse_Data_Structure: Abandon_Children (2)", Good_Def);
                   when Abandon_Siblings =>
                      Counting_Control := Continue;
                      return;
@@ -4042,7 +4040,7 @@ package body Thick_Queries is
                      when Continue =>
                         null;
                      when Abandon_Children =>
-                        Impossible ("Traverse_Data_Structure: Abandon_Children (1)", Good_Def);
+                        Report_Error ("Traverse_Data_Structure: Abandon_Children (1)", Good_Def);
                      when Abandon_Siblings =>
                         Counting_Control := Continue;
                         return;
@@ -4066,7 +4064,7 @@ package body Thick_Queries is
                            when Continue =>
                               null;
                            when Abandon_Children =>
-                              Impossible ("Traverse_Data_Structure: Abandon_Children (4)", Good_Def);
+                              Report_Error ("Traverse_Data_Structure: Abandon_Children (4)", Good_Def);
                            when Abandon_Siblings =>
                               Counting_Control := Continue;
                               return;
@@ -4075,7 +4073,7 @@ package body Thick_Queries is
                         end case;
                      end if;
                   when Abandon_Children =>
-                     Impossible ("Traverse_Data_Structure: Abandon_Children (5)", Good_Def);
+                     Report_Error ("Traverse_Data_Structure: Abandon_Children (5)", Good_Def);
                   when Abandon_Siblings =>
                      Counting_Control := Continue;
                      return;
@@ -4106,7 +4104,7 @@ package body Thick_Queries is
                Counting_Traverse (Decl, Element, Control, State, 1);
             end if;
          when others =>
-            Impossible ("Traverse_Data_Structure: bad Element", Element);
+            Report_Error ("Traverse_Data_Structure: bad Element", Element);
       end case;
    end Traverse_Data_Structure;
 
@@ -4665,7 +4663,7 @@ package body Thick_Queries is
                   -- Renaming of an attribute => return the attribute
                   exit Going_Up_Renamings;
                when others =>
-                  Impossible ("Ultimate_Name: unexpected expression in renaming", Result);
+                  Report_Error ("Ultimate_Name: unexpected expression in renaming", Result);
             end case;
          end loop;
          Decl := Corresponding_Name_Declaration (Result);
@@ -4807,7 +4805,7 @@ package body Thick_Queries is
                            return Matching_Formal_Name (Def, Other_Decl);
                         end if;
                      when others =>
-                        Impossible ("First_Defining_Name: not a callable entity (1)", Other_Decl);
+                        Report_Error ("First_Defining_Name: not a callable entity (1)", Other_Decl);
                   end case;
 
                when A_Definition =>
@@ -4819,7 +4817,7 @@ package body Thick_Queries is
                         -- access to subprogram
                         return Def;
                      when others =>
-                        Impossible ("First_Defining_Name: not a callable entity (2)", Other_Decl);
+                        Report_Error ("First_Defining_Name: not a callable entity (2)", Other_Decl);
                   end case;
 
                when A_Statement =>
@@ -4827,11 +4825,11 @@ package body Thick_Queries is
                      when An_Accept_Statement =>
                         return Matching_Formal_Name (Def, Corresponding_Entry (Other_Decl));
                      when others =>
-                        Impossible ("First_Defining_Name: not an accept", Other_Decl);
+                        Report_Error ("First_Defining_Name: not an accept", Other_Decl);
                   end case;
 
                when others =>
-                  Impossible ("First_Defining_Name: not a callable entity (3)", Other_Decl);
+                  Report_Error ("First_Defining_Name: not a callable entity (3)", Other_Decl);
             end case;
 
          when others =>
@@ -4890,7 +4888,7 @@ package body Thick_Queries is
    begin
       case Association_Kind (Assoc) is
          when Not_An_Association =>
-            Impossible ("Association_Choices: Not an association", Assoc);
+            Report_Error ("Association_Choices: Not an association", Assoc);
          when A_Discriminant_Association =>
             return Discriminant_Selector_Names (Assoc);
          when A_Record_Component_Association =>
@@ -4922,7 +4920,7 @@ package body Thick_Queries is
    begin
       case Association_Kind (Assoc) is
          when Not_An_Association =>
-            Impossible ("Association_Value: Not an association", Assoc);
+            Report_Error ("Association_Value: Not an association", Assoc);
          when A_Discriminant_Association =>
             return Discriminant_Expression (Assoc);
          when A_Record_Component_Association =>
@@ -5052,7 +5050,7 @@ package body Thick_Queries is
          when An_Expression =>
             Decl := Corresponding_Name_Declaration (Ultimate_Name (Element));
          when others =>
-            Impossible ("Inappropriate element in Ultimate_Origin", Element);
+            Report_Error ("Inappropriate element in Ultimate_Origin", Element);
       end case;
 
       if Is_Part_Of_Instance (Decl) then
@@ -5105,7 +5103,7 @@ package body Thick_Queries is
       then
          return Generic_Actual_Part (Element, Normalized => Normalized);
       else
-         Impossible ("Unexpected element in Actual_Parameters", Element);
+         Report_Error ("Unexpected element in Actual_Parameters", Element);
       end if;
    end Actual_Parameters;
 
@@ -5224,7 +5222,7 @@ package body Thick_Queries is
       begin
          case Discrete_Range_Kind (Def) is
             when Not_A_Discrete_Range =>
-               Impossible ("Discrete_Range_Bounds: Not a discrete range", Def);
+               Report_Error ("Discrete_Range_Bounds: Not a discrete range", Def);
             when A_Discrete_Subtype_Indication =>
                if Is_Nil (Subtype_Constraint (Def)) then
                   return Discrete_Constraining_Bounds (Subtype_Simple_Name (Def), Follow_Access);
@@ -5242,7 +5240,7 @@ package body Thick_Queries is
       begin
          case Constraint_Kind (Def) is
             when Not_A_Constraint =>
-               Impossible ("Constraint_Bounds: Not a constraint", Def);
+               Report_Error ("Constraint_Bounds: Not a constraint", Def);
             when A_Digits_Constraint
               | A_Delta_Constraint
               | A_Discriminant_Constraint
@@ -5299,7 +5297,7 @@ package body Thick_Queries is
             when A_Definition =>                 ----------------- Definitions
                case Definition_Kind (Item) is
                   when Not_A_Definition =>
-                     Impossible ("Discrete_Constraining_Bounds: not a definition", Item);
+                     Report_Error ("Discrete_Constraining_Bounds: not a definition", Item);
 
                   when A_Constraint =>
                      return Constraint_Bounds (Item);
@@ -5320,7 +5318,7 @@ package body Thick_Queries is
                   when A_Type_Definition =>
                      case Type_Kind (Item) is
                         when Not_A_Type_Definition =>
-                           Impossible ("Discrete_Constraining_Bounds: not a type definition", Item);
+                           Report_Error ("Discrete_Constraining_Bounds: not a type definition", Item);
                         when A_Derived_Type_Definition =>
                            Item := Parent_Subtype_Indication (Item);
                         when A_Derived_Record_Extension_Definition
@@ -5361,7 +5359,7 @@ package body Thick_Queries is
                                  -- No way to get the bounds...
                                  return (Nil_Element, Nil_Element);
                               when Not_A_Root_Type_Definition =>
-                                 Impossible ("Discrete_Constraining_Bounds: Wrong root type", Item);
+                                 Report_Error ("Discrete_Constraining_Bounds: Wrong root type", Item);
                            end case;
                         when A_Floating_Point_Definition
                            | An_Ordinary_Fixed_Point_Definition
@@ -5409,7 +5407,7 @@ package body Thick_Queries is
                   when A_Formal_Type_Definition =>
                      case Formal_Type_Kind (Item) is
                         when Not_A_Formal_Type_Definition =>
-                           Impossible ("Discrete_Constraining_Bounds: not a formal definition", Item);
+                           Report_Error ("Discrete_Constraining_Bounds: not a formal definition", Item);
                         when A_Formal_Private_Type_Definition
                            | A_Formal_Tagged_Private_Type_Definition
                              =>
@@ -5703,13 +5701,13 @@ package body Thick_Queries is
                      Item := Iteration_Scheme_Name (Item);
 
                   when others =>
-                     Impossible ("Discrete_Constraining_Bounds: Bad declaration "
+                     Report_Error ("Discrete_Constraining_Bounds: Bad declaration "
                                    & Asis.Declaration_Kinds'Wide_Image (Declaration_Kind (Item)),
                                  Item);
                end case;
 
             when others =>
-               Impossible ("Discrete_Constraining_Bounds: Inappropriate element", Item);
+               Report_Error ("Discrete_Constraining_Bounds: Inappropriate element", Item);
          end case;                               ----------------- Declarations
       end loop;
    end Discrete_Constraining_Bounds;
@@ -5756,7 +5754,7 @@ package body Thick_Queries is
                      Modular_Type := False;
                   end if;
                when others =>
-                  Impossible ("Bad return from Discrete_Range_Bounds", Bounds (2));
+                  Report_Error ("Bad return from Discrete_Range_Bounds", Bounds (2));
             end case;
          exception
             when Constraint_Error =>
@@ -5853,7 +5851,7 @@ package body Thick_Queries is
                when A_Null_Procedure_Declaration =>
                   return Nil_Element_List;
                when others =>
-                  Impossible ("Statements: invalid declaration kind", Element);
+                  Report_Error ("Statements: invalid declaration kind", Element);
             end case;
          when A_Statement =>
             case Statement_Kind (Element) is
@@ -5869,14 +5867,14 @@ package body Thick_Queries is
                when An_Extended_Return_Statement =>
                   return Extended_Return_Statements (Element, Include_Pragmas);
                when others =>
-                  Impossible ("Statements: invalid statement kind", Element);
+                  Report_Error ("Statements: invalid statement kind", Element);
             end case;
          when A_Path =>
             return Sequence_Of_Statements (Element, Include_Pragmas);
          when An_Exception_Handler =>
             return Handler_Statements (Element, Include_Pragmas);
          when others =>
-            Impossible ("Statements: invalid element kind", Element);
+            Report_Error ("Statements: invalid element kind", Element);
       end case;
    end Statements;
 
@@ -6043,7 +6041,7 @@ package body Thick_Queries is
                  =>
                   return Body_Exception_Handlers (Element);
                when others =>
-                  Impossible ("Exception_Handlers: invalid declaration kind", Element);
+                  Report_Error ("Exception_Handlers: invalid declaration kind", Element);
             end case;
          when A_Statement =>
             case Statement_Kind (Element) is
@@ -6054,10 +6052,10 @@ package body Thick_Queries is
                when An_Extended_Return_Statement =>
                   return Extended_Return_Exception_Handlers (Element);
                when others =>
-                  Impossible ("Exception_Handlers: invalid statement kind", Element);
+                  Report_Error ("Exception_Handlers: invalid statement kind", Element);
             end case;
          when others =>
-            Impossible ("Exception_Handlers: invalid element kind", Element);
+            Report_Error ("Exception_Handlers: invalid element kind", Element);
       end case;
    end Exception_Handlers;
 
@@ -6125,7 +6123,7 @@ package body Thick_Queries is
                                  when 65 .. 128 =>
                                     return "128";
                                  when others =>
-                                    Impossible ("Size of integer type > 128", Good_Name);
+                                    Report_Error ("Size of integer type > 128", Good_Name);
                               end case;
                            when Real_Types =>
                               -- Hard to tell what the compiler does...
@@ -6137,7 +6135,7 @@ package body Thick_Queries is
                         -- Give up
                         return "";
                      when others =>
-                          Impossible ("Size_Value_Image: Attribute not 'Base or 'Class", Good_Name);
+                          Report_Error ("Size_Value_Image: Attribute not 'Base or 'Class", Good_Name);
                   end case;
 
                when An_Explicit_Dereference =>
@@ -6151,7 +6149,7 @@ package body Thick_Queries is
                   Decl      := Corresponding_Name_Declaration (Good_Name);
 
                when others =>
-                  Impossible ("Size_Value_Image: wrong expression", Name);
+                  Report_Error ("Size_Value_Image: wrong expression", Name);
             end case;
 
          when A_Defining_Name =>
@@ -6159,7 +6157,7 @@ package body Thick_Queries is
             Def  := Good_Name;
 
          when others =>
-            Impossible ("Size_Value_Image: wrong element", Name);
+            Report_Error ("Size_Value_Image: wrong element", Name);
       end case;
 
       -- Do we have a size clause (type or object)?
@@ -6561,7 +6559,7 @@ package body Thick_Queries is
                                  return "";
                               end if;
                            when others =>
-                              Impossible ("Bad return from Discrete_Constraining_Bounds", Bounds (2 * Dim - 1));
+                              Report_Error ("Bad return from Discrete_Constraining_Bounds", Bounds (2 * Dim - 1));
                         end case;
                      end;
                   exception
@@ -6604,7 +6602,7 @@ package body Thick_Queries is
                               -- Modular type
                               return Static_Expression_Value_Image (Bounds (2 * Dim)) - "1";
                            when others =>
-                              Impossible ("Bad return from Discrete_Constraining_Bounds", Bounds (2 * Dim - 1));
+                              Report_Error ("Bad return from Discrete_Constraining_Bounds", Bounds (2 * Dim - 1));
                         end case;
                      end;
                   exception
@@ -6940,7 +6938,7 @@ package body Thick_Queries is
                   -- Do it now to skip next case on Definition_Kind (R)
                   return Is_Equal (Ultimate_Type_Declaration (L_Decl), Ultimate_Type_Declaration (R_Decl));
                when others =>
-                  Impossible ("Compatible_Types: Bad kind for L", L);
+                  Report_Error ("Compatible_Types: Bad kind for L", L);
             end case;
 
             case Definition_Kind (R) is
@@ -6982,7 +6980,7 @@ package body Thick_Queries is
                                (Strip_Attributes
                                 (Subtype_Simple_Name (Asis.Definitions.Access_To_Object_Definition (L)))));
                when others =>
-                  Impossible ("Compatible_Types: Bad kind for R", R);
+                  Report_Error ("Compatible_Types: Bad kind for R", R);
             end case;
 
             return Is_Equal (Ultimate_Type_Declaration (L_Decl), Ultimate_Type_Declaration (R_Decl));
@@ -7087,7 +7085,7 @@ package body Thick_Queries is
                when Identifier
                  | Not_Variable
                  =>
-                  Impossible ("Variables proximity: " & Part_Kind'Wide_Image (L_Descr (L_Inx).The_Kind),
+                  Report_Error ("Variables proximity: " & Part_Kind'Wide_Image (L_Descr (L_Inx).The_Kind),
                               L_Descr (L_Inx).Id_Name);
                when Field =>
                   if not Is_Equal (Corresponding_Name_Definition (L_Descr (L_Inx).Sel_Name),
@@ -7101,7 +7099,7 @@ package body Thick_Queries is
                      R_Indexes : constant Asis.Expression_List := Index_Expressions (R_Descr (R_Inx).Indexers);
                   begin
                      if L_Indexes'Length /= R_Indexes'Length then
-                        Impossible ("Variables proximity: different lengths", Nil_Element);
+                        Report_Error ("Variables proximity: different lengths", Nil_Element);
                      end if;
                      for I in L_Indexes'Range loop
                         declare
@@ -7117,9 +7115,9 @@ package body Thick_Queries is
                      end loop;
                   end;
                when Dereference =>
-                  Impossible ("Variables proximity: dereference", Nil_Element);
+                  Report_Error ("Variables proximity: dereference", Nil_Element);
                when Call =>
-                  Impossible ("Variables proximity: call", Nil_Element);
+                  Report_Error ("Variables proximity: call", Nil_Element);
             end case;
 
             L_Inx := L_Inx + 1;
@@ -7221,7 +7219,7 @@ package body Thick_Queries is
          when An_Expression =>
             Decl := Enclosing_Element (Corresponding_Name_Declaration (Simple_Name (Element)));
          when others =>
-            Impossible ("Bad element kind in Static_Level", Element);
+            Report_Error ("Bad element kind in Static_Level", Element);
       end case;
 
       while not Is_Nil (Decl) loop
@@ -7347,7 +7345,7 @@ package body Thick_Queries is
             when A_Type_Conversion =>
                return Expression_Used_Identifiers (Converted_Or_Qualified_Expression (Expr));
             when others =>
-               Impossible ("Expression_Used_Identifiers: unexpected expression in renaming", Expr);
+               Report_Error ("Expression_Used_Identifiers: unexpected expression in renaming", Expr);
          end case;
       end Expression_Used_Identifiers;
 

@@ -49,6 +49,9 @@ package Thick_Queries is
    -- The user procedure may raise an exception. If it doesn't (or no user procedure is defined),
    -- Program_Error will be raised.
 
+   procedure Report_Error (Message : Wide_String; E : Asis.Element := Asis.Nil_Element);
+   pragma No_Return (Report_Error);
+
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
    -- Convenience subtypes (for binary operators only)                                            --
