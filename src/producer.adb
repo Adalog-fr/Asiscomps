@@ -33,6 +33,7 @@
 ----------------------------------------------------------------------
 
 with   -- with for KLUDGE, to be removed when A4G fixed
+  Asis.Compilation_Units,
   Asis.Elements,   -- For KLUDGE
   Ada.Strings.Wide_Fixed;
 
@@ -544,7 +545,8 @@ package body Producer is
       -- This is a very important check, as most of client's bugs are trapped here!
       Assert (Last_Line > Current_State.Last_Printed_Line or else (Last_Line = Current_State.Last_Printed_Line and
                                                                    Last_Column >= Current_State.Last_Printed_Column),
-              "Illegal span in Print_Up_To ("
+              "Illegal span in Print_Up_To, "
+              & Asis.Compilation_Units.Text_Name (Asis.Elements.Enclosing_Compilation_Unit (The_Element)) & ": ("
               & Line_Number'Wide_Image (Current_State.Last_Printed_Line) & ','
               & Character_Position'Wide_Image (Current_State.Last_Printed_Column) & ") ("
               & Line_Number'Wide_Image (Last_Line) & ','
