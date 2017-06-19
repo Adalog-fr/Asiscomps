@@ -284,8 +284,10 @@ package Thick_Queries is
    -- If Include_Returns is True, also possibly returns a return statement, an extended return statement,
    -- or a requeue statement.
 
+   function Is_Part_Of (Elem : Asis.Element; Inside : Asis.Element)      return Boolean;
    function Is_Part_Of (Elem : Asis.Element; Inside : Asis.Element_List) return Boolean;
-   -- returns true if Elem is textually within Inside
+   -- returns true if Elem is textually within Inside (i.e.  for a list, between the beginning of the first element
+   -- and the end of the last element of Inside).
    -- Note: will return False for any element that Is_Part_Of_Instance, since these have no
    --       *textual* representation. The caller should take care of calling Corresponding_Generic_Element
    --       as needed to recognize elements that are Is_Part_Of_Instance
@@ -817,6 +819,10 @@ package Thick_Queries is
    function Unindexed_Name (The_Name : Asis.Expression) return Asis.Expression;
    -- Gets rid of indexing, i.e. returns the selector of its argument if An_Indexed_Component,
    -- its argument otherwise.
+
+   function Name_Path (Name : Asis.Expression) return Asis.Element_List;
+   -- For A_Selected_Component (to several levels), returns all components as a List (in textual order)
+   -- Otherwise, returns Name as a one element list
 
    function Strip_Attributes (Name : Asis.Expression) return Asis.Expression;
    -- If Name is an Attribute_Reference, returns the first prefix which is not itself an Attribute_Reference.

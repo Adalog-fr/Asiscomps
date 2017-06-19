@@ -4566,6 +4566,20 @@ package body Thick_Queries is
       end if;
    end Unindexed_Name;
 
+   ---------------
+   -- Name_Path --
+   ---------------
+
+   function Name_Path (Name : Asis.Expression) return Asis.Element_List is
+      use Asis.Expressions;
+   begin
+      if Expression_Kind (Name) = A_Selected_Component then
+         return Name_Path (Prefix (Name)) & Selector (Name);
+      else
+         return (1 => Name);
+      end if;
+   end Name_Path;
+
    -------------------
    -- Ultimate_Name --
    -------------------
@@ -5986,6 +6000,15 @@ package body Thick_Queries is
       return Exiting_Stmt;
    end First_Exiting_Statement;
 
+
+   ----------------
+   -- Is_Part_Of --
+   ----------------
+
+   function Is_Part_Of (Elem : Asis.Element; Inside : Asis.Element) return Boolean is
+   begin
+      return Is_Part_Of (Elem, (1 => Inside));
+   end Is_Part_Of;
 
    ----------------
    -- Is_Part_Of --
