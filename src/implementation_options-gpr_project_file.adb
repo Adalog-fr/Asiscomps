@@ -76,6 +76,7 @@ package body Implementation_Options.GPR_Project_File is
          end loop;
       end;
 
+      Unload (Tree);
       return To_Wide_String (Result);
 
    exception
@@ -104,6 +105,7 @@ package body Implementation_Options.GPR_Project_File is
          end loop;
       end;
 
+      Unload (Tree);
       return To_Wide_String (Result);
 
    exception
@@ -136,13 +138,20 @@ package body Implementation_Options.GPR_Project_File is
                                         Index        => Tool,
                                         Use_Extended => True);
          if Attributes = null then
+            Unload (Tree);
             return "";
          end if;
       end if;
 
       for I in Attributes'Range loop
          if Attributes (I).all = After then
-            return Attributes (I + 1).all;
+            declare  -- Could use an extended return...
+               Result : constant String := Attributes (I + 1).all;
+            begin
+               Unload (Tree);
+               GNAT.Strings.Free (Attributes);
+               return Result;
+            end;
          end if;
       end loop;
       return "";

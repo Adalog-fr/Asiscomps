@@ -45,6 +45,6 @@ package Implementation_Options.GPR_Project_File is
    -- the object_dir indications in a Gnat .gpr project file
 
    function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
-   -- From Default_Switches of package IDE:
+   -- From Default_Switches of (GPR) package IDE:
    -- returns the value of the parameter that follows After
 end Implementation_Options.GPR_Project_File;
