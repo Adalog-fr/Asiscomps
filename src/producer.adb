@@ -174,7 +174,9 @@ package body Producer is
          else
             Ada.Wide_Text_IO.Put_Line (Buffer (1..Buffer_Inx));
             Buffer_Inx := 0;
+            Cut_Point  := 0;
             In_Comment := False;
+            In_Quotes  := False;
          end if;
          Current_Line := Current_Line + 1;
          if Push_Count > 0 then   -- Count inserts
@@ -228,21 +230,45 @@ package body Producer is
       end if;
 
       if Buffer_Inx = Buffer'Last then
+         -- Reached max line length
          if Cut_Point = 0 then
-            User_Message ("Unable to cut long line");
-            Next_Line;
-            Put ("?Line cut? ");
-            return;
+            if In_Comment then
+               -- Split comment on two lines
+               Next_Line;
+               Put ("-- ");
+            elsif In_Quotes then
+               -- Concatenate on two lines
+               declare
+                  Save_Last : constant Wide_Character := Buffer (Buffer'Last);
+               begin
+                  Buffer (Buffer'Last) := '"';
+                  In_Quotes := False;
+                  Next_Line;
+                  Put ("& """);
+                  Put (Save_Last);
+                  -- Should be OK now, proceed normally
+               end;
+            else
+               -- Nothing we can do, generate something that does not compile
+               Next_Line;
+               User_Message ("Unable to cut long line, output line:" & Line_Number'Wide_Image (Output_Line));
+               Put ("?Line cut? ");
+            end if;
+
+         else
+            -- Output up to cut point and retry with the rest
+            declare
+               Extra_Part : constant Wide_String := Buffer (Cut_Point + 1 .. Buffer'Last) & Item;
+            begin
+               Buffer_Inx := Cut_Point;
+               Next_Line;
+               Put (Extra_Part);
+               return;
+            end;
          end if;
-
-         Buffer_Inx := Cut_Point;
-         Next_Line;
-
-         Buffer_Inx := Buffer'Last - Cut_Point;
-         Buffer (1.. Buffer_Inx) := Buffer (Cut_Point + 1 .. Buffer'Last);
-         Cut_Point := 0;
       end if;
 
+      -- Here, everything normal; add character to buffer
       Buffer_Inx := Buffer_Inx + 1;
       Buffer (Buffer_Inx) := Item;
 
