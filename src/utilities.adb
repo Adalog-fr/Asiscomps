@@ -290,7 +290,7 @@ package body Utilities is
    -------------
 
    procedure Failure (Message : in Wide_String; Element : Asis.Element) is
-      use Asis.Text;
+      use Asis, Asis.Elements, Asis.Text;
       function Span_Image (S : Span) return Wide_String is
       begin
          return
@@ -307,7 +307,7 @@ package body Utilities is
 
    begin  -- Failure
       Trace ("Failing element " & Span_Image (Element_Span (Element)), Element); --## rule line off no_trace
-      Failure (Message);
+      Failure (Message & " (" & Element_Kinds'Wide_Image (Element_Kind (Element)) & ')');
    end Failure;
 
    -------------
