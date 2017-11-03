@@ -2687,7 +2687,9 @@ package body Thick_Queries is
    -- Is_Ancestor --
    -----------------
 
-   function Is_Ancestor (Outer : Asis.Compilation_Unit; Inner : Asis.Compilation_Unit) return Boolean is
+   function Is_Ancestor (Outer : Asis.Compilation_Unit; Inner : Asis.Compilation_Unit; Strict : in Boolean := False)
+                         return Boolean
+   is
       use Asis.Compilation_Units;
 
       Good_Inner : Asis.Compilation_Unit := Inner;
@@ -2697,6 +2699,9 @@ package body Thick_Queries is
          Good_Inner := Corresponding_Subunit_Parent_Body (Good_Inner);
       end loop;
 
+      if Strict then
+         Good_Inner := Corresponding_Parent_Declaration (Good_Inner);
+      end if;
       while not Is_Nil (Good_Inner) loop
          if Is_Equal (Outer, Good_Inner) then
             return True;
