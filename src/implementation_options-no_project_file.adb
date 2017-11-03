@@ -74,4 +74,24 @@ package body Implementation_Options.No_Project_File is
       return "";
    end Tool_Switch;
 
+   -------------------------
+   -- Tool_Switch_Present --
+   -------------------------
+
+   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean is
+      pragma Unreferenced (Project_Name, Tool, Switch);
+   begin
+      return False;
+   end Tool_Switch_Present;
+
+   ----------------
+   -- Main_Files --
+   ----------------
+
+   function Main_Files (Project_Name : String) return Names_List is
+      pragma Unreferenced (Project_Name);
+      use Ada.Strings.Wide_Unbounded;
+   begin
+      return (1..0 => Null_Unbounded_Wide_String);
+   end Main_Files;
 end Implementation_Options.No_Project_File;

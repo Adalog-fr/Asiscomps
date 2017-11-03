@@ -32,6 +32,9 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
+
+with
+   Ada.Strings.Wide_Unbounded;
 package Implementation_Options.GPR_Project_File is
 
    function Is_Appropriate (Project_Name : String) return Boolean;
@@ -48,4 +51,11 @@ package Implementation_Options.GPR_Project_File is
    -- From Default_Switches of (GPR) package IDE:
    -- returns the value of the parameter that follows After, or "" if not found
 
+   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean;
+   -- From Default_Switches of (GPR) package IDE:
+   -- returns True if the switch Switch is given
+
+   type Names_List is array (Positive range <>) of Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
+   function Main_Files (Project_Name : String) return Names_List;
+   -- Returns a space-separated list of declared main files
 end Implementation_Options.GPR_Project_File;

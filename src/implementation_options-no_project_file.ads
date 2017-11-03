@@ -31,7 +31,8 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-
+with
+   Ada.Strings.Wide_Unbounded;
 package Implementation_Options.No_Project_File is
 -- Placeholder package to replace Implementation_Options.GPR_Project_File
 -- when support of .gpr files is not desired
@@ -47,4 +48,12 @@ package Implementation_Options.No_Project_File is
 
    function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
    -- always returns ""
+
+   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean;
+   -- always returns False
+
+   type Names_List is array (Positive range <>) of Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
+   function Main_Files (Project_Name : String) return Names_List;
+   -- always returns null Names_List
+
 end Implementation_Options.No_Project_File;
