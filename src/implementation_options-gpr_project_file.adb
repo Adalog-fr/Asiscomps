@@ -155,5 +155,9 @@ package body Implementation_Options.GPR_Project_File is
          end if;
       end loop;
       return "";
+   exception
+      when Invalid_Project =>
+         raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
    end Tool_Switch;
+
 end Implementation_Options.GPR_Project_File;

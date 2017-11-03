@@ -44,4 +44,6 @@ package Implementation_Options.ADP_Project_File is
    -- Constructs a list of -T<name> options from
    -- the obj_dir indications in an Emacs .adp project file
 
+   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
+   -- always returns ""
 end Implementation_Options.ADP_Project_File;

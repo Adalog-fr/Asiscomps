@@ -46,5 +46,6 @@ package Implementation_Options.GPR_Project_File is
 
    function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
    -- From Default_Switches of (GPR) package IDE:
-   -- returns the value of the parameter that follows After
+   -- returns the value of the parameter that follows After, or "" if not found
+
 end Implementation_Options.GPR_Project_File;

@@ -111,4 +111,14 @@ package body Implementation_Options.ADP_Project_File is
       return Options (Project_Name, Option => "-T", Key => "obj_dir=");
    end T_Options;
 
+   -----------------
+   -- Tool_Switch --
+   -----------------
+
+   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String is
+      pragma Unreferenced (Project_Name, Tool, After);
+   begin
+      return "";
+   end Tool_Switch;
+
 end Implementation_Options.ADP_Project_File;
