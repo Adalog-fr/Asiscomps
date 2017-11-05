@@ -113,8 +113,8 @@ package body Thick_Queries is
    -- Biggest_Int_Img --
    ---------------------
 
-   function Biggest_Int_Img (Item : Biggest_Int) return Wide_String is
-      Result : constant Wide_String := Biggest_Int'Wide_Image (Item); --## Rule line OFF Use_Img_Function
+   function Biggest_Int_Img (Item : Extended_Biggest_Int) return Wide_String is
+      Result : constant Wide_String := Extended_Biggest_Int'Wide_Image (Item); --## Rule line OFF Use_Img_Function
       subtype Slide is Wide_String (1 .. Result'Length-1);
    begin
       if Item < 0 then
@@ -6410,7 +6410,7 @@ package body Thick_Queries is
          when An_Integer_Literal =>
             -- We make a round-trip through Value/Image below to normalize the form of the result
             -- (get rid of based numbers and '_')
-            return Biggest_Int_Img (Biggest_Int'Wide_Value (Value_Image (Expression)));
+            return Biggest_Int_Img (Extended_Biggest_Int'Wide_Value (Value_Image (Expression)));
 
          when A_Real_Literal =>
             -- We can't make the same trick as with Integer literals, since it could cause

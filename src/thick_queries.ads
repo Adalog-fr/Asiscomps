@@ -1244,9 +1244,10 @@ package Thick_Queries is
    subtype Biggest_Positive         is Biggest_Int          range 1 .. Biggest_Int'Last;
    subtype Extended_Biggest_Natural is Extended_Biggest_Int range 0 .. Not_Static;
 
-   function Biggest_Int_Img (Item : Biggest_Int) return Wide_String;
+   function Biggest_Int_Img (Item : Extended_Biggest_Int) return Wide_String;
    -- Like Biggest_Int'Wide_Image, without the !*#!! initial space.
    -- (avoids depending on the Gnat specific attribute 'Img)
+   -- Note: Item is of type Extended_Biggest_Int because it may be needed in intermediate computations
 
    type Extended_Biggest_Int_List is array (Asis.List_Index range <>) of Extended_Biggest_Int;
    Nil_Extended_Biggest_Int_List : constant Extended_Biggest_Int_List (1 .. 0) := (others => 0);
