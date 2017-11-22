@@ -558,7 +558,7 @@ package body Units_List is
          -- Extract unit names and ignored units from unit spec.
          --
 
-         if Spec (Spec'First) = '+' then
+         if Spec (Spec'First) = '+' or Spec (Spec'First) = '-' then
             Start := Spec'First + 1;
          else
             Start := Spec'First;
