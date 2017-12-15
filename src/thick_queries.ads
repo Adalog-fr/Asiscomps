@@ -885,6 +885,7 @@ package Thick_Queries is
    function Matching_Name (Name : Asis.Defining_Name; Decl : Asis.Declaration) return Asis.Defining_Name;
    -- Return the Defining_Name from Decl which is identical to Name
    -- return Nil_Element if not found
+   -- Useful to check defining names between spec and body, f.e.
 
    function Ultimate_Expression (Expr : Asis.Expression) return Asis.Expression;
    -- Returns Simple_name (Expr), unless Expr is the name of constant, in which case it returns
@@ -1277,6 +1278,7 @@ package Thick_Queries is
    --     'Size if specified by a size clause, or a standard type, or a type derived type from one of these
    --     Conversions and qualified expressions
    --     Comparison operators
+   --     If expressions
    --  Integer: (provided values are within System.Min_Int .. System.Max_Int)
    --     Literal
    --     Named number
