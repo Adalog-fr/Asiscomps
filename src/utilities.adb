@@ -671,7 +671,6 @@ package body Utilities is
    ----------------------
 
    function ASIS_Integer_Img (Item : in Asis.ASIS_Integer) return Wide_String is
-      use Asis;
       Result : constant Wide_String := Asis.ASIS_Integer'Wide_Image (Item); --## Rule line OFF Use_Img_Function
       subtype Slide is Wide_String (1 .. Result'Length - 1);
    begin

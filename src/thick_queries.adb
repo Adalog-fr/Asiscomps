@@ -1129,7 +1129,6 @@ package body Thick_Queries is
 
    function Expression_Usage_Kind (Expr : Asis.Expression) return Expression_Usage_Kinds is
       use Asis.Clauses, Asis.Expressions;
-      use Thick_Queries;
       Elem     : Asis.Element := Expr;
       Previous : Asis.Element;
 
@@ -3712,8 +3711,19 @@ package body Thick_Queries is
                      return A_Tagged_Type;
                   when A_Formal_Derived_Type_Definition =>
                      if not Follow_Derived then
-                        return A_Derived_Type;
+                        if Trait_Kind (Type_Declaration_View (Good_Elem)) /= A_Private_Trait then
+                           return A_Derived_Type;
+                        end if;
+
+                        -- Formal extension
+                        if Separate_Extension then
+                           return An_Extended_Tagged_Type;
+                        else
+                           return A_Tagged_Type;
+                        end if;
                      end if;
+
+                     -- We follow derivations here
                      Good_Elem := Subtype_Simple_Name (Type_Declaration_View (Good_Elem));
                      case Attribute_Kind (Good_Elem) is
                         when Not_An_Attribute =>
@@ -3760,20 +3770,24 @@ package body Thick_Queries is
                   when Follow_Private =>
                      Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
                   when Follow_User_Private =>
-                     if Ultimate_Origin (Good_Elem) = An_Application_Unit then --##rule line off Simplifiable_statements
-                        Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
-                     else
+                     if Ultimate_Origin (Good_Elem) /= An_Application_Unit then
                         return A_Private_Type;
                      end if;
+                     Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
                   when Stop_At_Private =>
                      return A_Private_Type;
                end case;
             when A_Private_Extension_Declaration =>
-               if Separate_Extension then
-                  return An_Extended_Tagged_Type;
-               else
-                  return A_Tagged_Type;
-               end if;
+               case Privacy is
+                  when Follow_Private | Follow_User_Private =>
+                     if Separate_Extension then
+                        return An_Extended_Tagged_Type;
+                     else
+                        return A_Tagged_Type;
+                     end if;
+                  when Stop_At_Private =>
+                     return A_Private_Type;
+               end case;
             when others =>
                return Not_A_Type;
          end case;

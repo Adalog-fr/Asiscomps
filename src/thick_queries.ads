@@ -65,7 +65,7 @@ package Thick_Queries is
    subtype Multiplying_Operators is Asis.Operator_Kinds range Asis.A_Multiply_Operator .. Asis.A_Rem_Operator;
 
    subtype Discrete_Type_Kinds is Asis.Type_Kinds
-   range Asis.An_Enumeration_Type_Definition .. Asis.A_Modular_Type_Definition;
+      range Asis.An_Enumeration_Type_Definition .. Asis.A_Modular_Type_Definition;
    subtype Fixed_Type_Kinds    is Asis.Type_Kinds
       range Asis.An_Ordinary_Fixed_Point_Definition .. Asis.A_Decimal_Fixed_Point_Definition;
 
