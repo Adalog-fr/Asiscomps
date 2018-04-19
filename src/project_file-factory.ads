@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options.ADP_Project_File - Package specification --
---  Copyright (C) 2002-2016 Adalog                                  --
+--  Project_File.Factory - Package specification                    --
+--  Copyright (C) 2018 Adalog                                       --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -32,28 +32,14 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
-with
-   Ada.Strings.Wide_Unbounded;
-package Implementation_Options.ADP_Project_File is
+-- Choose one of these options:
 
-   function Is_Appropriate (Project_Name : String) return Boolean;
+-- To have full support of GNAT .gpr project files,
+-- uncomment the following lines :
+with Project_File.Factory_Full;
+package Project_File.Factory renames Project_File.Factory_Full;
 
-   function I_Options (Project_Name : String) return Wide_String;
-   -- Constructs a list of -I<name> options from
-   -- the src_dir indications in an Emacs .adp project file
-
-   function T_Options (Project_Name : String) return Wide_String;
-   -- Constructs a list of -T<name> options from
-   -- the obj_dir indications in an Emacs .adp project file
-
-   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
-   -- always returns ""
-
-   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean;
-   -- always returns False
-
-   type Names_List is array (Positive range <>) of Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
-   function Main_Files (Project_Name : String) return Names_List;
-   -- always returns null Names_List
-
-end Implementation_Options.ADP_Project_File;
+-- To have support of .adp project files only (no GNAT .gpr project files, saves dependence on GnatColl),
+-- uncomment the following lines :
+--  with Project_File.Factory_No_Gpr;
+--  package Project_File.Factory renames Project_File.Factory_No_Gpr;

@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options - Package body                           --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Project_File.GPR - Package specification                        --
+--  Copyright (C) 2002-2016 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,56 +31,43 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-with -- Standard Ada units
-  Ada.Strings.Wide_Fixed,
-  Ada.Strings.Wide_Unbounded;
 
-package body Implementation_Options is
 
-   -----------------------
-   -- Initialize_String --
-   -----------------------
+private with -- GNAT units
+   Gnatcoll.Projects;
 
-   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
-      Default : constant Wide_String := "-ws -k -asis05";
-   begin
-      if Debug_Mode then
-         return Default;
-      else
-         return Default & " -nbb";   -- No Bug Box
-      end if;
-   end Initialize_String;
+package Project_File.GPR is
+   -- Abstraction of a Gnat .gpr project file
 
-  -----------------------
-   -- Parameters_String --
-   -----------------------
+   type Instance is new Project_File.Instance with private;
 
-   function Parameters_String (Project       : Project_File.Class_Access := null;
-                               Other_Options : Wide_String := "") return Wide_String
-   is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
-      use Project_File;
+   procedure Activate (Project : access GPR.Instance; Name : String);
 
-      Default_Options : Unbounded_Wide_String;
-   begin
-      if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
-      end if;
-      if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
-      end if;
+   overriding function I_Options (Project : access GPR.Instance) return Wide_String;
+   -- Constructs a list of -I<name> options from the source_dirs indications
 
-      if Project = null then  -- No project file
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Other_Options;
-      else
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Project.I_Options
-           & ' ' & Project.T_Options
-           & ' ' & Other_Options;
-      end if;
-   end Parameters_String;
+   overriding function T_Options (Project : access GPR.Instance) return Wide_String;
+   -- Constructs a list of -T<name> options from the object_dir indications
 
-end Implementation_Options;
+   overriding function Tool_Switch (Project : access GPR.Instance;
+                                    Tool    : String;
+                                    After   : String) return String;
+   -- From Default_Switches of (GPR) package IDE:
+   -- returns the value of the parameter that follows After, or "" if not found
+
+   overriding function Tool_Switch_Present (Project : access GPR.Instance;
+                                            Tool    : String;
+                                            Switch  : String) return Boolean;
+   -- From Default_Switches of (GPR) package IDE:
+   -- returns True if the switch Switch is given
+
+   overriding function Main_Files (Project : access GPR.Instance) return Names_List;
+   -- Returns a space-separated list of declared main files
+
+private
+   type Instance is new Project_File.Instance with
+      record
+         Tree : GNATCOLL.Projects.Project_Tree;
+      end record;
+
+end Project_File.GPR;

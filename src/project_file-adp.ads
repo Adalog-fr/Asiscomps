@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options - Package body                           --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Project_File.ADP - Package specification                        --
+--  Copyright (C) 2002-2018 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,56 +31,40 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-with -- Standard Ada units
-  Ada.Strings.Wide_Fixed,
-  Ada.Strings.Wide_Unbounded;
 
-package body Implementation_Options is
+private with
+   Ada.Text_IO;
 
-   -----------------------
-   -- Initialize_String --
-   -----------------------
+package Project_File.ADP is
+   -- Abstraction of an Emacs .adp project file
 
-   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
-      Default : constant Wide_String := "-ws -k -asis05";
-   begin
-      if Debug_Mode then
-         return Default;
-      else
-         return Default & " -nbb";   -- No Bug Box
-      end if;
-   end Initialize_String;
+   type Instance is new Project_File.Instance with private;
 
-  -----------------------
-   -- Parameters_String --
-   -----------------------
+   procedure Activate (Project : access ADP.Instance; Name : String);
 
-   function Parameters_String (Project       : Project_File.Class_Access := null;
-                               Other_Options : Wide_String := "") return Wide_String
-   is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
-      use Project_File;
+   overriding function I_Options (Project : access ADP.Instance) return Wide_String;
+   -- Constructs a list of -I<name> options from the src_dir indications
 
-      Default_Options : Unbounded_Wide_String;
-   begin
-      if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
-      end if;
-      if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
-      end if;
+   overriding function T_Options (Project : access ADP.Instance) return Wide_String;
+   -- Constructs a list of -T<name> options from the obj_dir indications
 
-      if Project = null then  -- No project file
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Other_Options;
-      else
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Project.I_Options
-           & ' ' & Project.T_Options
-           & ' ' & Other_Options;
-      end if;
-   end Parameters_String;
+   overriding function Tool_Switch (Project : access ADP.Instance;
+                                    Tool    : String;
+                                    After   : String) return String;
+   -- always returns ""
 
-end Implementation_Options;
+   overriding function Tool_Switch_Present (Project : access ADP.Instance;
+                                            Tool    : String;
+                                            Switch  : String) return Boolean;
+   -- always returns False
+
+   overriding function Main_Files (Project : access ADP.Instance) return Names_List;
+   -- always returns null Names_List
+
+private
+   type Instance is new Project_File.Instance with
+      record
+         File : Ada.Text_IO.File_Type;
+      end record;
+
+end Project_File.ADP;

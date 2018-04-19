@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------
---  Implementation_Options.GPR_Project_File - Package body          --
+--  Project_File.GPR - Package body                                 --
 --  Copyright (C) 2002-2016 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
@@ -32,112 +32,84 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
-
 with -- Standard Ada units
    Ada.Characters.Handling;
 
 with -- GNAT units
    Gnat.Strings,
-   Gnatcoll.Projects,
    Gnatcoll.VFS;
+package body Project_File.GPR is
 
-package body Implementation_Options.GPR_Project_File is
+   --------------
+   -- Activate --
+   --------------
 
-   --------------------
-   -- Is_Appropriate --
-   --------------------
-
-   function Is_Appropriate (Project_Name : String) return Boolean is
-      use Ada.Characters.Handling;
+   procedure Activate (Project : access GPR.Instance; Name : String) is
+      use Gnatcoll.Projects, Gnatcoll.VFS;
    begin
-      return Project_Name'Length >= 5
-        and then To_Upper (Project_Name (Project_Name'Last - 3 .. Project_Name'Last)) = ".GPR";
-   end Is_Appropriate;
+      Load (Project.Tree, Root_Project_Path => Create (+Name));
+   exception
+      when Invalid_Project =>
+         raise Project_Error with "Unknown or invalid GPR project: " & Name;
+   end Activate;
 
    ---------------
    -- I_Options --
    ---------------
 
-   function I_Options (Project_Name : String) return Wide_String is
-      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
+   function I_Options (Project : access GPR.Instance) return Wide_String is
       use Gnatcoll.Projects, Gnatcoll.VFS;
+      use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
 
-      Tree   : Project_Tree;
-      Result : Unbounded_Wide_String;
-   begin    -- I_Options
-      Load (Tree, Root_Project_Path => Create (+Project_Name));
-
-      declare
-         Project_Dirs : constant File_Array := Source_Dirs (Root_Project (Tree), Recursive => True);
-      begin
-         for D in Project_Dirs'Range loop
-            Append (Result, " -I" & To_Wide_String (+Full_Name (Project_Dirs (D))));
-         end loop;
-      end;
-
-      Unload (Tree);
+      Project_Dirs : constant File_Array := Source_Dirs (Root_Project (Project.Tree), Recursive => True);
+      Result       : Unbounded_Wide_String;
+   begin
+      for D in Project_Dirs'Range loop
+         Append (Result, " -I" & To_Wide_String (+Full_Name (Project_Dirs (D))));
+      end loop;
       return To_Wide_String (Result);
-
-   exception
-      when Invalid_Project =>
-         raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
    end I_Options;
 
    ---------------
    -- T_Options --
    ---------------
 
-   function T_Options (Project_Name : String) return Wide_String is
+   function T_Options (Project : access GPR.Instance) return Wide_String is
       use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
       use Gnatcoll.Projects, Gnatcoll.VFS;
 
-      Tree   : Project_Tree;
-      Result : Unbounded_Wide_String;
-   begin    -- T_Options
-      Load (Tree, Root_Project_Path => Create (+Project_Name));
-
-      declare
-         Project_Dirs : constant File_Array := Object_Path (Root_Project (Tree), Recursive => True);
-      begin
-         for D in Project_Dirs'Range loop
-            Append (Result, " -T" & To_Wide_String (+Full_Name (Project_Dirs (D))));
-         end loop;
-      end;
-
-      Unload (Tree);
+      Project_Dirs : constant File_Array := Object_Path (Root_Project (Project.Tree), Recursive => True);
+      Result       : Unbounded_Wide_String;
+   begin
+      for D in Project_Dirs'Range loop
+         Append (Result, " -T" & To_Wide_String (+Full_Name (Project_Dirs (D))));
+      end loop;
       return To_Wide_String (Result);
-
-   exception
-      when Invalid_Project =>
-         raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
    end T_Options;
 
    -----------------
    -- Tool_Switch --
    -----------------
 
-   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String is
-      use Gnatcoll.Projects, Gnatcoll.VFS;
+   function Tool_Switch (Project : access GPR.Instance; Tool : String; After : String) return String is
+      use Gnatcoll.Projects;
       use type Gnat.Strings.String_List_Access;
 
-      Tree       : Project_Tree;
       Attributes : GNAT.Strings.String_List_Access;
 
       -- Not clear whether the value is named "Switches" or "Default_Switches"... Try both
    begin    -- Tool_Switch
-      Load (Tree, Root_Project_Path => Create (+Project_Name));
 
-      Attributes := Attribute_Value (Project      => Root_Project (Tree),
+      Attributes := Attribute_Value (Project      => Root_Project (Project.Tree),
                                      Attribute    => Build (Ide_Package, "Default_Switches"),
                                      Index        => Tool,
                                      Use_Extended => True);
       if Attributes = null then
-         Attributes := Attribute_Value (Project      => Root_Project (Tree),
+         Attributes := Attribute_Value (Project      => Root_Project (Project.Tree),
                                         Attribute    => Build (Ide_Package, "Switches"),
                                         Index        => Tool,
                                         Use_Extended => True);
          if Attributes = null then
-            Unload (Tree);
             return "";
          end if;
       end if;
@@ -147,97 +119,80 @@ package body Implementation_Options.GPR_Project_File is
             declare  -- Could use an extended return...
                Result : constant String := Attributes (I + 1).all;
             begin
-               Unload (Tree);
                GNAT.Strings.Free (Attributes);
                return Result;
             end;
          end if;
       end loop;
       return "";
-   exception
-      when Invalid_Project =>
-         raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
    end Tool_Switch;
 
    -------------------------
    -- Tool_Switch_Present --
    -------------------------
 
-   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean is
-      use Gnatcoll.Projects, Gnatcoll.VFS;
+   function Tool_Switch_Present (Project : access GPR.Instance;
+                                 Tool    : String;
+                                 Switch  : String) return Boolean
+   is
+      use Gnatcoll.Projects;
       use type Gnat.Strings.String_List_Access;
 
-      Tree       : Project_Tree;
       Attributes : GNAT.Strings.String_List_Access;
 
       -- Not clear whether the value is named "Switches" or "Default_Switches"... Try both
    begin    -- Tool_Switch_Present
-      Load (Tree, Root_Project_Path => Create (+Project_Name));
-
-      Attributes := Attribute_Value (Project      => Root_Project (Tree),
+      Attributes := Attribute_Value (Project      => Root_Project (Project.Tree),
                                      Attribute    => Build (Ide_Package, "Default_Switches"),
                                      Index        => Tool,
                                      Use_Extended => True);
       if Attributes = null then
-         Attributes := Attribute_Value (Project      => Root_Project (Tree),
+         Attributes := Attribute_Value (Project      => Root_Project (Project.Tree),
                                         Attribute    => Build (Ide_Package, "Switches"),
                                         Index        => Tool,
                                         Use_Extended => True);
          if Attributes = null then
-            Unload (Tree);
             return False;
          end if;
       end if;
 
       for I in Attributes'Range loop
          if Attributes (I).all = Switch then
-            Unload (Tree);
             GNAT.Strings.Free (Attributes);
             return True;
          end if;
       end loop;
       return False;
-   exception
-      when Invalid_Project =>
-         raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
    end Tool_Switch_Present;
 
    ----------------
    -- Main_Files --
    ----------------
 
-   function Main_Files (Project_Name : String) return Names_List is
+   function Main_Files (Project : access GPR.Instance) return Names_List is
       use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
-      use Gnatcoll.Projects, Gnatcoll.VFS;
+      use Gnatcoll.Projects;
       use type Gnat.Strings.String_List_Access;
 
-      Tree       : Project_Tree;
       Attributes : GNAT.Strings.String_List_Access;
    begin
-      Load (Tree, Root_Project_Path => Create (+Project_Name));
-
-      Attributes := Attribute_Value (Project      => Root_Project (Tree),
+      Attributes := Attribute_Value (Project      => Root_Project (Project.Tree),
                                      Attribute    => Main_Attribute,
                                      Index        => "",
                                      Use_Extended => False);
       if Attributes = null then
-         Unload (Tree);
-         return (1..0 => Null_Unbounded_Wide_String);
+         return (1 .. 0 => Null_Unbounded_Wide_String);
       end if;
+
       declare
          Result : Names_List (Attributes'Range);
       begin
          for I in Attributes'Range loop
             Result (I) := To_Unbounded_Wide_String (To_Wide_String (Attributes (I).all));
          end loop;
-         Unload (Tree);
          GNAT.Strings.Free (Attributes);
          return Result;
       end;
-
-   exception
-      when Invalid_Project =>
-         raise Implementation_Error with "Unknown or invalid GPR project: " & Project_Name;
    end Main_Files;
 
-end Implementation_Options.GPR_Project_File;
+end Project_File.GPR;

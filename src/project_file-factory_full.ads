@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options - Package body                           --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Project_File.Factory_Full - Package specification               --
+--  Copyright (C) 2018 Adalog                                       --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,56 +31,11 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-with -- Standard Ada units
-  Ada.Strings.Wide_Fixed,
-  Ada.Strings.Wide_Unbounded;
 
-package body Implementation_Options is
+package Project_File.Factory_Full is
 
-   -----------------------
-   -- Initialize_String --
-   -----------------------
+   function Corresponding_Project (Project_Name : String) return Project_File.Class_Access;
+   -- Recognizes the appropriate Project_File.Instance according to the Project_Name.
+   -- Returns a Project_File.No_Project.Instance if not recognized (including when Project_Name = "")
 
-   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
-      Default : constant Wide_String := "-ws -k -asis05";
-   begin
-      if Debug_Mode then
-         return Default;
-      else
-         return Default & " -nbb";   -- No Bug Box
-      end if;
-   end Initialize_String;
-
-  -----------------------
-   -- Parameters_String --
-   -----------------------
-
-   function Parameters_String (Project       : Project_File.Class_Access := null;
-                               Other_Options : Wide_String := "") return Wide_String
-   is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
-      use Project_File;
-
-      Default_Options : Unbounded_Wide_String;
-   begin
-      if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
-      end if;
-      if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
-      end if;
-
-      if Project = null then  -- No project file
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Other_Options;
-      else
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Project.I_Options
-           & ' ' & Project.T_Options
-           & ' ' & Other_Options;
-      end if;
-   end Parameters_String;
-
-end Implementation_Options;
+end Project_File.Factory_Full;

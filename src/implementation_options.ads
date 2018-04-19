@@ -32,13 +32,16 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
+with   -- Reusable components
+   Project_File;
+
 package Implementation_Options is
    -- This package defines parameter strings that are implementation dependent.
    -- There is no other (known) dependency on the ASIS implentation
 
    -- Parameters for ASIS
    function Initialize_String (Debug_Mode : Boolean := False) return Wide_String;
-   function Parameters_String (Project_Name  : String := "";
+   function Parameters_String (Project       : Project_File.Class_Access := null;
                                Other_Options : Wide_String := "") return Wide_String;
    Default_C_Parameter : Wide_Character := 'A';   -- -CA
    Default_F_Parameter : Wide_Character := 'M';   -- -FM
@@ -47,4 +50,5 @@ package Implementation_Options is
    Form_Parameters : constant String := "WCEM=h"; -- Use Hex encoding
 
    Implementation_Error : exception;
+
 end Implementation_Options;

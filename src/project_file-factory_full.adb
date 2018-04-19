@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options - Package body                           --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Project_File.Factory_Full - Package body                        --
+--  Copyright (C) 2018 Adalog                                       --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,56 +31,50 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-with -- Standard Ada units
-  Ada.Strings.Wide_Fixed,
-  Ada.Strings.Wide_Unbounded;
 
-package body Implementation_Options is
+with   -- Standard units
+   Ada.Characters.Handling,
+   Ada.Directories;
 
-   -----------------------
-   -- Initialize_String --
-   -----------------------
+with   -- Reusable components
+   Project_File.ADP,
+   Project_File.Dummy,
+   Project_File.GPR;
 
-   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
-      Default : constant Wide_String := "-ws -k -asis05";
+package body Project_File.Factory_Full is
+
+   ADP_Project   : aliased ADP.Instance;
+   Dummy_Project : aliased Dummy.Instance;
+   GPR_Project   : aliased GPR.Instance;
+
+   ---------------------------
+   -- Corresponding_Project --
+   ---------------------------
+
+   function Corresponding_Project (Project_Name : String) return Project_File.Class_Access is
+      use Ada.Characters.Handling, Ada.Directories;
+
    begin
-      if Debug_Mode then
-         return Default;
-      else
-         return Default & " -nbb";   -- No Bug Box
-      end if;
-   end Initialize_String;
-
-  -----------------------
-   -- Parameters_String --
-   -----------------------
-
-   function Parameters_String (Project       : Project_File.Class_Access := null;
-                               Other_Options : Wide_String := "") return Wide_String
-   is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
-      use Project_File;
-
-      Default_Options : Unbounded_Wide_String;
-   begin
-      if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
-      end if;
-      if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
+      if Project_Name = "" then
+         return Dummy_Project'Access;
       end if;
 
-      if Project = null then  -- No project file
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Other_Options;
-      else
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Project.I_Options
-           & ' ' & Project.T_Options
-           & ' ' & Other_Options;
-      end if;
-   end Parameters_String;
+      declare
+         Ext : constant String := To_Lower (Extension (Project_Name));
+      begin
+         if Ext = "" then -- assume GPR by default
+            GPR_Project.Activate (Project_Name & ".gpr");
+            return GPR_Project'Access;
+         elsif Ext = "gpr" then
+            GPR_Project.Activate (Project_Name);
+            return GPR_Project'Access;
+         elsif Ext = "adp" then
+            ADP_Project.Activate (Project_Name);
+            return ADP_Project'Access;
+         else
+            return Dummy_Project'Access;
+         end if;
+      end;
+   end Corresponding_Project;
 
-end Implementation_Options;
+end Project_File.Factory_Full;

@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options.No_Project_File - Package specification  --
---  Copyright (C) 2002-2016 Adalog                                  --
+--  Project_File.Factory_No_Gpr - Package body                      --
+--  Copyright (C) 2018 Adalog                                       --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,29 +31,44 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-with
-   Ada.Strings.Wide_Unbounded;
-package Implementation_Options.No_Project_File is
--- Placeholder package to replace Implementation_Options.GPR_Project_File
--- when support of .gpr files is not desired
 
-   function Is_Appropriate (Project_Name : String) return Boolean;
-   -- always returns false
+with   -- Standard units
+   Ada.Characters.Handling,
+   Ada.Directories;
 
-   function I_Options (Project_Name : String) return Wide_String;
-   -- always returns ""
+with   -- Reusable components
+   Project_File.ADP,
+   Project_File.Dummy;
 
-   function T_Options (Project_Name : String) return Wide_String;
-   -- always returns ""
+package body Project_File.Factory_No_Gpr is
 
-   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
-   -- always returns ""
+   ADP_Project   : aliased ADP.Instance;
+   Dummy_Project : aliased Dummy.Instance;
 
-   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean;
-   -- always returns False
+   ---------------------------
+   -- Corresponding_Project --
+   ---------------------------
 
-   type Names_List is array (Positive range <>) of Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
-   function Main_Files (Project_Name : String) return Names_List;
-   -- always returns null Names_List
+   function Corresponding_Project (Project_Name : String) return Project_File.Class_Access is
+      use Ada.Characters.Handling, Ada.Directories;
 
-end Implementation_Options.No_Project_File;
+   begin
+      if Project_Name = "" then
+         return Dummy_Project'Access;
+      end if;
+
+      declare
+         Ext : constant String := To_Lower (Extension (Project_Name));
+      begin
+         if Ext = "gpr" then
+            raise Project_Error with "GPR projects not supported";
+         elsif Ext = "adp" then
+            ADP_Project.Activate (Project_Name);
+            return ADP_Project'Access;
+         else  -- including ""
+            return Dummy_Project'Access;
+         end if;
+      end;
+   end Corresponding_Project;
+
+end Project_File.Factory_No_Gpr;

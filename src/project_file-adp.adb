@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options.ADP_Project_File - Package body          --
---  Copyright (C) 2002-2016 Adalog                                  --
+--  Project_File.ADP - Package body                                 --
+--  Copyright (C) 2002-2018 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -32,17 +32,15 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
-
 with -- Standard Ada units
-   Ada.Characters.Handling,
-   Ada.Text_IO;
+   Ada.Characters.Handling;
+package body Project_File.ADP is
 
-package body Implementation_Options.ADP_Project_File is
+   --------------- Internal utilities
 
-   function Options (Project_Name : String; Option : String; Key : String) return Wide_String is
+   function Options (Project : access ADP.Instance; Option : String; Key : String) return Wide_String is
       use Ada.Text_IO;
 
-      F : File_Type;
       function Get_Next_Src return Wide_String is
          use Ada.Characters.Handling;
 
@@ -50,7 +48,7 @@ package body Implementation_Options.ADP_Project_File is
          Last : Natural;
       begin
          loop  -- Exit on End_Error
-            Get_Line (F, Buf, Last);
+            Get_Line (Project.File, Buf, Last);
             if Last > Key'Length and then
               Buf (1 .. Key'Length) = Key
             then
@@ -65,58 +63,49 @@ package body Implementation_Options.ADP_Project_File is
       end Get_Next_Src;
 
    begin    -- Options
-      Open (F, In_File, Project_Name);
-      declare
-         Result : constant Wide_String := Get_Next_Src;
-      begin
-         Close (F);
-         return Result;
-      end;
-   exception
-      when Name_Error =>
-         raise Implementation_Error with "Unknown ADP project: " & Project_Name;
-      when others =>
-         if Is_Open (F) then
-            Close (F);
-         end if;
-         raise;
+      Reset (Project.File, In_File);
+      return Get_Next_Src;
    end Options;
 
-   --------------------
-   -- Is_Appropriate --
-   --------------------
+   --------------- Exported operations
 
-   function Is_Appropriate (Project_Name : String) return Boolean is
-      use Ada.Characters.Handling;
+   --------------
+   -- Activate --
+   --------------
+
+   procedure Activate (Project : access ADP.Instance; Name : String) is
+      use Ada.Text_IO;
    begin
-      return Project_Name'Length >= 5
-        and then To_Upper (Project_Name (Project_Name'Last - 3 .. Project_Name'Last)) = ".ADP";
-   end Is_Appropriate;
+      Open (Project.File, In_File, Name);
+   exception
+      when Name_Error =>
+         raise Project_Error with "Unknown ADP project: " & Name;
+   end Activate;
 
    ---------------
    -- I_Options --
    ---------------
 
-   function I_Options (Project_Name : String) return Wide_String is
+   function I_Options (Project : access ADP.Instance) return Wide_String is
    begin
-      return Options (Project_Name, Option => "-I", Key => "src_dir=");
+      return Options (Project, Option => "-I", Key => "src_dir=");
    end I_Options;
 
    ---------------
    -- T_Options --
    ---------------
 
-   function T_Options (Project_Name : String) return Wide_String is
+   function T_Options (Project : access ADP.Instance) return Wide_String is
    begin
-      return Options (Project_Name, Option => "-T", Key => "obj_dir=");
+      return Options (Project, Option => "-T", Key => "obj_dir=");
    end T_Options;
 
    -----------------
    -- Tool_Switch --
    -----------------
 
-   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String is
-      pragma Unreferenced (Project_Name, Tool, After);
+   function Tool_Switch (Project : access ADP.Instance; Tool : String; After : String) return String is
+      pragma Unreferenced (Project, Tool, After);
    begin
       return "";
    end Tool_Switch;
@@ -125,8 +114,11 @@ package body Implementation_Options.ADP_Project_File is
    -- Tool_Switch_Present --
    -------------------------
 
-   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean is
-      pragma Unreferenced (Project_Name, Tool, Switch);
+   overriding function Tool_Switch_Present (Project : access ADP.Instance;
+                                            Tool    : String;
+                                            Switch  : String) return Boolean
+   is
+      pragma Unreferenced (Project, Tool, Switch);
    begin
       return False;
    end Tool_Switch_Present;
@@ -135,11 +127,11 @@ package body Implementation_Options.ADP_Project_File is
    -- Main_Files --
    ----------------
 
-   function Main_Files (Project_Name : String) return Names_List is
-      pragma Unreferenced (Project_Name);
+   overriding function Main_Files (Project : access ADP.Instance) return Names_List is
+      pragma Unreferenced (Project);
       use Ada.Strings.Wide_Unbounded;
    begin
       return (1 .. 0 => Null_Unbounded_Wide_String);
    end Main_Files;
 
-end Implementation_Options.ADP_Project_File;
+end Project_File.ADP;

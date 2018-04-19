@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options.GPR_Project_File - Package specification --
---  Copyright (C) 2002-2016 Adalog                                  --
+--  Project_File.Dummy - Package specification                      --
+--  Copyright (C) 2002-2018 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -32,30 +32,34 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
+package Project_File.Dummy is
+-- Placeholder package to replace Implementation_Options.GPR_Project_File
+-- when support of .gpr files is not desired, or no project file given
 
-with
-   Ada.Strings.Wide_Unbounded;
-package Implementation_Options.GPR_Project_File is
+   type Instance is new Project_File.Instance with private;
+   -- no need to activate
 
-   function Is_Appropriate (Project_Name : String) return Boolean;
+   overriding function I_Options (Project : access Dummy.Instance) return Wide_String;
+   -- always returns ""
 
-   function I_Options (Project_Name : String) return Wide_String;
-   -- Constructs a list of -I<name> options from
-   -- the source_dirs indications in a Gnat .gpr project file
+   overriding function T_Options (Project : access Dummy.Instance) return Wide_String;
+   -- always returns ""
 
-   function T_Options (Project_Name : String) return Wide_String;
-   -- Constructs a list of -T<name> options from
-   -- the object_dir indications in a Gnat .gpr project file
+   overriding function Tool_Switch (Project : access Dummy.Instance;
+                                    Tool    : String;
+                                    After   : String) return String;
+   -- always returns ""
 
-   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String;
-   -- From Default_Switches of (GPR) package IDE:
-   -- returns the value of the parameter that follows After, or "" if not found
+   overriding function Tool_Switch_Present (Project : access Dummy.Instance;
+                                            Tool    : String;
+                                            Switch  : String) return Boolean;
+   -- always returns False
 
-   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean;
-   -- From Default_Switches of (GPR) package IDE:
-   -- returns True if the switch Switch is given
+   overriding function Main_Files (Project : access Dummy.Instance) return Names_List;
+   -- always returns null Names_List
 
-   type Names_List is array (Positive range <>) of Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
-   function Main_Files (Project_Name : String) return Names_List;
-   -- Returns a space-separated list of declared main files
-end Implementation_Options.GPR_Project_File;
+
+private
+   type Instance is new Project_File.Instance with null record;
+
+end Project_File.Dummy;

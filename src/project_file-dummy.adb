@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options - Package body                           --
---  Copyright (C) 2005-2016 Adalog                                  --
+--  Project_File.Dummy - Package specification                      --
+--  Copyright (C) 2002-2018 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -31,56 +31,60 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-with -- Standard Ada units
-  Ada.Strings.Wide_Fixed,
-  Ada.Strings.Wide_Unbounded;
 
-package body Implementation_Options is
+package body Project_File.Dummy is
 
-   -----------------------
-   -- Initialize_String --
-   -----------------------
+   ---------------
+   -- I_Options --
+   ---------------
 
-   function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
-      Default : constant Wide_String := "-ws -k -asis05";
+   overriding function I_Options (Project : access Dummy.Instance) return Wide_String is
+      pragma Unreferenced (Project);
    begin
-      if Debug_Mode then
-         return Default;
-      else
-         return Default & " -nbb";   -- No Bug Box
-      end if;
-   end Initialize_String;
+      return "";
+   end I_Options;
 
-  -----------------------
-   -- Parameters_String --
-   -----------------------
+   ---------------
+   -- T_Options --
+   ---------------
 
-   function Parameters_String (Project       : Project_File.Class_Access := null;
-                               Other_Options : Wide_String := "") return Wide_String
+   overriding function T_Options (Project : access Dummy.Instance) return Wide_String is
+      pragma Unreferenced (Project);
+   begin
+      return "";
+   end T_Options;
+
+   -----------------
+   -- Tool_Switch --
+   -----------------
+
+   overriding function Tool_Switch (Project : access Dummy.Instance; Tool : String; After : String) return String is
+      pragma Unreferenced (Project, Tool, After);
+   begin
+      return "";
+   end Tool_Switch;
+
+   -------------------------
+   -- Tool_Switch_Present --
+   -------------------------
+
+   overriding function Tool_Switch_Present (Project : access Dummy.Instance; Tool : String; Switch : String)
+                                            return Boolean
    is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
-      use Project_File;
-
-      Default_Options : Unbounded_Wide_String;
+      pragma Unreferenced (Project, Tool, Switch);
    begin
-      if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
-      end if;
-      if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
-      end if;
+      return False;
+   end Tool_Switch_Present;
 
-      if Project = null then  -- No project file
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Other_Options;
-      else
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Project.I_Options
-           & ' ' & Project.T_Options
-           & ' ' & Other_Options;
-      end if;
-   end Parameters_String;
+   ----------------
+   -- Main_Files --
+   ----------------
 
-end Implementation_Options;
+   overriding function Main_Files (Project : access Dummy.Instance) return Names_List is
+      pragma Unreferenced (Project);
+      use Ada.Strings.Wide_Unbounded;
+   begin
+      return (1 .. 0 => Null_Unbounded_Wide_String);
+   end Main_Files;
+
+end Project_File.Dummy;

@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options.Project_File - Package specification     --
---  Copyright (C) 2002-2016 Adalog                                  --
+--  Project_File.Factory_No_Gpr - Package specification             --
+--  Copyright (C) 2018 Adalog                                       --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -32,12 +32,11 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
--- Uncomment the following lines if you want to support GNAT .gpr project files
-with
-   Implementation_Options.GPR_Project_File;
-package Implementation_Options.Project_File renames Implementation_Options.GPR_Project_File;
+package Project_File.Factory_No_Gpr is
 
--- Uncomment the following lines if you don't want to support GNAT .gpr project files
---  with
---     Implementation_Options.No_Project_File;
---  package Implementation_Options.Project_File renames Implementation_Options.No_Project_File;
+   function Corresponding_Project (Project_Name : String) return Project_File.Class_Access;
+   -- Recognizes the appropriate Project_File.Instance according to the Project_Name.
+   -- Returns a Project_File.No_Project.Instance if not recognized (including when Project_Name = "")
+   -- Raises Project_Error for .gpr projects
+
+end Project_File.Factory_No_Gpr;

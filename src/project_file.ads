@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
---  Implementation_Options.No_Project_File - Package body           --
---  Copyright (C) 2002-2016 Adalog                                  --
+--  Project_File - Package specification                            --
+--  Copyright (C) 2018 Adalog                                       --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -32,66 +32,29 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
-package body Implementation_Options.No_Project_File is
+with   -- Standard Ada units
+   Ada.Strings.Wide_Unbounded;
 
-   --------------------
-   -- Is_Appropriate --
-   --------------------
+package Project_File is
+   type Instance is abstract tagged limited private;
+   subtype Class is Instance'Class;
+   type Class_Access is access all Class;
 
-   function Is_Appropriate (Project_Name : String) return Boolean is
-      pragma Unreferenced (Project_Name);
-   begin
-      return False;
-   end Is_Appropriate;
+   function I_Options (Project : access Project_File.Instance) return Wide_String is abstract;
+   function T_Options (Project : access Project_File.Instance) return Wide_String is abstract;
 
-   ---------------
-   -- I_Options --
-   ---------------
+   function Tool_Switch         (Project : access Project_File.Instance;
+                                 Tool    : String;
+                                 After   : String) return String is abstract;
+   function Tool_Switch_Present (Project : access Project_File.Instance;
+                                 Tool    : String;
+                                 Switch  : String) return Boolean is abstract;
 
-   function I_Options (Project_Name : String) return Wide_String is
-      pragma Unreferenced (Project_Name);
-   begin    -- I_Options
-      return "";
-   end I_Options;
+   type Names_List is array (Positive range <>) of Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
+   function Main_Files (Project : access Project_File.Instance) return Names_List is abstract;
 
-   ---------------
-   -- T_Options --
-   ---------------
+   Project_Error : exception;
 
-   function T_Options (Project_Name : String) return Wide_String is
-      pragma Unreferenced (Project_Name);
-   begin    -- T_Options
-      return "";
-   end T_Options;
-
-   -----------------
-   -- Tool_Switch --
-   -----------------
-
-   function Tool_Switch (Project_Name : String; Tool : String; After : String) return String is
-      pragma Unreferenced (Project_Name, Tool, After);
-   begin
-      return "";
-   end Tool_Switch;
-
-   -------------------------
-   -- Tool_Switch_Present --
-   -------------------------
-
-   function Tool_Switch_Present (Project_Name : String; Tool : String; Switch : String) return Boolean is
-      pragma Unreferenced (Project_Name, Tool, Switch);
-   begin
-      return False;
-   end Tool_Switch_Present;
-
-   ----------------
-   -- Main_Files --
-   ----------------
-
-   function Main_Files (Project_Name : String) return Names_List is
-      pragma Unreferenced (Project_Name);
-      use Ada.Strings.Wide_Unbounded;
-   begin
-      return (1..0 => Null_Unbounded_Wide_String);
-   end Main_Files;
-end Implementation_Options.No_Project_File;
+private
+   type Instance is abstract tagged limited null record;
+end Project_File;
