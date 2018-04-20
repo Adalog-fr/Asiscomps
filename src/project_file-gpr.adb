@@ -82,6 +82,16 @@ package body Project_File.GPR is
       Result       : Unbounded_Wide_String;
    begin
       for D in Project_Dirs'Range loop
+         if not Is_Directory (Project_Dirs (D)) then
+            -- These must exist since tree files are stored there
+            begin
+               Make_Dir (Project_Dirs (D));
+            exception
+               when Vfs_Directory_Error =>
+                  raise Project_Error
+                    with "Unable to create missing directory " & (+Full_Name (Project_Dirs (D)));
+            end;
+         end if;
          Append (Result, " -T" & To_Wide_String (+Full_Name (Project_Dirs (D))));
       end loop;
       return To_Wide_String (Result);
