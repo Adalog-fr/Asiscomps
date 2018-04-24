@@ -587,7 +587,12 @@ package body Units_List is
                                     -- Following nodes are added from stubs/with clauses
    begin  -- Register
       -- Build list of units
+
       Process_Units_Spec (Units_Spec);
+      if Is_Exhausted then
+         -- No units were added (empty indirect file for example)
+         return;
+      end if;
       Specified_Limit := Current_Order;
 
       --  Process list of units
