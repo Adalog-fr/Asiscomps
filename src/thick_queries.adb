@@ -3125,8 +3125,14 @@ package body Thick_Queries is
    -----------------------------------------
 
    function Corresponding_Full_Type_Declaration (Decl : Asis.Declaration) return Asis.Declaration is
+      use Asis.Limited_Views;
       Result : Asis.Declaration := Decl;
    begin
+      -- Get rid of limited views
+      if Is_From_Limited_View (Result) then
+         Result := Get_Nonlimited_View (Result);
+      end if;
+
       -- Ada 2012: Decl can be incomplete, then private, hence the loop
       while Declaration_Kind (Result) in An_Incomplete_Type_Declaration .. A_Private_Extension_Declaration loop
          Result := Corresponding_Type_Completion (Result);
