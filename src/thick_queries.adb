@@ -6107,6 +6107,18 @@ package body Thick_Queries is
       end case;
    end Exception_Handlers;
 
+   -----------------------
+   -- Lines_Span_Length --
+   -----------------------
+
+   function Lines_Span_Length (Element : Asis.Element) return Asis.ASIS_Positive is
+      use Asis.Text;
+
+      Elem_Span : constant Span := Element_Span (Element);
+   begin
+      return Elem_Span.Last_Line - Elem_Span.First_Line + 1;
+   end Lines_Span_Length;
+
    ----------------------
    -- Size_Value_Image --
    ----------------------

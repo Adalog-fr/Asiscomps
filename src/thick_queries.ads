@@ -265,6 +265,11 @@ package Thick_Queries is
    --    An_Extended_Return_Statement
 
 
+   function Lines_Span_Length (Element : Asis.Element) return Asis.ASIS_Positive;
+   -- Returns the number of lines that make up Element
+   -- Appropriate Element_Kinds:
+   --   All
+
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
    -- Queries about statements                                                                    --
