@@ -69,6 +69,16 @@ package body Project_File.ADP is
 
    --------------- Exported operations
 
+   ----------
+   -- Path --
+   ----------
+
+   overriding function Path (Project : access ADP.Instance) return String is
+      use Ada.Text_IO;
+   begin
+      return Name (Project.File);
+   end Path;
+
    --------------
    -- Activate --
    --------------

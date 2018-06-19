@@ -34,6 +34,17 @@
 
 package body Project_File.Dummy is
 
+   ----------
+   -- Path --
+   ----------
+
+   overriding function Path (Project : access Dummy.Instance) return String is
+      pragma Unreferenced (Project);
+   begin
+      return "";
+   end Path;
+
+
    ---------------
    -- I_Options --
    ---------------

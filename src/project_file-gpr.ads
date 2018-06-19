@@ -41,7 +41,9 @@ package Project_File.GPR is
 
    type Instance is new Project_File.Instance with private;
 
-   procedure Activate (Project : access GPR.Instance; Name : String);
+   not overriding procedure Activate (Project : access GPR.Instance; Name : String);
+
+   overriding function Path (Project : access GPR.Instance) return String;
 
    overriding function I_Options (Project : access GPR.Instance) return Wide_String;
    -- Constructs a list of -I<name> options from the source_dirs indications

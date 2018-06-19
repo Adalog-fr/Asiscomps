@@ -40,6 +40,9 @@ package Project_File is
    subtype Class is Instance'Class;
    type Class_Access is access all Class;
 
+   function Path (Project : access Project_File.Instance) return String is abstract;
+   -- Full path to the project file
+
    function I_Options (Project : access Project_File.Instance) return Wide_String is abstract;
    function T_Options (Project : access Project_File.Instance) return Wide_String is abstract;
 

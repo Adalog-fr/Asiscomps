@@ -31,26 +31,108 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-
 with -- Standard Ada units
-   Ada.Characters.Handling;
+   Ada.Characters.Handling,
+   Ada.Environment_Variables,
+   Ada.IO_Exceptions;
 
 with -- GNAT units
    Gnat.Strings,
    Gnatcoll.VFS;
+
+with -- Adalog components
+   Generic_File_Iterator;
+
 package body Project_File.GPR is
+   use Gnatcoll.VFS;
+
+   ----------
+   -- Path --
+   ----------
+
+   function Path (Project : access GPR.Instance) return String is
+      use Gnatcoll.Projects;
+   begin
+      return +Full_Name (Root_Project(Project.Tree).Project_Path);
+   end Path;
 
    --------------
    -- Activate --
    --------------
 
+   -- When null is passed as Errors call-back, Load prints a message! So...
+   procedure Shut_Up (Msg : String) is null;
+
    procedure Activate (Project : access GPR.Instance; Name : String) is
-      use Gnatcoll.Projects, Gnatcoll.VFS;
+      use Gnatcoll.Projects, Ada.Environment_Variables;
    begin
-      Load (Project.Tree, Root_Project_Path => Create (+Name));
-   exception
-      when Invalid_Project =>
-         raise Project_Error with "Unknown or invalid GPR project: " & Name;
+      -- Try current directory (i.e. name as given)
+      begin
+         Load (Self              => Project.Tree,
+               Root_Project_Path => Create (+Name),
+               Errors            => Shut_Up'Access);
+         -- OK, found
+         return;
+      exception
+         when Invalid_Project =>  -- not found
+            null;
+      end;
+
+      -- Try on paths from the file in GPR_PROJECT_PATH_FILE
+      declare
+         Valid_Project : exception;
+
+         procedure Check_One (Line : String) is
+            Project_Paths : constant File_Array := From_Path (+Line);
+         begin
+            if Line'Length >= 2 and then Line (1 .. 2) = "--" then  -- Undocumented feature of project path files
+               return;
+            end if;
+
+            Load (Self              => Project.Tree,
+                  Root_Project_Path => Locate_Regular_File (+Name, Project_Paths),
+                  Errors            => Shut_Up'Access);
+            -- OK found
+            raise Valid_Project;  -- to stop iteration
+         exception
+            when Invalid_Project =>
+               -- not found (yet)
+               null;
+         end Check_One;
+
+         procedure Iterate_Path_File is new Generic_File_Iterator (Check_One);
+         Path_File_Name : constant String := Value ("GPR_PROJECT_PATH_FILE", Default => "");
+      begin
+         if Path_File_Name /= "" then
+            Iterate_Path_File (Path_File_Name);
+         end if;
+         -- not found, exit block normally
+      exception
+         when Ada.IO_Exceptions.Name_Error =>
+            -- project path file not found
+            null;
+         when Valid_Project =>  -- OK found
+            return;
+      end;
+
+      -- Try on paths from GPR_PROJECT_PATH and ADA_PROJECT_PATH
+      declare
+         Project_Paths : constant File_Array := From_Path (+Value ("GPR_PROJECT_PATH", Default => "")) &
+                                                From_Path (+Value ("ADA_PROJECT_PATH", Default => ""));
+      begin
+         if Project_Paths'Length /= 0 then
+            Load (Self              => Project.Tree,
+                  Root_Project_Path => Locate_Regular_File (+Name, Project_Paths),
+                  Errors            => Shut_Up'Access);
+         end if;
+         -- OK, found
+         return;
+      exception
+         when Invalid_Project =>  -- not found
+            null;
+      end;
+
+      raise Project_Error with "Unknown or invalid GPR project: " & Name;
    end Activate;
 
    ---------------
@@ -58,7 +140,7 @@ package body Project_File.GPR is
    ---------------
 
    function I_Options (Project : access GPR.Instance) return Wide_String is
-      use Gnatcoll.Projects, Gnatcoll.VFS;
+      use Gnatcoll.Projects;
       use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
 
       Project_Dirs : constant File_Array := Source_Dirs (Root_Project (Project.Tree), Recursive => True);
@@ -76,7 +158,7 @@ package body Project_File.GPR is
 
    function T_Options (Project : access GPR.Instance) return Wide_String is
       use Ada.Characters.Handling, Ada.Strings.Wide_Unbounded;
-      use Gnatcoll.Projects, Gnatcoll.VFS;
+      use Gnatcoll.Projects;
 
       Project_Dirs : constant File_Array := Object_Path (Root_Project (Project.Tree), Recursive => True);
       Result       : Unbounded_Wide_String;

@@ -40,7 +40,9 @@ package Project_File.ADP is
 
    type Instance is new Project_File.Instance with private;
 
-   procedure Activate (Project : access ADP.Instance; Name : String);
+   not overriding procedure Activate (Project : access ADP.Instance; Name : String);
+
+   overriding function Path (Project : access ADP.Instance) return String;
 
    overriding function I_Options (Project : access ADP.Instance) return Wide_String;
    -- Constructs a list of -I<name> options from the src_dir indications

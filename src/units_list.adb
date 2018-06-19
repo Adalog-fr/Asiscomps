@@ -35,11 +35,11 @@
 with   -- Standard Ada units
   Ada.Characters.Handling,
   Ada.Exceptions,
+  Ada.IO_Exceptions,
   Ada.Strings.Wide_Maps,
   Ada.Strings.Wide_Fixed,
   Ada.Unchecked_Deallocation,
-  Ada.Wide_Characters.Handling,
-  Ada.Wide_Text_IO;
+  Ada.Wide_Characters.Handling;
 
 with   -- ASIS components
   Asis.Clauses,
@@ -49,6 +49,7 @@ with   -- ASIS components
   Asis.Text;
 
 with   -- Reusable components
+  Generic_File_Iterator,
   Linear_Queue,
   Thick_Queries,
   Utilities;
@@ -472,57 +473,31 @@ package body Units_List is
          use Ada.Characters.Handling, Ada.Wide_Characters.Handling, Ada.Strings.Wide_Fixed;
 
          procedure Process_Indirect_File (Name : String) is
-            use Ada.Wide_Text_IO, Ada.Exceptions;
+            use Ada.Exceptions, Ada.IO_Exceptions;
 
-            Units_File : Ada.Wide_Text_IO.File_Type;
-
-            function Read_Line return Wide_String is
-               Buffer : Wide_String (1..250);
-               Last   : Natural;
+            procedure Action (Line : String) is
+               Good_Line : constant Wide_String := Trim_All (To_Wide_String (Line));
+               Stop      : constant Natural:= Index (Good_Line, " ");
             begin
-               Get_Line (Units_File, Buffer, Last);
-               if Last = Buffer'Last then
-                  return Buffer & Read_Line;
-               else
-                  return Buffer (1 .. Last);
-               end if;
-            end Read_Line;
-
-         begin  -- Process_Indirect_File
-            Open (Units_File, In_File, Name);
-
-            -- Exit on End_Error
-            -- This is the simplest way to deal with improperly formed files
-            loop
-               declare
-                  Line : constant Wide_String := Trim_All (Read_Line);
-                  Stop : constant Natural     := Index (Line, " ");
-               begin
-                  if Line /= ""
-                    and then Line (1) /= '#'
-                    and then (Line'Length = 1 or else Line (1 .. 2) /= "--")
-                  then
-                     if Stop = 0 then
-                        Process_Units_Spec (Line);
-                     else
-                        Process_Units_Spec (Line (Line'First .. Stop-1));
-                     end if;
+               if Good_Line /= ""
+                 and then Good_Line (1) /= '#'
+                 and then (Good_Line'Length = 1 or else Good_Line (1 .. 2) /= "--")
+               then
+                  if Stop = 0 then
+                     Process_Units_Spec (Good_Line);
+                  else
+                     Process_Units_Spec (Good_Line (Good_Line'First .. Stop - 1));
                   end if;
-               end;
-            end loop;
+               end if;
+            end Action;
 
-            -- Never comes here
-
+            procedure Iterate is new Generic_File_Iterator (Action);
+         begin  -- Process_Indirect_File
+            Iterate (Name);
          exception
             when Name_Error =>
                Raise_Specification_Error ("Missing units file: " & Name);
-            when End_Error =>
-               -- normal exit
-               Close (Units_File);
             when Occur : others =>
-               if Is_Open (Units_File) then
-                  Close (Units_File);
-               end if;
                Raise_Specification_Error ("Exception while processing " & Name & ": " & Exception_Name (Occur));
          end Process_Indirect_File;
 

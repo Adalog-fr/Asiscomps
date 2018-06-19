@@ -39,6 +39,8 @@ package Project_File.Dummy is
    type Instance is new Project_File.Instance with private;
    -- no need to activate
 
+   overriding function Path (Project : access Dummy.Instance) return String;
+
    overriding function I_Options (Project : access Dummy.Instance) return Wide_String;
    -- always returns ""
 
