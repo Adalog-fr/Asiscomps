@@ -101,6 +101,9 @@ package Scope_Manager is
    function Active_Scopes   return Scope_List;
    function Is_Active (Scope : Asis.Element) return Boolean;
    -- True iff Scope is one of the elements of Active_Scopes
+   function Scope_Depth (Scope : Asis.Element) return Scope_Range;
+   -- Returns the Depth of the given Scope
+   -- Raises an exception (through Thick_Queries.Report_Error) if not Is_Active (Scope)
 
    function In_Private_Part (Scope : Scope_Range := Current_Depth) return Boolean;
    function In_Context_Clauses return Boolean;

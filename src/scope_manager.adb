@@ -235,6 +235,21 @@ package body Scope_Manager is
    end Is_Active;
 
    -----------------
+   -- Scope_Depth --
+   -----------------
+
+   function Scope_Depth (Scope : Asis.Element) return Scope_Range is
+      use Asis.Elements;
+   begin
+      for I in Scope_Range range 1 .. Scope_Top loop
+         if Is_Equal (Scope, Scope_Stack (I).Element) then
+            return I;
+         end if;
+      end loop;
+      Thick_Queries.Report_Error ("Depth of non active scope", Scope);
+   end Scope_Depth;
+
+   -----------------
    -- Default_Key --
    -----------------
 
