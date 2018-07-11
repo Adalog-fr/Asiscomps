@@ -5917,6 +5917,24 @@ package body Thick_Queries is
       end case;
    end Statements;
 
+   ---------------------
+   -- Statement_Index --
+   ---------------------
+
+   function Statement_Index (Stmt : Asis.Statement; Within : Asis.Statement_List) return Asis.ASIS_Natural is
+   begin
+      -- return, exit, goto statements are normally at the end of the statement list.
+      -- for others, we don't know, so we may as well look up in reverse order
+      for I in reverse Within'Range loop
+         if Is_Equal (Stmt, Within (I)) then
+            return I;
+         end if;
+      end loop;
+
+      -- Statement not found
+      return 0;
+   end Statement_Index;
+
    ------------------------------
    -- Last_Effective_Statement --
    ------------------------------

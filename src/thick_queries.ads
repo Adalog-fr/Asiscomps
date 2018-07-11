@@ -276,6 +276,10 @@ package Thick_Queries is
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
 
+   function Statement_Index (Stmt : Asis.Statement; Within : Asis.Statement_List) return Asis.ASIS_Natural;
+   -- Returns the index of Stmt within Inside
+   -- Returns 0 if not found
+
    function Last_Effective_Statement (Stats : Asis.Statement_List) return Asis.Statement;
    -- Returns the last statement from Stats, unless it is a block statement without exception handlers,
    -- in which case the last statement of the block is returned (recursively, of course).
