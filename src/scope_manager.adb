@@ -155,6 +155,20 @@ package body Scope_Manager is
       end case;
    end Is_Scope;
 
+   -------------------
+   -- Element_Scope --
+   -------------------
+
+   function Element_Scope (Element : Asis.Element) return Asis.Element is
+      use Asis.Elements;
+      Result : Asis.Element := Element;
+   begin
+      while not Is_Scope (Result) loop
+         Result := Enclosing_Element (Result);
+      end loop;
+      return Result;
+   end Element_Scope;
+
    ------------------
    --Current_Depth --
    ------------------

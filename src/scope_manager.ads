@@ -92,6 +92,8 @@ package Scope_Manager is
    function Is_Scope (Element : Asis.Element) return Boolean;
    -- True if Element is something considered a scope from the point of view of
    -- the scope manager
+   function Element_Scope (Element : Asis.Element) return Asis.Element;
+   -- Returns the closest enclosing element of Element for which Is_Scope is True
 
    function Current_Depth   return Scope_Range;
    function Current_Scope   return Asis.Element;
