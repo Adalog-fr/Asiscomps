@@ -821,25 +821,37 @@ package body Utilities is
    -- Trace  --
    ------------
 
-   procedure Trace (Message     : Wide_String;
-                    Element     : Asis.Element_List;
-                    With_Source : Boolean           := True)
+   procedure Trace (Message      : Wide_String;
+                    Element_List : Asis.Element_List;
+                    With_Source  : Boolean           := True)
    is
       use Asis.Text;
    begin
       if Debug_Option then
          Raw_Trace("<<" & Message);
 
-         for E in Element'Range loop
-            Trace_Elem (Element (E));
+         for E of Element_List loop
+            Trace_Elem (E);
 
             if With_Source then
-               Raw_Trace (Element_Image (Element (E)));
+               Raw_Trace (Element_Image (E));
             end if;
          end loop;
 
          Raw_Trace (">>");
       end if;
+   end Trace;
+
+   -----------
+   -- Trace --
+   -----------
+
+   function Trace (Message      : Wide_String;
+                   Element_List : Asis.Element_List;
+                   With_Source  : Boolean      := True) return Boolean is
+   begin
+      Trace (Message, Element_List, With_Source);
+      return True;
    end Trace;
 
    --## rule on no_trace
