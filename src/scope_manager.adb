@@ -309,7 +309,7 @@ package body Scope_Manager is
    -----------------
 
    procedure Enter_Scope (Scope : Asis.Element; Is_Unit : Boolean) is
-      use Asis, Asis.Elements;
+      use Asis, Asis.Elements, Thick_Queries;
       Current : Scoping_Link;
    begin
       if Unit_State = After_Context_Clauses then
@@ -319,7 +319,7 @@ package body Scope_Manager is
          Unit_State := Inside_Unit;
          return;
       elsif Scope_Top = Scope_Index'Last then
-         raise Program_Error with "Scope_Manager: maximum scope nesting reached";
+         Report_Error ("Scope_Manager: maximum scope nesting reached");
       end if;
 
       Scope_Top := Scope_Top + 1;

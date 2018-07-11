@@ -97,7 +97,9 @@ package Scope_Manager is
 
    function Current_Depth   return Scope_Range;
    function Current_Scope   return Asis.Element;
+   -- Where we are
    function Enclosing_Scope return Asis.Element;
+   -- The scope that encloses the current scope
    function Active_Scopes   return Scope_List;
    function Is_Active (Scope : Asis.Element) return Boolean;
    -- True iff Scope is one of the elements of Active_Scopes
@@ -115,7 +117,7 @@ package Scope_Manager is
 
 
    procedure Reset (Deactivate : Boolean);
-   -- Cleans up all active scope and all Scoped_Store data
+   -- Cleans up all active scopes and all Scoped_Store data
    -- To be used at the end of a full processing (like a Go command in AdaControl), or in the case
    -- of a premature termination due to an unexpected exception.
    -- If Deactivate is True, scoped stores are also deactivated, which should not

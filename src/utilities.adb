@@ -830,7 +830,7 @@ package body Utilities is
       if Debug_Option then
          Raw_Trace("<<" & Message);
 
-         for E of Element_List loop
+         for E : Asis.Element of Element_List loop
             Trace_Elem (E);
 
             if With_Source then
@@ -848,7 +848,8 @@ package body Utilities is
 
    function Trace (Message      : Wide_String;
                    Element_List : Asis.Element_List;
-                   With_Source  : Boolean      := True) return Boolean is
+                   With_Source  : Boolean      := True) return Boolean
+   is
    begin
       Trace (Message, Element_List, With_Source);
       return True;
