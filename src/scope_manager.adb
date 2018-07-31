@@ -39,9 +39,10 @@ with
 
 -- Asis
 with
+  Asis.Compilation_Units,
   Asis.Declarations,
   Asis.Elements,
-  Asis.Compilation_Units;
+  Asis.Statements;
 
 -- Adalog
 with
@@ -248,6 +249,35 @@ package body Scope_Manager is
       end loop;
       Thick_Queries.Report_Error ("Depth of non active scope", Scope);
    end Scope_Depth;
+
+   ----------------------------
+   -- Target_Statement_Depth --
+   ----------------------------
+
+   function Target_Statement_Depth (Stmt : Asis.Statement) return Scope_Manager.Scope_Range is
+      use Asis, Asis.Elements, Asis.Statements;
+      use Thick_Queries;
+   begin
+      case Statement_Kind (Stmt) is
+         when A_Return_Statement | An_Extended_Return_Statement =>
+            return Scope_Depth (Element_Scope (Enclosing_Program_Unit (Stmt, Including_Accept => True))) - 1;
+         when An_Exit_Statement =>
+            return Scope_Depth (Element_Scope (Corresponding_Loop_Exited (Stmt)));
+         when A_Goto_Statement =>
+            -- A goto may target a place outside the active scopes. Return 0 in that case, since it is outside
+            declare
+               Target_Scope : constant Asis.Element := Element_Scope (Corresponding_Destination_Statement (Stmt));
+            begin
+               if Is_Active (Target_Scope) then
+                  return Scope_Depth (Target_Scope);
+               else
+                  return 0;
+               end if;
+            end;
+         when others =>
+            Thick_Queries.Report_Error ("Target_Statement_Depth: unexpected statement", Stmt);
+      end case;
+   end Target_Statement_Depth;
 
    -----------------
    -- Default_Key --

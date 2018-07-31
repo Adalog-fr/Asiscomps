@@ -106,6 +106,13 @@ package Scope_Manager is
    function Scope_Depth (Scope : Asis.Element) return Scope_Range;
    -- Returns the Depth of the given Scope
    -- Raises an exception (through Thick_Queries.Report_Error) if not Is_Active (Scope)
+   function Target_Statement_Depth (Stmt : Asis.Statement) return Scope_Range;
+   -- Returns the depth of the target of Stmt
+   -- Appropriate Statement_Kind:
+   --   A_Goto_Statement (depth of label, or 0 if not in active scopes)
+   --   An_Exit_Statement (depth of the corresponding loop)
+   --   A_Return_Statement (depth of subprogram - 1)
+   --   An_Extended_Return_Statement (depth of subprogram - 1)
 
    function In_Private_Part (Scope : Scope_Range := Current_Depth) return Boolean;
    function In_Context_Clauses return Boolean;
