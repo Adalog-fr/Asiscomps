@@ -71,7 +71,7 @@ package body Thick_Queries is
 
    procedure Report_Error (Message : Wide_String; E : Asis.Element := Nil_Element) is
       use Ada.Exceptions, Ada.Characters.Handling, Asis.Text;
-      S : constant Span := Element_Span (E);
+      S : constant Span := A4G_Bugs.Element_Span (E);
    begin
       if User_Error_Proc /= null then
          User_Error_Proc (Message, E);
@@ -619,7 +619,7 @@ package body Thick_Queries is
    -----------------
 
    function All_Formals (Profile : Asis.Parameter_Specification_List) return Defining_Name_List is
-      -- Written to avoid recursvity, unless multiple names are declared
+      -- Written to avoid recursivity, unless multiple names are declared
       Result : Asis.Defining_Name_List (Profile'Range);
    begin
       for P in Profile'Range loop
@@ -6074,9 +6074,9 @@ package body Thick_Queries is
          return  False;
       end if;
 
-      Elem_Span  := Element_Span (Elem);
-      Start_Span := Element_Span (Inside (Inside'First));
-      Stop_Span  := Element_Span (Inside (Inside'Last));
+      Elem_Span  := A4G_Bugs.Element_Span (Elem);
+      Start_Span := A4G_Bugs.Element_Span (Inside (Inside'First));
+      Stop_Span  := A4G_Bugs.Element_Span (Inside (Inside'Last));
       if Elem_Span.First_Line not in Start_Span.First_Line .. Stop_Span.Last_Line then
          return False;
       end if;
@@ -6132,7 +6132,7 @@ package body Thick_Queries is
    function Lines_Span_Length (Element : Asis.Element) return Asis.ASIS_Positive is
       use Asis.Text;
 
-      Elem_Span : constant Span := Element_Span (Element);
+      Elem_Span : constant Span := A4G_Bugs.Element_Span (Element);
    begin
       return Elem_Span.Last_Line - Elem_Span.First_Line + 1;
    end Lines_Span_Length;

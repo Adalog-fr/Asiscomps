@@ -50,7 +50,8 @@
 -- has been fixed.
 
 with
-  Asis;
+  Asis,
+  Asis.Text;
 package A4G_Bugs is  --##rule line off NAMING_CONVENTION -- This is an acronym for Asis For Gnat
 
    --
@@ -171,6 +172,20 @@ package A4G_Bugs is  --##rule line off NAMING_CONVENTION -- This is an acronym f
    -- Fixed in    : GPL2012 (and likely long before)
    -- Removed from: AdaCtl 1.14b8
    -- function Corresponding_Entry (Statement : in Asis.Statement) return Asis.Declaration;
+
+   --
+   -- From Asis.Text
+   --
+
+   -- Reason      : Element_Span (and friends) of an implicit null statement returns Nil_Span
+   --               instead of the labels' span
+   -- Bug report  : [R801-006]
+   -- Gnat version: GPL 2018, GnatPro 18.2
+   -- Fixed in    :
+   -- Removed from:
+   function Element_Span      (Element : Asis.Element) return Asis.Text.Span;
+   function First_Line_Number (Element : Asis.Element) return Asis.Text.Line_Number;
+   function Last_Line_Number  (Element : Asis.Element) return Asis.Text.Line_Number;
 
    ------------------------------------------------------------------------------------------------
    -- Trace identified bugs (in debug mode):

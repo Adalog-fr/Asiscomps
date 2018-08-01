@@ -38,7 +38,8 @@ with   -- ASIS
   Asis.Declarations,
   Asis.Definitions,
   Asis.Elements,
-  Asis.Expressions;
+  Asis.Expressions,
+  Asis.Statements;
 
 with   -- Adalog
   Thick_Queries,
@@ -111,6 +112,67 @@ package body A4G_Bugs is
       end case;
       return Result;
    end Corresponding_Expression_Type;
+
+
+   ------------------
+   -- Element_Span --
+   ------------------
+
+   function Element_Span (Element : Asis.Element) return Asis.Text.Span is
+      use Asis.Elements, Asis.Statements, Asis.Text;
+   begin
+      if Statement_Kind (Element) = A_Null_Statement and then Is_Part_Of_Implicit (Element) then
+         declare
+            Labels : constant Element_List := Label_Names (Element);
+            First_Label_Span : constant Span := Element_Span (Labels (Labels'First));
+            Last_Label_Span  : constant Span := Element_Span (Labels (Labels'Last));
+            Result           : Span := (First_Line   => First_Label_Span.First_Line,
+                                        First_Column => First_Label_Span.First_Column - 1,
+                                        Last_Line    => Last_Label_Span.Last_Line,
+                                        Last_Column  => Last_Label_Span.Last_Column + 1);
+            Label_Lines      : constant Line_List    := Lines (Labels (Labels'First),
+                                                               Result.First_Line,
+                                                               Result.Last_Line);
+            First_Line       : constant Program_Text := Line_Image (Label_Lines (Label_Lines'First));
+            Last_Line        : constant Program_Text := Line_Image (Label_Lines (Label_Lines'Last));
+         begin
+            -- We assume that the "<<" of the first label and the ">>" of the last label are on the same line as
+            -- the label. This is not required by the syntax, but fortunately nobody knows that...
+            -- Only blanks can be between the brackets and the identifier
+            while First_Line (Result.First_Column) <= ' ' loop
+               Result.First_Column := Result.First_Column - 1;
+            end loop;
+            Result.First_Column := Result.First_Column - 1;
+
+            while Last_Line (Result.Last_Column) <= ' ' loop
+               Result.Last_Column := Result.Last_Column + 1;
+            end loop;
+            Result.Last_Column := Result.Last_Column + 1;
+
+            return Result;
+         end;
+      else
+         return Asis.Text.Element_Span (Element);
+      end if;
+   end Element_Span;
+
+   -----------------------
+   -- First_Line_Number --
+   -----------------------
+
+   function First_Line_Number (Element : Asis.Element) return Asis.Text.Line_Number is
+   begin
+      return A4G_Bugs.Element_Span (Element).First_Line;
+   end First_Line_Number;
+
+   ----------------------
+   -- Last_Line_Number --
+   ----------------------
+
+   function Last_Line_Number  (Element : Asis.Element) return Asis.Text.Line_Number is
+   begin
+      return A4G_Bugs.Element_Span (Element).Last_Line;
+   end Last_Line_Number;
 
 
    ---------------

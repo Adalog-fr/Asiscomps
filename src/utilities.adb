@@ -51,6 +51,7 @@ with  -- GNAT
   GNAT.Traceback.Symbolic;
 
 with  -- Adalog
+   A4G_Bugs,
    Thick_Queries;
 package body Utilities is
 
@@ -68,7 +69,7 @@ package body Utilities is
       use Ada.Wide_Text_IO;
       use Asis, Asis.Compilation_Units, Asis.Elements, Asis.Text;
 
-      S : constant Span := Element_Span (Element);
+      S : constant Span := A4G_Bugs.Element_Span (Element);
    begin
       Put (Current_Trace.all, Element_Kinds'Wide_Image (Element_Kind (Element)));
       if not Is_Nil (Element) then
@@ -306,7 +307,7 @@ package body Utilities is
       end Span_Image;
 
    begin  -- Failure
-      Trace ("Failing element " & Span_Image (Element_Span (Element)), Element); --## rule line off no_trace
+      Trace ("Failing element " & Span_Image (A4G_Bugs.Element_Span (Element)), Element); --## rule line off no_trace
       Failure (Message & " (" & Element_Kinds'Wide_Image (Element_Kind (Element)) & ')');
    end Failure;
 
