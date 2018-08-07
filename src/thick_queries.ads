@@ -308,10 +308,14 @@ package Thick_Queries is
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
 
-   function Element_List_Image (List : Asis.Element_List; Separator : Wide_Character) return Wide_String;
-   -- Like Element_Image, but for an element list
-   -- Concatenates elements images, separated by Separator
+   function Element_List_Image (List : Asis.Element_List) return Wide_String;
+   -- Like Element_Image, but for an element list. All text between the start of the first element and the
+   -- end of the last element is retained. Lines are separated by Delimiter_Image.
+   -- Consistent with Element_Image, if the first element's Span begins at column position P, the returned
+   -- program text will be padded at the beginning with P-1 white space characters.
 
+   function Element_Image_List (List : Asis.Element_List; Separator : Wide_String) return Wide_String;
+   -- Concatenates elements images, separated by Separator. Intervening comments, pragmas, etc are not retained
 
    function Attribute_Name_Image (Attribute : Asis.Expression) return Wide_String;
    --  Like Pragma_Name_Image, but for an Attribute_Reference

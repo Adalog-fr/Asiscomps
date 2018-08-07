@@ -31,7 +31,6 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-pragma Ada_05;
 --## Rule off Use_Img_Function ## This package should not depend on Utilities
 with   -- Standard Ada units
   Ada.Characters.Handling,
@@ -211,7 +210,41 @@ package body Thick_Queries is
    -- Element_List_Image --
    ------------------------
 
-   function Element_List_Image (List : Asis.Element_List; Separator : Wide_Character) return Wide_String is
+   function Element_List_Image (List : Asis.Element_List) return Wide_String is
+      use Asis.Text;
+      function Catenate (The_Lines : Line_List) return Wide_String is
+      begin
+         if The_Lines'Length = 1 then
+            return Line_Image (The_Lines (The_Lines'First));
+         else
+            return Line_Image (The_Lines (The_Lines'First))
+              & Delimiter_Image
+              & Catenate (The_Lines (The_Lines'First + 1 .. The_Lines'Last));
+         end if;
+      end Catenate;
+   begin  -- Element_List_Image
+      case List'Length is
+         when 0 =>
+            return "";
+         when 1 =>
+            return Element_Image (List (List'First));
+         when others =>
+            declare
+               Lines_Images : Wide_String := Catenate (Lines (List (List'First),
+                                                       A4G_Bugs.First_Line_Number (List (List'First)),
+                                                       A4G_Bugs.Last_Line_Number  (List (List'Last))));
+            begin
+               Lines_Images (1 .. A4G_Bugs.Element_Span (List (List'First)).First_Column - 1) := (others => ' ');
+               return Lines_Images;
+            end;
+      end case;
+   end Element_List_Image;
+
+   ------------------------
+   -- Element_Image_List --
+   ------------------------
+
+   function Element_Image_List (List : Asis.Element_List; Separator : Wide_String) return Wide_String is
       use Asis.Text;
    begin
       case List'Length is
@@ -223,9 +256,9 @@ package body Thick_Queries is
             return
               Element_Image (List (List'First))
               & Separator
-              & Element_List_Image (List (List'First + 1 .. List'Last), Separator);
+              & Element_Image_List (List (List'First + 1 .. List'Last), Separator);
       end case;
-   end Element_List_Image;
+   end Element_Image_List;
 
 
    --------------------------
@@ -508,9 +541,7 @@ package body Thick_Queries is
          Result     : Profile_Table (List_Index range 1 .. Names_1'Length + Parameters'Length - 1);
          Result_Inx : Asis.List_Index;
       begin
-         for I in List_Index range 1 .. Names_1'Length loop
-            Result (I) := Entry_1;
-         end loop;
+         Result (1 .. Names_1'Length) := (others => Entry_1);
 
          Result_Inx := Names_1'Length;
          for I in List_Index range Parameters'First + 1 .. Parameters'Last loop
@@ -5662,9 +5693,7 @@ package body Thick_Queries is
                                                              (Dependent_Expression (Expression_Paths (Item) (1)),
                                                               Follow_Access);
                      begin
-                        for P in Path1_Bounds'Range loop
-                           Path1_Bounds (P) := Nil_Element;
-                        end loop;
+                        Path1_Bounds := (others => Nil_Element);
                         return Path1_Bounds;
                      end;
 
