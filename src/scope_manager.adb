@@ -260,7 +260,7 @@ package body Scope_Manager is
    begin
       case Statement_Kind (Stmt) is
          when A_Return_Statement | An_Extended_Return_Statement =>
-            return Scope_Depth (Element_Scope (Enclosing_Program_Unit (Stmt, Including_Accept => True))) - 1;
+            return Scope_Depth (Element_Scope (Enclosing_Program_Unit (Stmt, Including_Accept => False))) - 1;
          when An_Exit_Statement =>
             return Scope_Depth (Element_Scope (Corresponding_Loop_Exited (Stmt)));
          when A_Goto_Statement =>
