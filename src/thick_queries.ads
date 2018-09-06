@@ -1292,6 +1292,8 @@ package Thick_Queries is
    --     Conversions and qualified expressions
    --     Comparison operators
    --     If expressions
+   --     Case expressions
+   --     Membership tests (only value and 'discrete' range)
    --  Integer: (provided values are within System.Min_Int .. System.Max_Int)
    --     Literal
    --     Named number

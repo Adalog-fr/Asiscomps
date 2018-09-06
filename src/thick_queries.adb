@@ -62,9 +62,9 @@ package body Thick_Queries is
    -- Internal utilities                                           --
    ------------------------------------------------------------------
 
-   ----------------
-   -- Impossible --
-   ----------------
+   ------------------
+   -- Report_Error --
+   ------------------
 
    User_Error_Proc : Error_Procedure := null;
 
@@ -94,6 +94,22 @@ package body Thick_Queries is
    begin
       return Translate (S, Upper_Case_Map);
    end To_Upper;
+
+   ------------
+   -- Choose --
+   ------------
+
+   -- Could be replaced by an if-expression...
+   function Choose (Condition  : in Boolean;
+                    When_True  : in Wide_String;
+                    When_False : in Wide_String) return Wide_String is
+   begin
+      if Condition then
+         return When_True;
+      else
+         return When_False;
+      end if;
+   end Choose;
 
    ------------------------------------------------------------------
    -- Exported subprograms                                         --
@@ -6790,6 +6806,137 @@ package body Thick_Queries is
                -- An else expression path can be omitted only if the expression is boolean, and the default is
                -- False whose 'Pos is 0
                return "0";
+            end;
+
+         when A_Case_Expression =>
+            declare
+               Case_Paths    : constant Asis.Path_List := Expression_Paths (Expression);
+               Case_Expr_Str : constant Wide_String    := Static_Expression_Value_Image (Case_Expression (Expression));
+            begin
+               if Case_Expr_Str = "" then
+                  -- non static case variable
+                  return "";
+               end if;
+
+               Case_Paths_Loop :
+               for P in List_Index range Case_Paths'Range loop
+                  declare
+                     Choices_List : constant Asis.Element_List := Case_Statement_Alternative_Choices(Case_Paths (P));
+                     Current_Choice : Asis.Element;
+                  begin
+                     Case_Choices_Loop :
+                     for Choice_Index in List_Index range Choices_List'Range loop
+                        Current_Choice := Choices_List (Choice_Index);
+                        if (Element_Kind (Current_Choice) = An_Expression
+                            and then Case_Expr_Str = Static_Expression_Value_Image (Current_Choice))
+                          or else
+                            (Element_Kind (Current_Choice) = A_Definition
+                             and then Definition_Kind (Current_Choice) = An_Others_Choice)
+                        then
+                           return Static_Expression_Value_Image (Dependent_Expression (Case_Paths (P)));
+                        end if;
+
+                        if Definition_Kind (Current_Choice) = A_Discrete_Range then
+                           declare
+                              Bounds_List : constant Asis.Element_List := Discrete_Constraining_Bounds (Current_Choice);
+                              -- with negative values being possible, it is easier to compare using actual values
+
+                              Case_Expr_Value : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Case_Expr_Str);
+                              Lower_Bound     : constant Asis.Element         := Bounds_List (Bounds_List'First);
+                              Upper_Bound     : constant Asis.Element         := Bounds_List (Bounds_List'Last);
+                           begin
+                              if Is_Nil (Upper_Bound) then
+                                 return "";
+                              end if;
+
+                              -- with a modular type 'Range, a Nil_Element is used as the lower bound
+                              -- being a case statement, it is the only case where the lower bound is a Nil_Element
+                              if Is_Nil (Lower_Bound)
+                                and then Case_Expr_Value in 0 .. Discrete_Static_Expression_Value (Upper_Bound)
+                              then
+                                 return Static_Expression_Value_Image (Dependent_Expression (Case_Paths (P)));
+                              end if;
+
+                              if not Is_Nil (Lower_Bound)
+                                and then Case_Expr_Value in Discrete_Static_Expression_Value (Lower_Bound) ..
+                                                            Discrete_Static_Expression_Value (Upper_Bound)
+                              then
+                                 return Static_Expression_Value_Image (Dependent_Expression (Case_Paths (P)));
+                              end if;
+                           end;
+                        end if;
+                     end loop Case_Choices_Loop;
+                  end;
+               end loop Case_Paths_Loop;
+
+               -- something went wrong above :(, value not covered!
+               Report_Error ("Uncovered value in case expression", Expression);
+            end;
+
+         when An_In_Membership_Test
+            | A_Not_In_Membership_Test
+            =>
+            declare
+               Left_Str         : constant Wide_String       := Static_Expression_Value_Image
+                                                                 (Membership_Test_Expression (Expression));
+               Choices_List     : constant Asis.Element_List := Membership_Test_Choices (Expression);
+               Is_In_Membership : constant Boolean           := Expression_Kind (Expression) = An_In_Membership_Test;
+            begin
+               if Left_Str = "" then
+                  -- non static case variable
+                  return "";
+               end if;
+
+               for Choice_Index in List_Index range Choices_List'Range loop
+                  declare
+                     Current_Choice : constant Asis.Element := Choices_List (Choice_Index);
+                  begin
+                     if Element_Kind (Current_Choice) = An_Expression then
+                        if Static_Expression_Value_Image (Current_Choice) = "" then
+                           -- subtype or class membership test not covered
+                           return "";
+                        end if;
+
+                        -- beware with Float (exponent) because it is a string comparison
+                        if Left_Str = Static_Expression_Value_Image (Current_Choice) then
+                           return Choose (Is_In_Membership, "1", "0");
+                        end if;
+                     end if;
+
+                     if Definition_Kind (Current_Choice) = A_Constraint then
+                        -- Constraint_Kind (Current_Choice) should be A_Simple_Expression_Range
+                        -- or A_Range_Attribute_Reference
+                        declare
+                           -- with negative values being possible, it is easier to compare using actual values
+                           Bounds_List : constant Asis.Element_List    := Discrete_Constraining_Bounds (Current_Choice);
+                           -- digits, delta, float...etc will lead to Constraint_Error
+                           Left_Value  : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Left_Str);
+                           Lower_Bound : constant Asis.Element         := Bounds_List (Bounds_List'First);
+                           Upper_Bound : constant Asis.Element         := Bounds_List (Bounds_List'Last);
+                        begin
+                           -- with a modular type 'Range, a Nil_Element is used as the lower bound
+                           -- should first check if it is really a modular type
+                           if Is_Nil (Lower_Bound)
+                             and then not Is_Nil (Upper_Bound)
+                             and then Left_Value in 0 .. Discrete_Static_Expression_Value (Upper_Bound)
+                           then
+                              return Choose (Is_In_Membership, "1", "0");
+                           end if;
+
+                           if Is_Nil (Lower_Bound) or else Is_Nil (Upper_Bound) then
+                              return "";
+                           end if;
+
+                           if Left_Value in Discrete_Static_Expression_Value (Lower_Bound) ..
+                                            Discrete_Static_Expression_Value (Upper_Bound)
+                           then
+                              return Choose (Is_In_Membership, "1", "0");
+                           end if;
+                        end;
+                     end if;
+                  end;
+               end loop;
+               return Choose (Is_In_Membership, "0", "1");
             end;
 
          when others =>
