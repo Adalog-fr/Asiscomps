@@ -783,6 +783,7 @@ package body Utilities is
                     Element     : Asis.Element;
                     With_Source : Boolean      := True)
    is
+      use Ada.Characters.Handling, Ada.Exceptions;
       use Asis.Elements, Asis.Text;
       use  Thick_Queries;
    begin
@@ -797,7 +798,12 @@ package body Utilities is
             elsif Is_Part_Of_Instance (Element) then
                Raw_Trace ("(from instance) " & Extended_Name_Image (Element, Silent_If_Inappropriate => True));
             else
-               Raw_Trace (Element_Image (Element));
+               begin
+                  Raw_Trace (Element_Image (Element));
+               exception
+                  when Occur : others =>   -- Happens sometimes in case of ASIS bugs...
+                     Raw_Trace ("Image unavailable: " & To_Wide_String (Exception_Name (Occur)));
+               end;
             end if;
          end if;
 
