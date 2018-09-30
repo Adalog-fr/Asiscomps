@@ -162,7 +162,7 @@ package body Scope_Manager is
 
    function Element_Scope (Element : Asis.Element) return Asis.Element is
       use Asis.Elements;
-      Result : Asis.Element := Element;
+      Result : Asis.Element := Enclosing_Element (Element);
    begin
       while not Is_Scope (Result) loop
          Result := Enclosing_Element (Result);
