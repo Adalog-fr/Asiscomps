@@ -50,6 +50,7 @@ with   -- ASIS units
   Asis.Errors,
   Asis.Exceptions,
   Asis.Expressions,
+  Asis.Extensions,
   Asis.Implementation,
   Asis.Iterator,
   Asis.Limited_Views,
@@ -102,7 +103,8 @@ package body Thick_Queries is
    -- Could be replaced by an if-expression...
    function Choose (Condition  : in Boolean;
                     When_True  : in Wide_String;
-                    When_False : in Wide_String) return Wide_String is
+                    When_False : in Wide_String) return Wide_String
+   is
    begin
       if Condition then
          return When_True;
@@ -608,8 +610,7 @@ package body Thick_Queries is
          when An_Enumeration_Literal_Specification =>
             -- Profile for an enumeration litteral
             -- Like a parameterless function; go up two levels (type specification then type declaration)
-            -- to find the return type.
-            -- of the Enumaration_Literal_Specification
+            -- to find the return type of the Enumeration_Literal_Specification
             -- Return immediately, since we know there are no parameters, and Parameter_Profile
             -- would choke on this.
             return (Formals_Length => 0,
@@ -635,7 +636,7 @@ package body Thick_Queries is
                when others =>
                   Report_Error ("Types_Profile: bad access_definition", Good_Declaration);
             end case;
-         when others => -- (generic) procedure or entry declaration
+         when others => -- (generic or null) procedure, or entry declaration
             Result_Entry := (Access_Form  => Not_An_Access_Definition,
                              Attribute    => None,
                              Name         => Nil_Element,
@@ -2281,8 +2282,6 @@ package body Thick_Queries is
                               & Expression_Kinds'Wide_Image (Expression_Kind (Element)),
                               Element);
             end  case;
-         when A_Statement =>
-            return Not_A_Callable;
          when others =>
             -- Impossible
             Report_Error ("Callable_Kind called on "
@@ -2327,6 +2326,244 @@ package body Thick_Queries is
             return Not_A_Callable;
       end case;
    end Callable_Kind;
+
+
+   ---------------------
+   -- Is_Primitive_Of --
+   ---------------------
+
+   function Is_Primitive_Of (The_Type : Asis.Element; The_Callable : Asis.Element) return Boolean is
+      use Asis.Definitions, Asis.Expressions, Asis.Extensions;
+
+      Type_Decl         : Asis.Declaration; -- declaration of the first named subtype of The_Type
+      Callable_Decl     : Asis.Declaration; -- declaration of The_Callable
+      Inst_Or_Call_Decl : Asis.Declaration; -- Overriding_xx is Asis.Extension seem to need the instantiation, not the
+                                            -- expanded body to work properly.
+      The_Call          : Asis.Expression;
+   begin
+      case Element_Kind (The_Type) is
+         when A_Declaration =>
+            Type_Decl := The_Type;
+         when A_Defining_Name =>
+            Type_Decl := Enclosing_Element (The_Type);
+         when An_Expression =>
+            case Expression_Kind (Simple_Name (The_Type)) is
+               when An_Identifier =>
+                  Type_Decl := Corresponding_Name_Declaration (Simple_Name (The_Type));
+               when An_Attribute_Reference =>
+                  if Attribute_Kind (Simple_Name (The_Type)) = A_Class_Attribute then
+                     -- Class wide types have no primitive operations
+                     return False;
+                  end if;
+                  -- must be 'Base...
+                  Type_Decl := Corresponding_Name_Declaration (Simple_Name (Prefix (The_Type)));
+               when others =>
+                  Report_Error ("Is_Primitive_Of called with type "
+                                & Expression_Kinds'Wide_Image (Expression_Kind (The_Type)),
+                                The_Type);
+            end  case;
+         when others =>
+            -- Impossible
+            Report_Error ("Callable_Kind called with type "
+                          & Element_Kinds'Wide_Image (Element_Kind (The_Type)),
+                          The_Type);
+      end case;
+      Type_Decl := Corresponding_First_Subtype (Type_Decl);
+
+      case Element_Kind (Simple_Name (The_Callable)) is
+         when A_Declaration =>
+            Callable_Decl := The_Callable;
+         when A_Defining_Name | A_Definition =>
+            Callable_Decl := Enclosing_Element (The_Callable);
+         when An_Expression =>
+            case Expression_Kind (The_Callable) is
+               when An_Identifier =>
+                  Callable_Decl := Corresponding_Name_Declaration (The_Callable);
+               when An_Operator_Symbol =>
+                  Callable_Decl := Corresponding_Name_Declaration (The_Callable);
+                  if Is_Nil (Callable_Decl) then -- A predefined operator, primitive of its type by 3.2.3(4)
+                                                 -- Retrieve the type from the type of the (enclosing) call
+                     The_Call := Enclosing_Element (The_Callable);
+                     -- Name can be prefixed...
+                     while Expression_Kind (The_Call) /= A_Function_Call loop
+                        The_Call := Enclosing_Element (The_Call);
+                     end loop;
+                     return Is_Equal (Corresponding_First_Subtype (A4G_Bugs.Corresponding_Expression_Type (The_Call)),
+                                      Type_Decl);
+                  end if;
+               when An_Enumeration_Literal =>
+                  -- Always a primitive operation of its type (and only it)
+                  -- The literal specification is inside an enumeration type definition or a derived_type definition,
+                  -- inside the type declaration
+                  return Is_Equal (Type_Decl,
+                                   Enclosing_Element (Enclosing_Element
+                                                      (Corresponding_Name_Declaration (The_Callable))));
+               when An_Attribute_Reference =>
+                  -- Attribute subprograms have no declaration, but they are primitive operations of their prefix
+                  Callable_Decl := Corresponding_Name_Declaration (Simple_Name (Prefix (The_Callable)));
+                  if Declaration_Kind (Callable_Decl) not in A_Type_Declaration then
+                     -- Not an attribute whose prefix is a type...
+                     return False;
+                  end if;
+                  return Is_Equal (Type_Decl, Corresponding_First_Subtype (Callable_Decl));
+               when others =>
+                  Report_Error ("Is_Callable_Construct called on "
+                                & Expression_Kinds'Wide_Image (Expression_Kind (The_Callable)),
+                                The_Callable);
+            end  case;
+         when others =>
+            -- Impossible
+            Report_Error ("Callable_Kind called on "
+                          & Element_Kinds'Wide_Image (Element_Kind (The_Callable)),
+                          The_Callable);
+      end case;
+
+      case Declaration_Kind (Callable_Decl) is
+         when A_Procedure_Body_Declaration     | A_Function_Body_Declaration     | A_Null_Procedure_Declaration
+            | A_Procedure_Body_Stub            | A_Function_Body_Stub            | An_Expression_Function_Declaration
+            | A_Procedure_Renaming_Declaration | A_Function_Renaming_Declaration
+            =>
+            if not Is_Nil (Corresponding_Declaration (Callable_Decl)) then
+               -- A body that does not act as a specification, determine primitiveness from the spec
+               -- (Is_Overriding_Operation returns False on these)
+               Callable_Decl := Corresponding_Declaration (Callable_Decl);
+            end if;
+         when others =>
+            null;
+      end case;
+
+      if Is_Part_Of_Instance (Callable_Decl) then
+         Inst_Or_Call_Decl := Enclosing_Element (Callable_Decl);
+      else
+         Inst_Or_Call_Decl := Callable_Decl;
+      end if;
+
+      if Type_Kind (Enclosing_Element (Callable_Decl)) = A_Derived_Type_Definition then
+         -- This is an inherited subprogram => primitive of the enclosing type
+         return Is_Equal (Type_Decl, Enclosing_Element (Enclosing_Element (Callable_Decl)));
+      end if;
+
+      if Type_Kind (Type_Declaration_View (Type_Decl)) = A_Derived_Type_Definition
+        and then Is_Overriding_Operation (Inst_Or_Call_Decl)
+      then
+         -- A redefinition of an inherited operation, but is it primitive for THIS type?
+         return Is_Primitive_Of (Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                                 (Parent_Subtype_Indication
+                                                                  (Type_Declaration_View (Type_Decl)))),
+                                 Corresponding_Overridden_Operation (Inst_Or_Call_Decl));
+      end if;
+
+      -- Not an inherited callable here
+      -- The callable is primitive if it is declared immediately within the same package specification as the type
+      -- and it is an operation of the type
+      if        Declaration_Kind (Enclosing_Element (Type_Decl))         /= A_Package_Declaration
+        or else Declaration_Kind (Enclosing_Element (Inst_Or_Call_Decl)) /= A_Package_Declaration
+        or else not Is_Equal (Enclosing_Element (Type_Decl), Enclosing_Element (Inst_Or_Call_Decl))
+      then
+         return False;
+      end if;
+
+      declare
+         Prof : constant Profile_Descriptor := Types_Profile (Callable_Decl);
+      begin
+         if not Is_Nil (Prof.Result_Type.Name)
+           and then Prof.Result_Type.Attribute /= Class
+           and then Is_Equal (Enclosing_Element (Prof.Result_Type.Name), Type_Decl)
+         then
+            return True;
+         end if;
+
+         for Param : Profile_Entry of Prof.Formals loop
+            if not Is_Nil (Param.Name)
+              and then Param.Attribute /= Class
+              and then Is_Equal (Enclosing_Element (Param.Name), Type_Decl)
+            then
+               return True;
+            end if;
+         end loop;
+      end;
+      return False;
+   end Is_Primitive_Of;
+
+
+   -----------------------------------
+   -- Corresponding_Primitive_Types --
+   -----------------------------------
+
+   function Corresponding_Primitive_Types (The_Callable : Asis.Element) return Asis.Element_List is
+      use Asis.Expressions;
+
+      The_Declaration : Asis.Element;
+   begin
+      -- Go to the declaration
+      case Element_Kind (The_Callable) is
+         when A_Declaration =>
+            The_Declaration := The_Callable;
+         when A_Defining_Name | A_Definition =>
+            The_Declaration := Enclosing_Element (The_Callable);
+         when An_Expression =>
+            case Expression_Kind (The_Callable) is
+               when An_Identifier | An_Enumeration_Literal =>
+                  The_Declaration := Corresponding_Name_Declaration (The_Callable);
+               when An_Operator_Symbol =>
+                  The_Declaration := Corresponding_Name_Declaration (The_Callable);
+                  if Is_Nil (The_Declaration) then -- a predefined operator
+                                                   -- it is primitive of its result type and AFAIK no other type
+                                                   -- Get it from the type of the call
+                     return (1 => A4G_Bugs.Corresponding_Expression_Type (Enclosing_Element (The_Callable)));
+
+                  end if;
+               when A_Selected_Component =>
+                  The_Declaration := Corresponding_Name_Declaration (Selector (The_Callable));
+               when others =>
+                  Report_Error ("Is_Callable_Construct called on "
+                                & Expression_Kinds'Wide_Image (Expression_Kind (The_Callable)),
+                                The_Callable);
+            end  case;
+         when others =>
+            Report_Error ("Corresponding_Primitive_Types called on "
+                          & Element_Kinds'Wide_Image (Element_Kind (The_Callable)),
+                          The_Callable);
+      end case;
+
+      declare
+         Profile : constant Profile_Descriptor := Types_Profile (The_Declaration);
+         Result  : Asis.Element_List (1 .. Profile.Formals_Length+1);
+         Last    : Asis.ASIS_Natural := 0;
+         Decl    : Asis.Declaration;
+         Found   : Boolean;
+      begin
+         if not Is_Nil (Profile.Result_Type.Name)             -- A function with a named result_type
+           and then Is_Primitive_Of (Profile.Result_Type.Name, The_Callable)
+         then
+            Last := 1;
+            Result (Last) := Enclosing_Element (Profile.Result_Type.Name);
+         end if;
+
+         for F in Profile.Formals'Range loop
+            Decl := Profile.Formals (F).Name;
+            if not Is_Nil (Decl) then
+               -- Otherwise, it is an anonymous type, can't be primitive
+               Decl := Enclosing_Element (Decl);
+               if Is_Primitive_Of (Decl, The_Callable) then
+                  -- Already there?
+                  Found := False;
+                  for R in List_Index range 1 .. Last loop
+                     if Is_Equal (Decl, Result (R)) then
+                        Found := True;
+                        exit;
+                     end if;
+                  end loop;
+                  if not Found then
+                     Last := Last + 1;
+                     Result (Last) := Decl;
+                  end if;
+               end if;
+            end if;
+         end loop;
+         return Result (1 .. Last);
+      end;
+   end Corresponding_Primitive_Types;
 
 
    ---------------------------

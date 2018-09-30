@@ -1051,8 +1051,34 @@ package Thick_Queries is
    --    An_Expression
    -- Appropriate Expression_Kinds:
    --    An_Identifier
+   --    An_Enumeration_Literal
+   --    An_Operator_Symbol
+   --    A_Character_Literal
    --    An_Attribute_Reference
    --    A_Selected_Component (applies to the selector)
+
+   function Is_Primitive_Of (The_Type : Asis.Element; The_Callable : Asis.Element) return Boolean;
+   -- Checks whether The_Callable is a primitive operation of type The_Type
+   -- Expected elements for The_Type:
+   --    A_Declaration
+   --    A_Defining_Name
+   --    An_Expression
+   -- Appropriate Expression_Kinds for The_Type:
+   --    An_Identifier
+   --    An_Attribute_Reference
+   --    A_Selected_Component (applies to the selector)
+   --
+   -- Expected elements for The_Callable:
+   --   like Callable_Kind
+
+   function Corresponding_Primitive_Types (The_Callable : Asis.Element) return Asis.Element_List;
+   -- Returns the list of types from The_Callable's profile for which The_Callable is a primitive operation
+   -- Returned types are first named subtypes, and appear only once in the list (even if The_Callable has several
+   -- parameters of the primitive type)
+   -- Appropriate Element_Kinds like Types_Profile
+   --
+   -- Returns Element_Kinds:
+   --    A_Declaration
 
    function Is_Callable_Construct (Element : Asis.Element) return Boolean;
    -- Checks whether the Element is a callable construct
@@ -1170,7 +1196,7 @@ package Thick_Queries is
    --                  pretty (!) rare, we don't care about deallocating the corresponding structure
    --                  (yes, it is a deliberate memory leak).
    --
-   -- Note that Non-nil Name and Non-nil Anon_Profile are exclusive, but we didn't put them as variants,
+   -- Note that Non-nil Name and Non-null Anon_Profile are exclusive, but we didn't put them as variants,
    -- because this would have required a discriminant (sometimes evaluated dynamically, preventing aggregates) and
    -- would complicate making arrays of Profile_Entry... Too much burden to save a single word.
    --
