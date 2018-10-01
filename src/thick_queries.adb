@@ -340,14 +340,24 @@ package body Thick_Queries is
                =>
                -- Callee might be a declaration whose body is provided by renaming.
                -- This must be handled as renaming
-               if Declaration_Kind (Corresponding_Body (Callee))
-                  not in A_Procedure_Renaming_Declaration .. A_Function_Renaming_Declaration
-               then
-                  -- Note that this includes Not_A_Declaration when there is
-                  -- no body (like "/=" when "=" has been redefined)
-                  exit;
-               end if;
-               Callee := Corresponding_Body (Callee);
+               declare
+                  Temp : Asis.Declaration;
+               begin
+                  Temp := Corresponding_Body (Callee);
+                  if Declaration_Kind (Temp)
+                     not in A_Procedure_Renaming_Declaration .. A_Function_Renaming_Declaration
+                  then
+                     -- Note that this includes Not_A_Declaration when there is
+                     -- no body (like "/=" when "=" has been redefined)
+                     exit;
+                  end if;
+                  Callee := Temp;
+               exception
+                  when Asis.Exceptions.ASIS_Inappropriate_Element =>
+                     -- ASIS bug: the subprogram is declared within a formal package
+                     A4G_Bugs.Trace_Bug ("Corresponding_Call_Description: call of SP from formal package");
+                     exit;   -- Hope the body is not provided by renaming declaration...
+               end;
 
             when A_Null_Procedure_Declaration =>   -- Ada 2005
                -- nothing to fear here
