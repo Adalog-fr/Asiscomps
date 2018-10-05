@@ -96,6 +96,7 @@ package Thick_Queries is
    --  the corresponding entry name from the entry declaration (not really a program unit,
    --  but useful f.e. if the Element is a Return_Statement, and you want to know what you
    --  are returning from).
+   --  For context clauses elements, returns the defining name of the corresponding program unit
    --
    --  Appropriate Element_Kinds:
    --     Any element

@@ -1076,8 +1076,16 @@ package body Thick_Queries is
       loop
          case Element_Kind (My_Enclosing_Element) is
             when Not_An_Element =>
-               Result := Nil_Element;
-               exit;
+               declare
+                  Comp_Unit : constant Asis.Compilation_Unit := Enclosing_Compilation_Unit (Element);
+               begin
+                  if Is_Part_Of (Element, Context_Clause_Elements (Comp_Unit)) then
+                     Result := Names (Unit_Declaration (Comp_Unit)) (1);
+                  else
+                     Result := Nil_Element;
+                  end if;
+                  exit;
+               end;
 
             when A_Declaration =>
                case Declaration_Kind (My_Enclosing_Element) is
@@ -2267,7 +2275,7 @@ package body Thick_Queries is
             case Expression_Kind (Element) is
                when An_Identifier =>
                   The_Declaration := Corresponding_Name_Declaration (Element);
-               when An_Enumeration_Literal =>
+               when An_Enumeration_Literal | A_Character_Literal =>
                   -- Always considered a function
                   return An_Enumeration_Callable;
                when A_Selected_Component =>
@@ -2388,10 +2396,12 @@ package body Thick_Queries is
                      while Expression_Kind (The_Call) /= A_Function_Call loop
                         The_Call := Enclosing_Element (The_Call);
                      end loop;
-                     return Is_Equal (Corresponding_First_Subtype (A4G_Bugs.Corresponding_Expression_Type (The_Call)),
+                     return Is_Equal (Corresponding_First_Subtype (A4G_Bugs.Corresponding_Expression_Type
+                                                                    (Actual_Parameter
+                                                                     (Actual_Parameters (The_Call) (1)))),
                                       Type_Decl);
                   end if;
-               when An_Enumeration_Literal =>
+               when An_Enumeration_Literal | A_Character_Literal =>
                   -- Always a primitive operation of its type (and only it)
                   -- The literal specification is inside an enumeration type definition or a derived_type definition,
                   -- inside the type declaration
