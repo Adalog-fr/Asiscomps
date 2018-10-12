@@ -511,6 +511,7 @@ package body Thick_Queries is
             case Attribute_Kind (Def) is
                when A_Base_Attribute =>
                   Attribute := Base;
+                  Good_Mark := Simple_Name (Strip_Attributes (Good_Mark));
                when A_Class_Attribute =>
                   Attribute := Class;
                   -- According to 3.9(14), T'Class'Class is allowed, and "is the same as" T'Class.
@@ -1634,7 +1635,7 @@ package body Thick_Queries is
 
                      | A_Formal_Procedure_Declaration
                      | A_Formal_Function_Declaration
-                       =>
+                     =>
                      return Full_Name_Image (Names (Parent) (1), With_Profile)
                        & '.'
                        & Anonymous_Subname
