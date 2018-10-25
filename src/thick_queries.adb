@@ -817,59 +817,25 @@ package body Thick_Queries is
                                Return_Default : Boolean := True) return Asis.Expression
    is
       use Asis.Expressions;
-      Actuals : constant Asis.Association_List := Actual_Parameters (Call);
-      Last_Is_Others    : Boolean := False;
-      Good_Actuals_Last : Asis.List_Index;
+      Actuals : constant Asis.Association_List := Actual_Parameters (Call, Normalized => True);
    begin
       if Is_Dispatching_Call (Call) then
          return Nil_Element;
       end if;
 
       if Actuals /= Nil_Element_List then
-         if Definition_Kind (Formal_Parameter (Actuals (Actuals'Last))) = An_Others_Choice then
-            -- This happens only for the others => <> in a partial generic instantiation (in Ada 2012)
-            -- but it doesn't harm to write it more general
-            Last_Is_Others    := True;
-            Good_Actuals_Last := Actuals'Last - 1;
-         else
-            Last_Is_Others    := False;
-            Good_Actuals_Last := Actuals'Last;
-         end if;
-
-         for I in Asis.List_Index range Actuals'First .. Good_Actuals_Last loop
-            if Is_Equal (Formal, Formal_Name (Call, I)) then
-               return Actual_Parameter (Actuals (I));
+         for Assoc of Actuals loop
+            if Is_Equal (Formal, Formal_Parameter (Assoc)) then
+               if not Return_Default and then Is_Defaulted_Association (Assoc) then
+                  return Nil_Element;
+               else
+                  return Actual_Parameter (Assoc);
+               end if;
             end if;
          end loop;
-
-         -- Not found, can be covered by others
-         if Last_Is_Others then
-            return Actual_Parameter (Actuals (Actuals'Last));
-         end if;
       end if;
 
-      -- Otherwise, can still be covered by a default value
-      if not Return_Default then
-         return Nil_Element;
-      end if;
-
-      declare
-         Formals : constant Asis.Association_List := Called_Profile (Call);
-      begin
-         for I in Formals'Range loop
-            declare
-               Formal_Names : constant Asis.Defining_Name_List := Names (Formals (I));
-            begin
-               for J in Formal_Names'Range loop
-                  if Is_Equal (Formal_Names (J), Formal) then
-                     return Initialization_Expression (Formals (I));
-                  end if;
-               end loop;
-            end;
-         end loop;
-      end;
-
-      -- Really not found
+      -- Not found
       return Nil_Element;
    end Actual_Expression;
 
@@ -4598,6 +4564,10 @@ package body Thick_Queries is
                      -- (for attributes that are functions, Corresponding_Expression_Type is not Nil)
                      return Nil_Element;
                end case;
+            when A_Positional_Array_Aggregate | A_Named_Array_Aggregate =>
+               -- Corresponding_Expression_Type is Nil if it is a subaggregate of a multi-dimesional aggregate
+               -- => do the same
+               return Nil_Element;
             when others =>
                null;
          end case;
