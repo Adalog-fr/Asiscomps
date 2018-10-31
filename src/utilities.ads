@@ -34,6 +34,7 @@
 
 with  -- Standard Ada units
   Ada.Exceptions,
+  Ada.Tags,
   Ada.Wide_Text_IO;
 
 with  -- Asis
@@ -154,6 +155,7 @@ package Utilities is
    procedure Trace (Message : Wide_String; Value : Boolean);
    procedure Trace (Message : Wide_String; Value : Integer);
    procedure Trace (Message : Wide_String; Value : Ada.Exceptions.Exception_Occurrence);
+   procedure Trace (Message : Wide_String; Value : Ada.Tags.Tag);
 
    procedure Trace (Message     : Wide_String;
                     Element     : Asis.Element;

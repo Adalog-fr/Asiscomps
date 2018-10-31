@@ -775,6 +775,16 @@ package body Utilities is
       Trace (Message & ", exception info= " & To_Wide_String (Exception_Information (Value)));
    end Trace;
 
+   -----------
+   -- Trace --
+   -----------
+
+   procedure Trace (Message : Wide_String; Value : Ada.Tags.Tag) is
+      use Ada.Tags;
+   begin
+      Trace (Message & ", tag= " & Wide_Expanded_Name (Value));
+   end Trace;
+
    ------------
    -- Trace  --
    ------------
