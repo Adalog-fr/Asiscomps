@@ -6162,10 +6162,8 @@ package body Thick_Queries is
                   | A_Task_Body_Declaration
                  =>
                   return Body_Statements (Element, Include_Pragmas);
-               when A_Null_Procedure_Declaration =>
+               when others =>  -- including A_Null_Procedure_Declaration
                   return Nil_Element_List;
-               when others =>
-                  Report_Error ("Statements: invalid declaration kind", Element);
             end case;
          when A_Statement =>
             case Statement_Kind (Element) is
@@ -6181,14 +6179,14 @@ package body Thick_Queries is
                when An_Extended_Return_Statement =>
                   return Extended_Return_Statements (Element, Include_Pragmas);
                when others =>
-                  Report_Error ("Statements: invalid statement kind", Element);
+                  return Nil_Element_List;
             end case;
          when A_Path =>
             return Sequence_Of_Statements (Element, Include_Pragmas);
          when An_Exception_Handler =>
             return Handler_Statements (Element, Include_Pragmas);
          when others =>
-            Report_Error ("Statements: invalid element kind", Element);
+            return Nil_Element_List;
       end case;
    end Statements;
 

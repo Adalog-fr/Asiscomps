@@ -226,6 +226,7 @@ package Thick_Queries is
    function Statements (Element         : in Asis.Element;
                         Include_Pragmas : in Boolean := False) return Asis.Statement_List;
    -- Returns the statements of any construct with statements.
+   -- Returns Nil_Element_List for Elements that do not include statements.
    -- Appropriate Element_Kinds:
    --    A_Declaration
    --    A_Statement
@@ -979,7 +980,7 @@ package Thick_Queries is
    -- Returns Untouched if Expr is part of a renaming declaration or the prefix of an attribute
    -- Returns Write if Expr designates a variable which is the
    --  target of an assignment statement, or an actual corresponding
-   --  to an out parameter in a procedure or entry call.
+   --  to an out parameter in a procedure (or function!) or entry call.
    -- Returns Read_Write if Expr designates a variable which is
    --  an actual corresponding to an in out parameter in a procedure
    --  or entry call.
