@@ -121,6 +121,10 @@ package Utilities is
    --   we use "return" rather than ":" for the return type of functions.
    --   we use "access" rather than "*" for access parameters
 
+   function Strip_Profile (Original : Wide_String) return Wide_String;
+   -- Removes the profile information from a Full_Name_Image
+   -- Mainly used for error messages where providing a full overloaded name
+   -- would make the message too long (and unreadable)
 
    --
    --  Error

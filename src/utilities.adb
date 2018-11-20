@@ -170,6 +170,34 @@ package body Utilities is
              & Adjust_Image (Original (Pos + 2 .. Original'Last));
    end Adjust_Image;
 
+   -------------------
+   -- Strip_Profile --
+   -------------------
+
+   function Strip_Profile (Original : Wide_String) return Wide_String is
+      Result : Wide_String (Original'Range);
+      Out_Inx : Positive := Result'First;
+      Brackets_Nesting : Natural := 0;
+   begin
+      for In_Inx in Original'Range loop
+         case Original (In_Inx) is
+            when '{' =>
+               Brackets_Nesting := Brackets_Nesting + 1;
+            when '}' =>
+               Brackets_Nesting := Brackets_Nesting - 1;
+            when ':' =>
+               -- Only result type profile after a ':', we are finished
+               exit;
+            when others =>
+               if Brackets_Nesting = 0 then
+                  Result (Out_Inx) := Original (In_Inx);
+                  Out_Inx          := Out_Inx + 1;
+               end if;
+         end case;
+      end loop;
+      return Result (Result'First .. Out_Inx - 1);
+   end Strip_Profile;
+
    -----------------------------
    -- Asis_Exception_Messages --
    -----------------------------
