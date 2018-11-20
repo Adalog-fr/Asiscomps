@@ -824,7 +824,7 @@ package body Thick_Queries is
       end if;
 
       if Actuals /= Nil_Element_List then
-         for Assoc of Actuals loop
+         for Assoc : Asis.Association of Actuals loop
             if Is_Equal (Formal, Formal_Parameter (Assoc)) then
                if not Return_Default and then Is_Defaulted_Association (Assoc) then
                   return Nil_Element;
@@ -1501,7 +1501,7 @@ package body Thick_Queries is
          if Expression_Kind (Prefix (The_Name)) = A_Function_Call then
             return Full_Name_Image (Prefix (Prefix (The_Name)), With_Profile) & ''' & Attribute_Name_Image (The_Name);
          else
-            return Full_Name_Image (Prefix (The_Name), With_Profile) & ''' & Attribute_Name_Image (The_Name);
+            return Full_Name_Image (Prefix (The_Name),          With_Profile) & ''' & Attribute_Name_Image (The_Name);
          end if;
       end if;
 
@@ -2098,22 +2098,6 @@ package body Thick_Queries is
 
    function Corresponding_Static_Predicates (Elem : in Asis.Element) return Asis.Element_List is
       use Asis.Definitions, Asis.Expressions;
-
-      function Filter_Aspects (Aspects : Asis.Element_List; Name : Wide_String) return Asis.Element_List is
-      -- Name is expected to be uppercase
-
-         Result : Asis.Element_List (1 .. Aspects'Length);
-         Count  : Asis_Natural := 0;
-      begin
-         for A in Aspects'Range loop
-            if To_Upper (Extended_Name_Image (Aspect_Mark (Aspects (A)))) = Name then
-               Count := Count + 1;
-               Result (Count) := Aspects (A);
-            end if;
-         end loop;
-         return Result (1 .. Count);
-      end Filter_Aspects;
-
       Decl : Asis.Declaration;
    begin  -- Corresponding_Static_Predicates
       case Element_Kind (Elem) is
@@ -2149,7 +2133,7 @@ package body Thick_Queries is
 
       -- Here we have a type or subtype declaration
       declare
-         Decl_Aspects : constant Asis.Element_List := Filter_Aspects (Aspect_Specifications (Decl), "STATIC_PREDICATE");
+         Decl_Aspects : constant Asis.Element_List := Corresponding_Aspects (Decl, "STATIC_PREDICATE");
          Def          : constant Asis.Definition := Type_Declaration_View (Decl);
       begin
          --## Rule off Avoid_Query ## for Corresponding_Parent_Subtype, we need a declaration, and we cannot have
@@ -3521,6 +3505,44 @@ package body Thick_Queries is
       end if;
       return Declaration_Kind (Decl) = The_Kind;
    end Is_Type_Declaration_Kind;
+
+
+   ---------------------------
+   -- Corresponding_Aspects --
+   ---------------------------
+
+   function Corresponding_Aspects (Elem : Asis.Element; Filter : Wide_String := "") return Definition_List is
+      use Asis.Definitions, Asis.Expressions;
+      Decl : Asis.Declaration;
+   begin
+      case Element_Kind (Elem) is
+         when A_Declaration =>
+            Decl := Elem;
+         when A_Defining_Name =>
+            Decl := Enclosing_Element (Elem);
+         when An_Expression =>
+            Decl := Corresponding_Name_Declaration (Simple_Name (Elem));
+         when others =>
+            Report_Error ("Corresponding_Aspects: Incorrect parameter", Elem);
+      end case;
+
+      declare
+         All_Aspects : constant Element_List := Aspect_Specifications (Decl);
+         Result      : Asis.Element_List (1 .. All_Aspects'Length);
+         Count       : Asis_Natural := 0;
+      begin
+         if Filter = "" then
+            return All_Aspects;
+         end if;
+         for A in All_Aspects'Range loop
+            if To_Upper (Extended_Name_Image (Aspect_Mark (All_Aspects (A)))) = Filter then
+               Count := Count + 1;
+               Result (Count) := All_Aspects (A);
+            end if;
+         end loop;
+         return Result (1 .. Count);
+      end;
+   end Corresponding_Aspects;
 
 
    ---------------------------------

@@ -66,6 +66,8 @@ package Thick_Queries is
 
    subtype Discrete_Type_Kinds is Asis.Type_Kinds
       range Asis.An_Enumeration_Type_Definition .. Asis.A_Modular_Type_Definition;
+   subtype Integer_Type_Kinds is Asis.Type_Kinds
+      range Asis.A_Signed_Integer_Type_Definition .. Asis.A_Modular_Type_Definition;
    subtype Fixed_Type_Kinds    is Asis.Type_Kinds
       range Asis.An_Ordinary_Fixed_Point_Definition .. Asis.A_Decimal_Fixed_Point_Definition;
 
@@ -674,6 +676,21 @@ package Thick_Queries is
    --     A_Known_Discriminant_Part
    --  Nil_Element is allowed and returns No_Discriminant_Part
 
+
+   function Corresponding_Aspects (Elem : Asis.Element; Filter : Wide_String := "") return Asis.Definition_List;
+   -- Returns the list of aspects that apply to the indicated declaration (or of name's declaration)
+   -- All aspects are returned if Filter is "", otherwise returns aspects whose Aspect_Mark is Filter.
+   -- Filter must be given in upper case.
+   -- Returns Nil_Element_List if there is no (matching) Aspect.
+   --
+   -- Appropriate Element_Kinds:
+   --     A_Declaration
+   --     A_Defining_Name
+   --     An_Expression
+   --
+   --  Appropriate Expression_Kinds:
+   --       An_Identifier
+   --       A_Selected_Component (applies to selector)
 
    function Attribute_Clause_Expression (Attribute : in Asis.Attribute_Kinds;
                                          Elem      : in Asis.Element)
