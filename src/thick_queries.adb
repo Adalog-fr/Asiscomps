@@ -6355,24 +6355,35 @@ package body Thick_Queries is
    function Is_Part_Of (Elem : Asis.Element; Inside : Asis.Element_List) return Boolean is
       use Asis.Compilation_Units, Asis.Text;
 
-      Elem_Span  : Span;
-      Start_Span : Span;
-      Stop_Span  : Span;
+      Good_Elem    : Asis.Element;
+      Inside_First : Asis.Element;
+      Inside_Last  : Asis.Element;
+      Elem_Span    : Span;
+      Start_Span   : Span;
+      Stop_Span    : Span;
    begin
       if Inside = Nil_Element_List then
          return False;
       end if;
 
-      if not Is_Equal (Enclosing_Compilation_Unit (Elem),
-                       Enclosing_Compilation_Unit (Inside (Inside'First)))
+      Good_Elem    := Elem;
+      Inside_First := Inside (Inside'First);
+      Inside_Last  := Inside (Inside'Last);
+
+      if not Is_Equal (Enclosing_Compilation_Unit (Good_Elem),
+                       Enclosing_Compilation_Unit (Inside_First))
       then
          return  False;
       end if;
 
-      Elem_Span  := A4G_Bugs.Element_Span (Elem);
-      Start_Span := A4G_Bugs.Element_Span (Inside (Inside'First));
-      Stop_Span  := A4G_Bugs.Element_Span (Inside (Inside'Last));
-      if Elem_Span.First_Line not in Start_Span.First_Line .. Stop_Span.Last_Line then
+      if Is_Part_Of_Instance (Good_Elem) then
+         return False; -- As specified, sigh
+      end if;
+
+      Elem_Span  := A4G_Bugs.Element_Span (Good_Elem);
+      Start_Span := A4G_Bugs.Element_Span (Inside_First);
+      Stop_Span  := A4G_Bugs.Element_Span (Inside_Last);
+      if Elem_Span.First_Line < Start_Span.First_Line or Elem_Span.Last_Line > Stop_Span.Last_Line then
          return False;
       end if;
       if Elem_Span.First_Line = Start_Span.First_Line and Elem_Span.First_Column < Start_Span.First_Column then
