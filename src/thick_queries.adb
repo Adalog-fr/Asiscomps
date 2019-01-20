@@ -4698,7 +4698,9 @@ package body Thick_Queries is
          when A_Variable_Declaration
             | A_Constant_Declaration
             | A_Deferred_Constant_Declaration
-              =>
+            | A_Return_Variable_Specification
+            | A_Return_Constant_Specification
+            =>
             Def := Object_Declaration_View (Local_Elem);
             case Definition_Kind (Def) is
                when A_Type_Definition =>
