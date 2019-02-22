@@ -2340,17 +2340,25 @@ package body Thick_Queries is
                   Callable_Decl := Corresponding_Name_Declaration (The_Callable);
                when An_Operator_Symbol =>
                   Callable_Decl := Corresponding_Name_Declaration (The_Callable);
-                  if Is_Nil (Callable_Decl) then -- A predefined operator, primitive of its type by 3.2.3(4)
+                  if Is_Nil (Callable_Decl) then -- A predefined operator, primitive of its type by 3.2.3(3)
                                                  -- Retrieve the type from the type of the (enclosing) call
                      The_Call := Enclosing_Element (The_Callable);
                      -- Name can be prefixed...
                      while Expression_Kind (The_Call) /= A_Function_Call loop
                         The_Call := Enclosing_Element (The_Call);
                      end loop;
-                     return Is_Equal (Corresponding_First_Subtype (A4G_Bugs.Corresponding_Expression_Type
-                                                                    (Actual_Parameter
-                                                                     (Actual_Parameters (The_Call) (1)))),
-                                      Type_Decl);
+                     declare
+                        Parameter_Type_Decl : constant Asis.Declaration := A4G_Bugs.Corresponding_Expression_Type
+                                                                            (Actual_Parameter
+                                                                             (Actual_Parameters (The_Call) (1)));
+                     begin
+                        if Is_Nil (Parameter_Type_Decl) then
+                           -- The parameter type must be of an anonymous type. The only available operations are "="
+                           -- and "/=", and they are primitive!
+                           return True;
+                        end if;
+                        return Is_Equal (Corresponding_First_Subtype (Parameter_Type_Decl), Type_Decl);
+                     end;
                   end if;
                when An_Enumeration_Literal | A_Character_Literal =>
                   -- Always a primitive operation of its type (and only it)
@@ -2393,8 +2401,17 @@ package body Thick_Queries is
             null;
       end case;
 
+      -- If the callable is an instantiation that overrides, Is_Overriding_Operation must be called
+      -- with the instantiation. However, if it is declared within an instantiation of a generic package,
+      -- Is_Overriding_Operation must be called with the callable itself. Unfortunately, Is_Part_Of_Instance
+      -- is True in both cases. These cases can be recognized, because the enclosing element in the first
+      -- case is the instanciation.
       if Is_Part_Of_Instance (Callable_Decl) then
          Inst_Or_Call_Decl := Enclosing_Element (Callable_Decl);
+         if Declaration_Kind (Inst_Or_Call_Decl) not in A_Generic_Instantiation then
+            -- Declared in a package, backup to the callable
+            Inst_Or_Call_Decl := Callable_Decl;
+         end if;
       else
          Inst_Or_Call_Decl := Callable_Decl;
       end if;
