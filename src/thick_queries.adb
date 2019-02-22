@@ -7347,7 +7347,11 @@ package body Thick_Queries is
 
       begin  -- Descriptor
          if Element_Kind (E) = A_Defining_Name then
-            return (1 => (Identifier, E));
+            if Declaration_Kind (Enclosing_Element (E)) in A_Renaming_Declaration then
+               E := Renamed_Entity (Enclosing_Element (E));
+            else
+               return (1 => (Identifier, E));
+            end if;
          end if;
 
          loop
