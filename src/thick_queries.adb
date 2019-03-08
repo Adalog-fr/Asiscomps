@@ -2769,14 +2769,9 @@ package body Thick_Queries is
             | An_Ordinary_Fixed_Point_Definition
             | A_Decimal_Fixed_Point_Definition
             =>
-            return Kind in Adding_Operators
-              or Kind in Multiplying_Operators
-              or Kind in Relational_Operators;
+            return Kind in Adding_Operators | Multiplying_Operators | Relational_Operators;
          when A_Modular_Type_Definition =>
-            return Kind in Adding_Operators
-              or Kind in Multiplying_Operators
-              or Kind in Logical_Operators
-              or Kind in Relational_Operators;
+            return Kind in Adding_Operators | Multiplying_Operators | Relational_Operators | Logical_Operators;
          when A_Constrained_Array_Definition
             | An_Unconstrained_Array_Definition
             =>
@@ -2793,19 +2788,15 @@ package body Thick_Queries is
                                                       (Operation_Ultimate_Type)))));
             -- Boolean array?
             if Is_Type (Temp, "STANDARD.BOOLEAN", Or_Derived => True) then
-               return Kind in Logical_Operators
-                 or Kind in Relational_Operators
-                 or Kind = A_Concatenate_Operator;
+               return Kind in Logical_Operators | Relational_Operators | A_Concatenate_Operator;
             end if;
 
             -- Discrete array ?
             if Type_Kind (Enclosing_Element (Temp)) in Discrete_Type_Kinds then
-               return Kind in Relational_Operators
-                 or Kind = A_Concatenate_Operator;
+               return Kind in Relational_Operators | A_Concatenate_Operator;
             end if;
 
-            return Kind in Equality_Operators
-              or Kind = A_Concatenate_Operator;
+            return Kind in Equality_Operators | A_Concatenate_Operator;
          when others =>
             return Kind in Equality_Operators;
       end case;
@@ -6364,6 +6355,10 @@ package body Thick_Queries is
 
    function Is_Part_Of (Elem : Asis.Element; Inside : Asis.Element) return Boolean is
    begin
+      if Is_Nil (Inside) then
+         return False;
+      end if;
+
       return Is_Part_Of (Elem, (1 => Inside));
    end Is_Part_Of;
 
@@ -7347,11 +7342,10 @@ package body Thick_Queries is
 
       begin  -- Descriptor
          if Element_Kind (E) = A_Defining_Name then
-            if Declaration_Kind (Enclosing_Element (E)) in A_Renaming_Declaration then
-               E := Renamed_Entity (Enclosing_Element (E));
-            else
+            if Declaration_Kind (Enclosing_Element (E)) not in A_Renaming_Declaration then
                return (1 => (Identifier, E));
             end if;
+            E := Renamed_Entity (Enclosing_Element (E));
          end if;
 
          loop

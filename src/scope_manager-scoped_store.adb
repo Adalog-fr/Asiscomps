@@ -816,9 +816,7 @@ package body Scoped_Store is
             | A_Generic_Instantiation
               =>
             if Scope_Top = 1
-              and then (Scope_Kind = A_Package_Declaration
-                        or Scope_Kind = A_Generic_Package_Declaration
-                        or Scope_Kind = A_Package_Instantiation)
+              and then Scope_Kind in A_Package_Declaration | A_Generic_Package_Declaration | A_Package_Instantiation
             then
                -- Library package specification
                -- Save data for the corresponding body and child units
