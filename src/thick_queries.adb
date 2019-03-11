@@ -1,3 +1,4 @@
+with Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -2595,22 +2596,30 @@ package body Thick_Queries is
             return Is_Static_Object (Prefix (Obj))
               and then Discrete_Constraining_Lengths (Slice_Range (Obj), Follow_Access => False) (1) /= Not_Static;
          when A_Selected_Component =>
-            case Declaration_Kind (Corresponding_Name_Declaration (Simple_Name (Prefix (Obj)))) is
-               when A_Constant_Declaration
-                  | A_Variable_Declaration
-                  | A_Parameter_Specification
-                  | A_Formal_Object_Declaration
-                    =>
-                  -- Prefix is an object
-                  if Is_Access_Expression (Prefix (Obj)) then
-                     -- Implicit dereference
-                     return False;
-                  end if;
-                  return Is_Static_Object (Selector (Obj)) and then Is_Static_Object (Prefix (Obj));
+            declare
+               Pfx : constant Asis.Element := Prefix (Obj);
+            begin
+               if Expression_Kind (Pfx) = A_Function_Call then
+                  -- Dynamic prefix
+                  return False;
+               end if;
+               case Declaration_Kind (Corresponding_Name_Declaration (Simple_Name (Pfx))) is
+                  when A_Constant_Declaration
+                     | A_Variable_Declaration
+                     | A_Parameter_Specification
+                     | A_Formal_Object_Declaration
+                     =>
+                     -- Prefix is an object
+                     if Is_Access_Expression (Pfx) then
+                        -- Implicit dereference
+                        return False;
+                     end if;
+                     return Is_Static_Object (Selector (Obj)) and then Is_Static_Object (Pfx);
                when others =>
                   -- Prefix must be a unit name
                   return Is_Static_Object (Selector (Obj));
-            end case;
+               end case;
+            end;
          when A_Type_Conversion | A_Qualified_Expression =>
             return Is_Static_Object (Converted_Or_Qualified_Expression (Obj));
          when others =>
@@ -4684,9 +4693,7 @@ package body Thick_Queries is
                   return Def;
                else
                   -- An identifier, selected name, or attribute
-                  return Type_Declaration_View (Corresponding_Name_Declaration
-                                                (Simple_Name
-                                                   (Strip_Attributes (Def))));
+                  return Type_Declaration_View (Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Def))));
                end if;
             when others =>
                -- TBSL This unfortunately covers the case of an aggregate of an anonymous array type, like in:
@@ -4697,50 +4704,78 @@ package body Thick_Queries is
       end loop;
 
       if Element_Kind (Local_Elem) = A_Defining_Name then
-         Local_Elem := Enclosing_Element (Local_Elem);
-      else
-         Local_Elem := Corresponding_Name_Declaration (Local_Elem);
+         return Corresponding_Declaration_Type_Definition (Enclosing_Element (Local_Elem));
+      else -- An_Identifier
+         return Corresponding_Declaration_Type_Definition (Corresponding_Name_Declaration (Local_Elem));
       end if;
 
-      case Declaration_Kind (Local_Elem) is
+   end Corresponding_Expression_Type_Definition;
+
+
+   -----------------------------------------------
+   -- Corresponding_Declaration_Type_Definition --
+   -----------------------------------------------
+
+   function Corresponding_Declaration_Type_Definition (The_Declaration : Asis.Declaration) return Asis.Definition is
+      use Asis.Definitions, Asis.Expressions;
+
+      Def : Asis.Definition;
+   begin
+      case Declaration_Kind (The_Declaration) is
          when A_Variable_Declaration
             | A_Constant_Declaration
             | A_Deferred_Constant_Declaration
             | A_Return_Variable_Specification
             | A_Return_Constant_Specification
             =>
-            Def := Object_Declaration_View (Local_Elem);
+            Def := Object_Declaration_View (The_Declaration);
             case Definition_Kind (Def) is
                when A_Type_Definition =>
                   -- This can only be an anonymous array => we have the definition
                   return Def;
                when An_Access_Definition =>   -- ASIS 2005
-                 -- Anonymous access type
+                  -- Anonymous access type
                   return Def;
                when others =>
                   return Type_Declaration_View (Corresponding_Name_Declaration
                                                 (Simple_Name
-                                                 (Strip_Attributes   -- Ignore 'Base and 'Class if any
-                                                  (Subtype_Simple_Name (Def)))));
+                                                   (Strip_Attributes   -- Ignore 'Base and 'Class if any
+                                                      (Subtype_Simple_Name (Def)))));
             end case;
          when A_Discriminant_Specification
             | A_Parameter_Specification
             =>
-            Def := Object_Declaration_View (Local_Elem);
+            Def := Object_Declaration_View (The_Declaration);
             if Definition_Kind (Def) = An_Access_Definition then
                return Def;
             end if;
             return Type_Declaration_View (Corresponding_Name_Declaration (Strip_Attributes (Simple_Name (Def))));
+         when A_Loop_Parameter_Specification =>
+            Def := Specification_Subtype_Definition (The_Declaration);
+            case Discrete_Range_Kind (Def) is
+               when Not_A_Discrete_Range =>
+                  Report_Error ("Corresponding_declaration_type_definition: Bad discrete range", Def);
+               when A_Discrete_Subtype_Indication =>
+                  return Type_Declaration_View (Corresponding_Name_Declaration
+                                                (Simple_Name
+                                                   (Strip_Attributes   -- Ignore 'Base and 'Class if any
+                                                      (Subtype_Simple_Name (Def)))));
+               when A_Discrete_Range_Attribute_Reference =>
+                  return Corresponding_Expression_Type_Definition (Prefix (Range_Attribute (Def)));
+               when A_Discrete_Simple_Expression_Range =>
+                  -- No type name in sight, guess the type from the lower bound
+                  return Corresponding_Expression_Type_Definition (Lower_Bound (Def));
+            end case;
          when A_Formal_Object_Declaration =>
-            if Definition_Kind (Object_Declaration_View (Local_Elem)) = An_Access_Definition then
+            if Definition_Kind (Object_Declaration_View (The_Declaration)) = An_Access_Definition then
                -- Must be an anonymous formal type
-               return Object_Declaration_View (Local_Elem);
+               return Object_Declaration_View (The_Declaration);
             else
                return  Type_Declaration_View (Corresponding_Name_Declaration
-                                              (Declaration_Subtype_Mark (Local_Elem)));
+                                              (Declaration_Subtype_Mark (The_Declaration)));
             end if;
          when A_Component_Declaration =>
-            Def := Component_Definition_View (Object_Declaration_View (Local_Elem));   -- ASIS 2005
+            Def := Component_Definition_View (Object_Declaration_View (The_Declaration));   -- ASIS 2005
             if Definition_Kind (Def) = An_Access_Definition then -- ASIS 2005
                -- A component whose type is an anonymous access type
                return Def;
@@ -4749,15 +4784,15 @@ package body Thick_Queries is
             end if;
          when A_Single_Protected_Declaration
             | A_Single_Task_Declaration
-              =>
-            return Object_Declaration_View (Local_Elem);
+            =>
+            return Object_Declaration_View (The_Declaration);
          when An_Object_Renaming_Declaration =>
-            return Corresponding_Expression_Type_Definition (Renamed_Entity (Local_Elem));
+            return Corresponding_Expression_Type_Definition (Renamed_Entity (The_Declaration));
          when others =>
             return Nil_Element;
       end case;
 
-   end Corresponding_Expression_Type_Definition;
+   end Corresponding_Declaration_Type_Definition;
 
 
    ------------------------------
@@ -7285,7 +7320,8 @@ package body Thick_Queries is
    -- Algorithm:
    -- Build an array of descriptors for each, each representing a "part" of the name (identifier,
    -- indexing, selectors, dereferences, etc.), including implicit dereferences, then compare.
-   -- Note that anything left of the rightmost dereference is irrelevant.
+   -- Note that anything left of the rightmost dereference is irrelevant, only the accessed type
+   -- matters (since the actual object is unknown).
    function Variables_Proximity (Left, Right : Asis.Element) return Proximity is
       use Asis.Expressions;
 
@@ -7294,7 +7330,7 @@ package body Thick_Queries is
          record
             case The_Kind is
                when Identifier =>
-                  Id_Name : Asis.Expression;
+                  Id_Name : Asis.Element;  -- An_Identifier or A_Defining_Name
                when Field =>
                   Sel_Name : Asis.Expression;
                when Indexing =>
@@ -7413,7 +7449,7 @@ package body Thick_Queries is
          Best_Conf : Result_Confidence;
          L_Rightmost_Deref : Natural := 1;
          R_Rightmost_Deref : Natural := 1;
-         L_Inx, R_Inx : Positive;
+         L_Inx, R_Inx      : Positive;
          Base_Proximity    : Proximity;
 
          function Compatible_Types (L, R : Asis.Definition) return Boolean is
@@ -7518,6 +7554,10 @@ package body Thick_Queries is
             return Is_Equal (Ultimate_Type_Declaration (L_Decl), Ultimate_Type_Declaration (R_Decl));
          end Compatible_Types;
 
+         function Name_Type_Definition (Elem : Asis.Element) return Asis.Definition is
+           (if Element_Kind (Elem) = A_Defining_Name
+              then Corresponding_Declaration_Type_Definition (Enclosing_Element (Elem))
+              else Corresponding_Expression_Type_Definition (Elem));
       begin   -- Descriptors_Proximity
 
          -- First, compare the "base" variable and eliminate expressions that are not variables
@@ -7586,8 +7626,10 @@ package body Thick_Queries is
 
          elsif L_Rightmost_Deref /= 1 then
             -- Dereference on left side only
+            Utilities.Trace ("R", R_Descr (1).Id_Name);
+            Utilities.Trace ("R type def", Name_Type_Definition (R_Descr (1).Id_Name));
             if Compatible_Types (L_Descr (L_Rightmost_Deref).Designated_Type,
-                                 Corresponding_Expression_Type_Definition (R_Descr (1).Id_Name))
+                                 Name_Type_Definition (R_Descr (1).Id_Name))
             then
                return (Unlikely, Complete);
             else
@@ -7595,7 +7637,7 @@ package body Thick_Queries is
             end if;
          else
             -- Dereference on right side only
-            if Compatible_Types (Corresponding_Expression_Type_Definition (L_Descr (1).Id_Name),
+            if Compatible_Types (Name_Type_Definition (L_Descr (1).Id_Name),
                                  R_Descr (R_Rightmost_Deref).Designated_Type)
             then
                   return (Unlikely, Complete);

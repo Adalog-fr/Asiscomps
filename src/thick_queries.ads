@@ -973,6 +973,25 @@ package Thick_Queries is
    -- WARNING 2: This function works when passed a type name (not really an expression),
    --            not sure if it will work with the ASIS05 query
 
+   function Corresponding_Declaration_Type_Definition (The_Declaration : Asis.Declaration) return Asis.Definition;
+   -- returns the (full) type definition of the object declared by this declaration
+   -- returns Nil_Element for any other declaration
+   --
+   -- Appropriate declaration kinds:
+   --   A_Variable_Declaration
+   --   A_Constant_Declaration
+   --   A_Deferred_Constant_Declaration
+   --   A_Return_Variable_Specification
+   --   A_Return_Constant_Specification
+   --   A_Discriminant_Specification
+   --   A_Loop_Parameter_Specification
+   --   A_Parameter_Specification
+   --   A_Formal_Object_Declaration
+   --   A_Component_Declaration
+   --   A_Single_Protected_Declaration
+   --   A_Single_Task_Declaration
+   --   An_Object_Renaming_Declaration
+
    function Corresponding_Components (The_Element : Asis.Element) return Asis.Record_Component_List;
    -- If the element is (a defining name of) a variable or a component of a record type, returns the
    -- corresponding components
