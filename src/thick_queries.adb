@@ -1,4 +1,3 @@
-with Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -2603,6 +2602,16 @@ package body Thick_Queries is
                   -- Dynamic prefix
                   return False;
                end if;
+
+               if Expression_Kind (Pfx) = An_Indexed_Component then
+                  -- Prefix is certainly an object
+                  if Is_Access_Expression (Pfx) then
+                     -- Implicit dereference
+                     return False;
+                  end if;
+                  return Is_Static_Object (Selector (Obj)) and then Is_Static_Object (Pfx);
+               end if;
+
                case Declaration_Kind (Corresponding_Name_Declaration (Simple_Name (Pfx))) is
                   when A_Constant_Declaration
                      | A_Variable_Declaration
@@ -2615,9 +2624,9 @@ package body Thick_Queries is
                         return False;
                      end if;
                      return Is_Static_Object (Selector (Obj)) and then Is_Static_Object (Pfx);
-               when others =>
-                  -- Prefix must be a unit name
-                  return Is_Static_Object (Selector (Obj));
+                  when others =>
+                     -- Prefix must be a unit name
+                     return Is_Static_Object (Selector (Obj));
                end case;
             end;
          when A_Type_Conversion | A_Qualified_Expression =>
@@ -7626,8 +7635,6 @@ package body Thick_Queries is
 
          elsif L_Rightmost_Deref /= 1 then
             -- Dereference on left side only
-            Utilities.Trace ("R", R_Descr (1).Id_Name);
-            Utilities.Trace ("R type def", Name_Type_Definition (R_Descr (1).Id_Name));
             if Compatible_Types (L_Descr (L_Rightmost_Deref).Designated_Type,
                                  Name_Type_Definition (R_Descr (1).Id_Name))
             then
