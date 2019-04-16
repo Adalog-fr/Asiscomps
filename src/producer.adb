@@ -231,31 +231,7 @@ package body Producer is
 
       if Buffer_Inx = Buffer'Last then
          -- Reached max line length
-         if Cut_Point = 0 then
-            if In_Comment then
-               -- Split comment on two lines
-               Next_Line;
-               Put ("-- ");
-            elsif In_Quotes then
-               -- Concatenate on two lines
-               declare
-                  Save_Last : constant Wide_Character := Buffer (Buffer'Last);
-               begin
-                  Buffer (Buffer'Last) := '"';
-                  In_Quotes := False;
-                  Next_Line;
-                  Put ("& """);
-                  Put (Save_Last);
-                  -- Should be OK now, proceed normally
-               end;
-            else
-               -- Nothing we can do, generate something that does not compile
-               Next_Line;
-               User_Message ("Unable to cut long line, output line:" & Line_Number'Wide_Image (Output_Line));
-               Put ("?Line cut? ");
-            end if;
-
-         else
+         if Cut_Point /= 0 then
             -- Output up to cut point and retry with the rest
             declare
                Extra_Part : constant Wide_String := Buffer (Cut_Point + 1 .. Buffer'Last) & Item;
@@ -265,6 +241,30 @@ package body Producer is
                Put (Extra_Part);
                return;
             end;
+         end if;
+
+         -- No cut point here
+         if In_Comment then
+            -- Split comment on two lines
+            Next_Line;
+            Put ("-- ");
+         elsif In_Quotes then
+            -- Concatenate on two lines
+            declare
+               Save_Last : constant Wide_Character := Buffer (Buffer'Last);
+            begin
+               Buffer (Buffer'Last) := '"';
+               In_Quotes := False;
+               Next_Line;
+               Put ("& """);
+               Put (Save_Last);
+               -- Should be OK now, proceed normally
+            end;
+         else
+            -- Nothing we can do, generate something that does not compile
+            Next_Line;
+            User_Message ("Unable to cut long line, output line:" & Line_Number'Wide_Image (Output_Line));
+            Put ("?Line cut? ");
          end if;
       end if;
 
@@ -310,8 +310,8 @@ package body Producer is
 
    procedure Put (Item : Wide_String) is
    begin
-      for I in Item'Range loop
-         Put (Item (I));
+      for C : Wide_Character of Item loop
+         Put (C);
       end loop;
    end Put;
 
@@ -382,10 +382,10 @@ package body Producer is
                             (Current_State.Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
             New_Line_And_Comment (The_Lines (The_Lines'First));
 
-            for I in Positive range The_Lines'First+1 .. The_Lines'Last-1 loop
+            for L : Line of The_Lines (The_Lines'First+1 .. The_Lines'Last-1) loop
                There_Is_Substitution := True;
-               Print_Comments (Line_Image (The_Lines (I)));
-               New_Line_And_Comment (The_Lines (I), Conditional => True);
+               Print_Comments (Line_Image (L));
+               New_Line_And_Comment (L, Conditional => True);
             end loop;
 
             There_Is_Substitution := True;
@@ -603,9 +603,9 @@ package body Producer is
                                (Current_State.Last_Printed_Column+1 .. Length (The_Lines (The_Lines'First))));
             New_Line_And_Comment (The_Lines (The_Lines'First));
 
-            for I in Positive range The_Lines'First+1 .. The_Lines'Last-1 loop
-               Print_Substituted (Line_Image (The_Lines (I)));
-               New_Line_And_Comment (The_Lines (I));
+            for L : Line of The_Lines (The_Lines'First+1 .. The_Lines'Last-1) loop
+               Print_Substituted (Line_Image (L));
+               New_Line_And_Comment (L);
            end loop;
 
             -- Last_Column seems unreliable in some cases.

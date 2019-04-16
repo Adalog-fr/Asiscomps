@@ -227,8 +227,8 @@ package body Scope_Manager is
    function Is_Active (Scope : Asis.Element) return Boolean is
       use Asis.Elements;
    begin
-      for I in Scope_Range range 1 .. Scope_Top loop
-         if Is_Equal (Scope, Scope_Stack (I).Element) then
+      for S : Scope_Data of Scope_Stack (1 .. Scope_Top) loop
+         if Is_Equal (Scope, S.Element) then
             return True;
          end if;
       end loop;

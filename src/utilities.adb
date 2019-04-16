@@ -175,12 +175,13 @@ package body Utilities is
    -------------------
 
    function Strip_Profile (Original : Wide_String) return Wide_String is
+   -- Note that brackets can be nested...
       Result : Wide_String (Original'Range);
       Out_Inx : Positive := Result'First;
       Brackets_Nesting : Natural := 0;
    begin
-      for In_Inx in Original'Range loop
-         case Original (In_Inx) is
+      for Current_C : Wide_Character of Original loop
+         case Current_C is
             when '{' =>
                Brackets_Nesting := Brackets_Nesting + 1;
             when '}' =>
@@ -190,7 +191,7 @@ package body Utilities is
                exit;
             when others =>
                if Brackets_Nesting = 0 then
-                  Result (Out_Inx) := Original (In_Inx);
+                  Result (Out_Inx) := Current_C;
                   Out_Inx          := Out_Inx + 1;
                end if;
          end case;
@@ -567,13 +568,13 @@ package body Utilities is
       Index := Result'First;
       Result (Index) := '"';
 
-      for I in Item'Range loop
-         if Item (I) = '"' then
+      for Current_C : Wide_Character of Item loop
+         if Current_C = '"' then
             Index := Index + 1;
             Result (Index) := '"';
          end if;
          Index := Index + 1;
-         Result (Index) := Item (I);
+         Result (Index) := Current_C;
       end loop;
       Result (Result'Last) := '"';
 
