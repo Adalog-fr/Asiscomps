@@ -39,7 +39,8 @@ with   -- Standard Ada units
   Ada.Strings.Wide_Maps.Wide_Constants;
 
 with   -- Reusable components
-  A4G_Bugs;
+  A4G_Bugs,
+  Elements_Set;
 
 with   -- ASIS units
   Asis.Clauses,
@@ -3531,6 +3532,78 @@ package body Thick_Queries is
       end if;
       return Declaration_Kind (Decl) = The_Kind;
    end Is_Type_Declaration_Kind;
+
+
+   -----------------------------
+   -- Governing_Discriminants --
+   -----------------------------
+
+   function Governing_Discriminants (Elem : Asis.Element) return Asis.Defining_Name_List is
+      use Asis.Expressions, Asis.Iterator;
+      use Elements_Set;
+
+      Decl : Asis.Declaration;
+      Discrs_Set : Set;
+
+      type Nothing is null record;
+      procedure Pre_Operation  (Element :        Asis.Element;
+                                Control : in out Traverse_Control;
+                                State   : in out Nothing);
+      procedure Post_Operation (Element :        Asis.Element;
+                                Control : in out Traverse_Control;
+                                State   : in out Nothing) is null;
+      procedure Traverse is new Traverse_Element (Nothing, Pre_Operation, Post_Operation);
+      procedure Pre_Operation  (Element :        Asis.Element;
+                                Control : in out Traverse_Control;
+                                State   : in out Nothing)
+      is
+      begin
+         case Element_Kind (Element) is
+            when A_Pragma =>
+               -- Don't traverse pragmas, since they can contain things without declarations
+               Control := Abandon_Children;
+            when An_Expression =>
+               case Expression_Kind (Element) is
+                  when An_Identifier =>
+                     if Declaration_Kind (Corresponding_Name_Declaration (Element)) /= A_Discriminant_Specification then
+                        return;
+                     end if;
+
+                     Add (To => Discrs_Set, Element => Element);
+                  when An_Attribute_Reference =>
+                     -- Traverse prefix only, not the attribute name
+                     Traverse (Prefix (Element), Control, State);
+                     Control := Abandon_Children;
+                  when others =>
+                     null;
+               end case;
+            when others =>
+               null;
+         end case;
+      end Pre_Operation;
+
+      Control : Traverse_Control := Continue;
+      State   : Nothing;
+   begin  -- Governing_Discriminants
+      case Element_Kind (Elem) is
+         when A_Declaration =>
+            Decl := Elem;
+         when A_Defining_Name =>
+            Decl := Enclosing_Element (Elem);
+         when An_Expression =>
+            if Expression_Kind (Elem) = An_Indexed_Component then
+               -- Array of array => the component cannot depend on discriminants, since it had to be constrained
+               -- at the point of the declaration of the enclosing array
+               return Nil_Element_List;
+            end if;
+            Decl := Corresponding_Name_Declaration (Simple_Name (Elem));
+         when others =>
+            Report_Error ("Governing_Discriminants: Incorrect parameter", Elem);
+      end case;
+
+      Traverse (Object_Declaration_View (Decl), Control, State);
+      return Elements_In_Set (Discrs_Set);
+   end Governing_Discriminants;
 
 
    ---------------------------

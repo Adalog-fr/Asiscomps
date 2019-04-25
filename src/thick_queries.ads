@@ -676,6 +676,19 @@ package Thick_Queries is
    --     A_Known_Discriminant_Part
    --  Nil_Element is allowed and returns No_Discriminant_Part
 
+   function Governing_Discriminants (Elem : Asis.Element) return Asis.Defining_Name_List;
+   -- returns the declarations of discriminants that appear within the constraint of the declaration of Elem.
+   -- returns Nil_Element_List if Elem is not constrained, or if its constraint does not contain discriminants
+   --
+   -- Appropriate Element_Kinds:
+   --     A_Declaration
+   --     A_Defining_Name
+   --     An_Expression
+   --
+   --  Appropriate Expression_Kinds:
+   --       An_Identifier
+   --       A_Selected_Component (applies to selector)
+
 
    function Corresponding_Aspects (Elem : Asis.Element; Filter : Wide_String := "") return Asis.Definition_List;
    -- Returns the list of aspects that apply to the indicated declaration (or of name's declaration)
