@@ -7407,7 +7407,7 @@ package body Thick_Queries is
    function Variables_Proximity (Left, Right : Asis.Element) return Proximity is
       use Asis.Expressions;
 
-      type Part_Kind is (Identifier, Field, Indexing, Dereference, Call, Not_Variable);
+      type Part_Kind is (Identifier, Field, Indexing, Slice, Dereference, Call, Not_Variable);
       type Name_Part (The_Kind : Part_Kind := Identifier) is
          record
             case The_Kind is
@@ -7417,6 +7417,8 @@ package body Thick_Queries is
                   Sel_Name : Asis.Expression;
                when Indexing =>
                   Indexers : Asis.Expression;
+               when Slice =>
+                  Slicer : Asis.Definition;
                when Dereference =>
                   Designated_Type : Asis.Definition;
                when Call =>
@@ -7499,10 +7501,8 @@ package body Thick_Queries is
                                               & Name_Part'(Indexing, E));
 
                when A_Slice =>
-                  -- Well, it could be the whole object as well...
-                  -- Simply ignore the slice
-                  -- (Too complicated to check for static matching)
-                   return Complete_For_Access (Descriptor (Prefix (E), With_Deref => True));
+                  return Complete_For_Access (Descriptor (Prefix (E), With_Deref => True)
+                                             & Name_Part'(Slice, Slice_Range (E)));
 
                when A_Function_Call =>
                   --  a Function_Call can appear only as the first
@@ -7526,13 +7526,16 @@ package body Thick_Queries is
          end loop;
       end Descriptor;
 
+      ---------------------------
+      -- Descriptors_Proximity --
+      ---------------------------
+
       function Descriptors_Proximity (L_Descr, R_Descr : Name_Descriptor) return Proximity is
          -- Note that L_Descr'First and R_Descr'First are always 1
-         Best_Conf : Result_Confidence;
+         Best_Proximity    : Proximity;
          L_Rightmost_Deref : Natural := 1;
          R_Rightmost_Deref : Natural := 1;
          L_Inx, R_Inx      : Positive;
-         Base_Proximity    : Proximity;
 
          function Compatible_Types (L, R : Asis.Definition) return Boolean is
          -- Are L and R definitions for types in the same derivation family?
@@ -7640,6 +7643,27 @@ package body Thick_Queries is
            (if Element_Kind (Elem) = A_Defining_Name
               then Corresponding_Declaration_Type_Definition (Enclosing_Element (Elem))
               else Corresponding_Expression_Type_Definition (Elem));
+
+         procedure Check_Overlap (L_Low, L_High, R_Low, R_High : Extended_Biggest_Int) is
+         -- Computes proximity given the (low, high) bounds of two slices (indexing considered a slice of 1)
+         -- from a same variable
+         begin
+            if Not_Static in L_Low | L_High | R_Low | R_High then
+               Best_Proximity := (Result_Confidence'Min (Best_Proximity.Confidence, Possible), Partial);
+               return;
+            end if;
+
+            if L_Low = R_Low and L_High = R_High then
+               -- Equal slices
+               Best_Proximity := (Best_Proximity.Confidence, Complete);
+            elsif L_Low > R_High or R_Low > R_High then
+               -- Non overlaping slices
+               Best_Proximity := (Best_Proximity.Confidence, None);
+            else
+               Best_Proximity := (Best_Proximity.Confidence, Partial);
+            end if;
+         end Check_Overlap;
+
       begin   -- Descriptors_Proximity
 
          -- First, compare the "base" variable and eliminate expressions that are not variables
@@ -7693,9 +7717,9 @@ package body Thick_Queries is
 
          elsif L_Rightmost_Deref /= 1 and R_Rightmost_Deref /= 1 then
             -- Dereferences on both sides
-            Base_Proximity := Descriptors_Proximity (L_Descr (1 .. L_Rightmost_Deref - 1),
-                                                     R_Descr (1 .. R_Rightmost_Deref - 1));
-            if Base_Proximity /= Same_Variable then
+            if Descriptors_Proximity (L_Descr (1 .. L_Rightmost_Deref - 1),
+                                      R_Descr (1 .. R_Rightmost_Deref - 1)) /= Same_Variable
+            then
                if Compatible_Types (L_Descr (L_Rightmost_Deref).Designated_Type,
                                     R_Descr (R_Rightmost_Deref).Designated_Type)
                then
@@ -7728,60 +7752,98 @@ package body Thick_Queries is
 
          -- Here, Left and Right are the same variable
          -- Compare the rest to refine how much they overlap
-         Best_Conf := Certain;
-         L_Inx     := L_Rightmost_Deref + 1;
-         R_Inx     := R_Rightmost_Deref + 1;
+         Best_Proximity := Same_Variable;
+         L_Inx          := L_Rightmost_Deref + 1;
+         R_Inx          := R_Rightmost_Deref + 1;
          while L_Inx <= L_Descr'Last and R_Inx <= R_Descr'Last loop
-            if L_Descr (L_Inx).The_Kind /= R_Descr (R_Inx).The_Kind then
-               return Different_Variables;
-            end if;
-            case L_Descr (L_Inx).The_Kind is
-               when Identifier
-                 | Not_Variable
-                 =>
-                  Report_Error ("Variables proximity: " & Part_Kind'Wide_Image (L_Descr (L_Inx).The_Kind),
-                              L_Descr (L_Inx).Id_Name);
-               when Field =>
-                  if not Is_Equal (Corresponding_Name_Definition (L_Descr (L_Inx).Sel_Name),
-                                   Corresponding_Name_Definition (R_Descr (R_Inx).Sel_Name))
-                  then
-                     return Different_Variables;
-                  end if;
-               when Indexing =>
-                  declare
-                     L_Indexes : constant Asis.Expression_List := Index_Expressions (L_Descr (L_Inx).Indexers);
-                     R_Indexes : constant Asis.Expression_List := Index_Expressions (R_Descr (R_Inx).Indexers);
-                  begin
-                     if L_Indexes'Length /= R_Indexes'Length then
-                        Report_Error ("Variables proximity: different lengths", Nil_Element);
-                     end if;
-                     for I in L_Indexes'Range loop
-                        declare
-                           L_Value : constant Wide_String := Static_Expression_Value_Image (L_Indexes (I));
-                           R_Value : constant Wide_String := Static_Expression_Value_Image (R_Indexes (I));
-                        begin
-                           if L_Value = "" or R_Value = "" then
-                              Best_Conf := Result_Confidence'Min (Best_Conf, Possible);
-                           elsif L_Value /= R_Value then
-                              return Different_Variables;
-                           end if;
-                        end;
-                     end loop;
-                  end;
-               when Dereference =>
-                  Report_Error ("Variables proximity: dereference", Nil_Element);
-               when Call =>
-                  Report_Error ("Variables proximity: call", Nil_Element);
-            end case;
+            -- Indexing and Slice are compatible, otherwise L and R must have the same kind
+            -- If one is Indexing and the other one is Slice, the Indexing must be one-dimensional since
+            -- they are both on the same variable.
+            if L_Descr (L_Inx).The_Kind = Indexing and  R_Descr (R_Inx).The_Kind = Slice then
+               declare
+                  L_Indexer : constant Extended_Biggest_Int      := Discrete_Static_Expression_Value
+                                                                     (Index_Expressions (L_Descr (L_Inx).Indexers) (1));
+                  R_Slicer  : constant Extended_Biggest_Int_List := Discrete_Constraining_Values
+                                                                     (R_Descr (R_Inx).Slicer);
+               begin
+                  Check_Overlap (L_Low  => L_Indexer,     L_High => L_Indexer,
+                                 R_Low  => R_Slicer (1),  R_High => R_Slicer (2));
+               end;
 
+            elsif L_Descr (L_Inx).The_Kind = Slice    and  R_Descr (R_Inx).The_Kind = Indexing then
+               declare
+                  L_Slicer  : constant Extended_Biggest_Int_List := Discrete_Constraining_Values
+                                                                     (L_Descr (L_Inx).Slicer);
+                  R_Indexer : constant Extended_Biggest_Int      := Discrete_Static_Expression_Value
+                                                                     (Index_Expressions (R_Descr (R_Inx).Indexers) (1));
+               begin
+                  Check_Overlap (L_Low  => L_Slicer (1), L_High => L_Slicer (2),
+                                 R_Low  => R_Indexer,    R_High => R_Indexer);
+               end;
+
+            elsif L_Descr (L_Inx).The_Kind /= R_Descr (R_Inx).The_Kind then
+               return Different_Variables;
+
+            else
+               -- Regular case: L and R are of the same kind
+               case L_Descr (L_Inx).The_Kind is
+                  when Identifier
+                     | Not_Variable
+                     =>
+                     Report_Error ("Variables proximity: " & Part_Kind'Wide_Image (L_Descr (L_Inx).The_Kind),
+                                   L_Descr (L_Inx).Id_Name);
+                  when Field =>
+                     if not Is_Equal (Corresponding_Name_Definition (L_Descr (L_Inx).Sel_Name),
+                                      Corresponding_Name_Definition (R_Descr (R_Inx).Sel_Name))
+                     then
+                        return Different_Variables;
+                     end if;
+                  when Indexing =>
+                     declare
+                        L_Indexes : constant Asis.Expression_List := Index_Expressions (L_Descr (L_Inx).Indexers);
+                        R_Indexes : constant Asis.Expression_List := Index_Expressions (R_Descr (R_Inx).Indexers);
+                     begin
+                        if L_Indexes'Length /= R_Indexes'Length then
+                           Report_Error ("Variables proximity: different lengths", Nil_Element);
+                        end if;
+                        for I in L_Indexes'Range loop
+                           declare
+                              L_Value : constant Wide_String := Static_Expression_Value_Image (L_Indexes (I));
+                              R_Value : constant Wide_String := Static_Expression_Value_Image (R_Indexes (I));
+                           begin
+                              if L_Value = "" or R_Value = "" then
+                                 Best_Proximity.Confidence := Result_Confidence'Min (Best_Proximity.Confidence,
+                                                                                     Possible);
+                              elsif L_Value /= R_Value then
+                                 return Different_Variables;
+                              end if;
+                           end;
+                        end loop;
+                     end;
+                  when Slice =>
+                     declare
+                        L_Slicer : constant Extended_Biggest_Int_List := Discrete_Constraining_Values
+                                                                          (L_Descr (L_Inx).Slicer);
+                        R_Slicer : constant Extended_Biggest_Int_List := Discrete_Constraining_Values
+                                                                          (R_Descr (R_Inx).Slicer);
+                     begin
+                        Check_Overlap (L_Low  => L_Slicer (1), L_High => L_Slicer (2),
+                                       R_Low  => R_Slicer (1), R_High => R_Slicer (2));
+                     end;
+                  when Dereference =>
+                     Report_Error ("Variables proximity: dereference", Nil_Element);
+                  when Call =>
+                     Report_Error ("Variables proximity: call", Nil_Element);
+               end case;
+            end if;
             L_Inx := L_Inx + 1;
             R_Inx := R_Inx + 1;
          end loop;
 
          if L_Inx = L_Descr'Last + 1 and R_Inx = R_Descr'Last + 1 then
-            return (Best_Conf, Complete);
+            return Best_Proximity;
          else
-            return (Best_Conf, Partial);
+            return (Best_Proximity.Confidence, Partial);
          end if;
       end Descriptors_Proximity;
 
