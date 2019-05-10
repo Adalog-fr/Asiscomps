@@ -1,3 +1,4 @@
+with Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -2434,7 +2435,10 @@ package body Thick_Queries is
    function Corresponding_Primitive_Types (The_Callable : Asis.Element) return Asis.Element_List is
       use Asis.Expressions;
 
+      subtype A_Comparison_Operator is Operator_Kinds range An_Equal_Operator .. A_Greater_Than_Or_Equal_Operator;
+
       The_Declaration : Asis.Element;
+      Param_Type      : Asis.Declaration;
    begin
       -- Go to the declaration
       case Element_Kind (The_Callable) is
@@ -2449,9 +2453,38 @@ package body Thick_Queries is
                when An_Operator_Symbol =>
                   The_Declaration := Corresponding_Name_Declaration (The_Callable);
                   if Is_Nil (The_Declaration) then -- a predefined operator
-                                                   -- it is primitive of its result type and AFAIK no other type
-                                                   -- Get it from the type of the call
-                     return (1 => A4G_Bugs.Corresponding_Expression_Type (Enclosing_Element (The_Callable)));
+
+                     -- It is primitive of its result type, except for comparison operators that return Boolean
+                     -- Get the type from the type of the call, but use the parameters for comparisons
+                     -- Don't use parameters for other than comparisons, since parameters can be universal with a typed
+                     -- result!
+                     case Operator_Kind (The_Callable) is
+                        when A_Comparison_Operator =>
+                           declare
+                              Parameters : constant Asis.Element_List := Function_Call_Parameters (Enclosing_Element
+                                                                                                   (The_Callable));
+                           begin
+                              Param_Type := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
+                                                                                    (Parameters (1)));
+                              if (Is_Nil (Param_Type)
+                                  or else Type_Kind (Type_Declaration_View (Param_Type)) = A_Root_Type_Definition)
+                                and Parameters'Length > 1
+                              then
+                                 Param_Type := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
+                                                                                       (Parameters (2)));
+                              end if;
+
+                              if Is_Nil (Param_Type)
+                                or else Type_Kind (Type_Declaration_View (Param_Type)) = A_Root_Type_Definition
+                              then
+                                 -- All operands universal or equivalent => not primitive of anything
+                                 return Nil_Element_List;
+                              end if;
+                           end;
+                           return (1 => Param_Type);
+                        when others =>
+                           return (1 => A4G_Bugs.Corresponding_Expression_Type (Enclosing_Element (The_Callable)));
+                     end case;
 
                   end if;
                when A_Selected_Component =>
