@@ -95,6 +95,27 @@ package body Elements_Set is
       end;
    end Elements_In_Set;
 
+   --------------
+   -- Contains --
+   --------------
+
+   function Contains (To : in Set; Element : in Asis.Element) return Boolean
+   is
+      use Utilities;
+   begin
+      return Is_Present (To, To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Simple_Name (Element)))));
+   end Contains;
+
+   ------------
+   -- Delete --
+   ------------
+
+   procedure Delete (To : in out Set; Element : Asis.Element) is
+      use Utilities;
+   begin
+      Delete (To, To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Simple_Name (Element)))));
+   end Delete;
+
    -----------
    -- Clear --
    -----------

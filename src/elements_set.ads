@@ -48,6 +48,10 @@ package Elements_Set is
 
    function Elements_In_Set (S : Set) return Asis.Defining_Name_List;
 
+   function Contains (To : in Set; Element : in Asis.Element) return Boolean;
+
+   procedure Delete (To : in out Set; Element : Asis.Element);
+
    procedure Clear (The_Set : in out Set);
 private
    use Ada.Strings.Wide_Unbounded;
