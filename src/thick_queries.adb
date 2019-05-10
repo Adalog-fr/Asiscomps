@@ -97,23 +97,6 @@ package body Thick_Queries is
       return Translate (S, Upper_Case_Map);
    end To_Upper;
 
-   ------------
-   -- Choose --
-   ------------
-
-   -- Could be replaced by an if-expression...
-   function Choose (Condition  : in Boolean;
-                    When_True  : in Wide_String;
-                    When_False : in Wide_String) return Wide_String
-   is
-   begin
-      if Condition then
-         return When_True;
-      else
-         return When_False;
-      end if;
-   end Choose;
-
    ------------------------------------------------------------------
    -- Exported subprograms                                         --
    ------------------------------------------------------------------
@@ -153,8 +136,8 @@ package body Thick_Queries is
          return False;
       end if;
       R := Right'First;
-      for L in Left'Range loop
-         if Left (L) = Not_Static or else Right (R) = Not_Static or else Left (L) /= Right (R) then
+      for L : Extended_Biggest_Int of Left loop
+         if L = Not_Static or else Right (R) = Not_Static or else L /= Right (R) then
             return  False;
          end if;
          R := R + 1;
@@ -791,19 +774,14 @@ package body Thick_Queries is
    --------------------------
 
    function Matching_Formal_Name (Name : Asis.Defining_Name; Into : Asis.Declaration) return Asis.Defining_Name is
-         This_Name : constant Wide_String := To_Upper (Defining_Name_Image (Name));
-         Formals   : constant Asis.Parameter_Specification_List := Parameter_Profile (Into);
+      This_Name : constant Wide_String := To_Upper (Defining_Name_Image (Name));
    begin
-      for F in Formals'Range loop
-         declare
-            Other_Names : constant Asis.Defining_Name_List := Names (Formals (F));
-         begin
-            for N in Other_Names'Range loop
-               if To_Upper (Defining_Name_Image (Other_Names (N))) = This_Name then
-                  return Other_Names (N);
-               end if;
-            end loop;
-         end;
+      for Formal : Asis.Declaration of Parameter_Profile (Into) loop
+         for N : Asis.Defining_Name of Names (Formal) loop
+            if To_Upper (Defining_Name_Image (N)) = This_Name then
+               return N;
+            end if;
+         end loop;
       end loop;
       -- Not found here
       Report_Error ("Matching_Formal_Name: not found", Name);
@@ -855,30 +833,25 @@ package body Thick_Queries is
       Result   : Asis.Element := Nil_Element;
 
       function Matching_Handler (E : Asis.Element) return Asis.Exception_Handler is
-         Handlers : constant Asis.Exception_Handler_List := Exception_Handlers (E);
       begin
-         for H in Handlers'Range loop
-            declare
-               Choices : constant Asis.Element_List := Exception_Choices (Handlers (H));
-            begin
-               for C in Choices'Range loop
-                  case Element_Kind (Choices (C)) is
-                     when An_Expression =>
-                        if Is_Equal (Def_Name, Corresponding_Name_Definition (Ultimate_Name (Choices (C)))) then
-                           return Handlers (H);
-                        end if;
-                     when A_Definition =>
-                        -- Handler for when others
-                        if Include_Others then
-                           return Handlers (H);
-                        else
-                           return Nil_Element;
-                        end if;
-                     when others =>
-                        Report_Error ("wrong result from Exception_Choices", Choices (C));
-                  end case;
-               end loop;
-            end;
+         for H: Asis.Exception_Handler of Exception_Handlers (E) loop
+            for Choice : Asis.Element of Exception_Choices (H)  loop
+               case Element_Kind (Choice) is
+                  when An_Expression =>
+                     if Is_Equal (Def_Name, Corresponding_Name_Definition (Ultimate_Name (Choice))) then
+                        return H;
+                     end if;
+                  when A_Definition =>
+                     -- Handler for when others
+                     if Include_Others then
+                           return H;
+                     else
+                        return Nil_Element;
+                     end if;
+                  when others =>
+                     Report_Error ("wrong result from Exception_Choices", Choice);
+               end case;
+            end loop;
          end loop;
          -- Not found
          return Nil_Element;
@@ -1729,35 +1702,26 @@ package body Thick_Queries is
       end case;
 
       declare
-         Element_Decl    : constant Asis.Declaration         := Enclosing_Element (Elem_Def_Name);
-         Element_Pragmas : constant Asis.Pragma_Element_List := Corresponding_Pragmas (Element_Decl);
-         Type_Name       : Asis.Expression;
-         Result          : Pragma_Set := (others => False);
+         Element_Decl : constant Asis.Declaration := Enclosing_Element (Elem_Def_Name);
+         Type_Name    : Asis.Expression;
+         Result       : Pragma_Set := (others => False);
       begin
-         for Pragma_Elt in Element_Pragmas'Range loop
+         for Pragma_Elt : Asis.Pragma_Element of Corresponding_Pragmas (Element_Decl) loop
             -- Retrieve the associations composing the current pragma
-            declare
-               Pragma_Associations : constant Asis.Association_List := Pragma_Argument_Associations (Element_Pragmas
-                                                                                                     (Pragma_Elt));
-            begin
-               for Pragma_Assoc in Pragma_Associations'Range loop
-                  -- Check if the pragma has been set on Element
-                  begin
-                     if Is_Equal (Elem_Def_Name,
-                                  Corresponding_Name_Definition (Actual_Parameter
-                                                                 (Pragma_Associations (Pragma_Assoc))))
-                     then
-                        Result (Pragma_Kind (Element_Pragmas (Pragma_Elt))) := True;
-                     end if;
-                  exception
-                     when Asis.Exceptions.ASIS_Inappropriate_Element =>
-                        -- Raised by Corresponding_Name_Definition of predefined "special" identifiers, like the "C"
-                        -- in pragma convention (C, .. .).
-                        -- Anyway, this is a junk element
-                        null;
-                  end;
-               end loop;
-            end;
+            for Pragma_Assoc : Asis.Association of Pragma_Argument_Associations (Pragma_Elt) loop
+               -- Check if the pragma has been set on Element
+               begin
+                  if Is_Equal (Elem_Def_Name, Corresponding_Name_Definition (Actual_Parameter (Pragma_Assoc))) then
+                     Result (Pragma_Kind (Pragma_Elt)) := True;
+                  end if;
+               exception
+                  when Asis.Exceptions.ASIS_Inappropriate_Element =>
+                     -- Raised by Corresponding_Name_Definition of predefined "special" identifiers, like the "C"
+                     -- in pragma convention (C, .. .).
+                     -- Anyway, this is a junk element
+                     null;
+               end;
+            end loop;
          end loop;
 
          case Declaration_Kind (Element_Decl) is
@@ -1826,15 +1790,16 @@ package body Thick_Queries is
                if Is_Compilation_Unit (Element_Decl) then
                   declare
                      Good_Decl : constant Asis.Declaration := Corresponding_Declaration (Element_Decl);
-                     -- Categorization pragmas can be declared inside the specification, or after as compilation pragma
-                     Other_Pragmas : constant Asis.Pragma_Element_List
-                       := Pragmas (Good_Decl) & Compilation_Pragmas (Enclosing_Compilation_Unit (Good_Decl));
-                     Kind : Asis.Pragma_Kinds;
+                     Kind      : Asis.Pragma_Kinds;
                   begin
+                     -- Categorization pragmas can be declared inside the specification, or after as compilation pragma
                      -- No need to check that categorization pragmas are for the current unit, the compiler
                      -- did it for us.
-                     for P in Other_Pragmas'Range loop
-                        Kind := Pragma_Kind (Other_Pragmas (P));
+                     -- Gnat bug forces using "&" (...)
+                     for P : Asis.Pragma_Element of "&" (Pragmas (Good_Decl),
+                                                         Compilation_Pragmas (Enclosing_Compilation_Unit (Good_Decl)))
+                     loop
+                        Kind := Pragma_Kind (P);
                         case Kind is
                            when A_Pure_Pragma
                               | A_Preelaborate_Pragma
@@ -1864,14 +1829,11 @@ package body Thick_Queries is
 
    function Is_Profile_Applied (Element : in Asis.Element; Profile : Wide_String) return Boolean is
       use Asis.Expressions;
-      Comp_Pragmas : constant Asis.Pragma_Element_List := Compilation_Pragmas (Enclosing_Compilation_Unit (Element));
    begin
-      for P in Comp_Pragmas'Range loop
-         if Pragma_Kind (Comp_Pragmas (P)) = A_Profile_Pragma then
+      for P : Asis.Pragma_Element of Compilation_Pragmas (Enclosing_Compilation_Unit (Element)) loop
+         if Pragma_Kind (P) = A_Profile_Pragma then
             -- The name of the profile is always the first parameter of the pragma
-            if To_Upper (Name_Image (Actual_Parameter (Pragma_Argument_Associations (Comp_Pragmas (P)) (1))))
-              = Profile
-            then
+            if To_Upper (Name_Image (Actual_Parameter (Pragma_Argument_Associations (P) (1)))) = Profile then
                return True;
             end if;
          end if;
@@ -2056,8 +2018,8 @@ package body Thick_Queries is
          declare
             Index_List : Asis.Element_List := Discrete_Subtype_Definitions (Type_Def);
          begin
-            for I in Index_List'Range loop
-               Index_List (I) := Range_Ultimate_Name (Index_List (I));
+            for Inx : Asis.Element of Index_List loop
+               Inx := Range_Ultimate_Name (Inx);
             end loop;
             return Index_List;
          end;
@@ -2068,8 +2030,8 @@ package body Thick_Queries is
          declare
             Index_List : Asis.Expression_List := Index_Subtype_Definitions (Type_Def);
          begin
-            for I in Index_List'Range loop
-               Index_List (I) := Corresponding_Name_Definition (Simple_Name (Index_List (I)));
+            for Inx : Asis.Expression of Index_List loop
+               Inx := Corresponding_Name_Definition (Simple_Name (Inx));
             end loop;
             return Index_List;
          end;
@@ -2519,16 +2481,16 @@ package body Thick_Queries is
             Result (Last) := Enclosing_Element (Profile.Result_Type.Name);
          end if;
 
-         for F in Profile.Formals'Range loop
-            Decl := Profile.Formals (F).Name;
+         for F : Profile_Entry of Profile.Formals loop
+            Decl := F.Name;
             if not Is_Nil (Decl) then
                -- Otherwise, it is an anonymous type, can't be primitive
                Decl := Enclosing_Element (Decl);
                if Is_Primitive_Of (Decl, The_Callable) then
                   -- Already there?
                   Found := False;
-                  for R in List_Index range 1 .. Last loop
-                     if Is_Equal (Decl, Result (R)) then
+                  for R : Asis.Element of Result (1 .. Last) loop
+                     if Is_Equal (Decl, R) then
                         Found := True;
                         exit;
                      end if;
@@ -2577,16 +2539,12 @@ package body Thick_Queries is
                return False;
             end if;
 
-            declare
-               Indexes : constant Asis.Expression_List := Index_Expressions (Obj);
-            begin
-               for I in Indexes'Range loop
-                  if  not Is_Static_Expression (Indexes (I)) then
-                     return False;
-                  end if;
-               end loop;
-               return True;
-            end;
+            for Index : Asis.Expression of Index_Expressions (Obj) loop
+               if  not Is_Static_Expression (Index) then
+                  return False;
+               end if;
+            end loop;
+            return True;
          when A_Slice =>
             if Is_Access_Expression (Prefix (Obj)) then
                -- Implicit dereference
@@ -3086,16 +3044,12 @@ package body Thick_Queries is
          end if;
       end;
 
-      declare
-         Lits : constant Asis.Declaration_List := Enumeration_Literal_Declarations (Good_Def);
-      begin
-         for I in Lits'Range loop
-            if Defining_Name_Kind (Names (Lits (I)) (1)) = A_Defining_Character_Literal then
-               return True;
-            end if;
-         end loop;
-         return False;
-      end;
+      for Lit : Asis.Declaration of Enumeration_Literal_Declarations (Good_Def) loop
+         if Defining_Name_Kind (Names (Lit) (1)) = A_Defining_Character_Literal then
+            return True;
+         end if;
+      end loop;
+      return False;
    end Is_Character_Subtype;
 
    ---------------------------
@@ -3246,52 +3200,43 @@ package body Thick_Queries is
             return False;
          end if;
 
-         declare
-            Components : constant Asis.Record_Component_List := Record_Components (Def);
-         begin
-            for I in Components'Range loop
-               case Element_Kind (Components (I)) is
-                  when A_Declaration =>
-                     -- Can only be A_Component_Declaration
-                     declare
-                        CSI : constant Asis.Definition := Component_Definition_View
-                                                           (Object_Declaration_View (Components (I)));
-                     begin
-                        if Definition_Kind (CSI) /= An_Access_Definition then
-                           -- the component is not of an anonymous access type
-                           Comp_Name := Subtype_Simple_Name (CSI);
-                           if Expression_Kind (Comp_Name) = An_Attribute_Reference then
-                              -- Limitedness is the same for 'Base and 'Class as the prefix
-                              Comp_Name := Simple_Name (Prefix (Comp_Name));
-                           end if;
-                           if Is_Limited (Corresponding_Name_Declaration (Comp_Name)) then
+         for Comp : Asis.Record_Component of Record_Components (Def) loop
+            case Element_Kind (Comp) is
+               when A_Declaration =>
+                  -- Can only be A_Component_Declaration
+                  declare
+                     CSI : constant Asis.Definition := Component_Definition_View (Object_Declaration_View (Comp));
+                  begin
+                     if Definition_Kind (CSI) /= An_Access_Definition then
+                        -- the component is not of an anonymous access type
+                        Comp_Name := Subtype_Simple_Name (CSI);
+                        if Expression_Kind (Comp_Name) = An_Attribute_Reference then
+                           -- Limitedness is the same for 'Base and 'Class as the prefix
+                           Comp_Name := Simple_Name (Prefix (Comp_Name));
+                        end if;
+                        if Is_Limited (Corresponding_Name_Declaration (Comp_Name)) then
+                           return True;
+                        end if;
+                     end if;
+                  end;
+               when A_Definition =>
+                  case Definition_Kind (Comp) is
+                     when A_Null_Component =>
+                        null;
+                     when A_Variant_Part =>
+                        for V : Asis.Variant of Variants (Comp) loop
+                           if Has_Limited_Components (V) then
                               return True;
                            end if;
-                        end if;
-                     end;
-                  when A_Definition =>
-                     case Definition_Kind (Components (I)) is
-                        when A_Null_Component =>
-                           null;
-                        when A_Variant_Part =>
-                           declare
-                              The_Variants : constant Asis.Variant_List := Variants (Components (I));
-                           begin
-                              for J in The_Variants'Range loop
-                                 if Has_Limited_Components (The_Variants (J)) then
-                                    return True;
-                                 end if;
-                              end loop;
-                           end;
-                        when others =>
-                           Report_Error ("Wrong component definition kind", Components (I));
-                     end case;
-                  when others =>
-                     -- We didn't ask for pragmas, and we shouldn't get An_Attribute_Definition_Clause...
-                     Report_Error ("Wrong component element kind", Components (I));
-               end case;
-            end loop;
-         end;
+                        end loop;
+                     when others =>
+                        Report_Error ("Wrong component definition kind", Comp);
+                  end case;
+               when others =>
+                  -- We didn't ask for pragmas, and we shouldn't get An_Attribute_Definition_Clause...
+                  Report_Error ("Wrong component element kind", Comp);
+            end case;
+         end loop;
 
          return False;
       end Has_Limited_Components;
@@ -3633,10 +3578,10 @@ package body Thick_Queries is
          if Filter = "" then
             return All_Aspects;
          end if;
-         for A in All_Aspects'Range loop
-            if To_Upper (Extended_Name_Image (Aspect_Mark (All_Aspects (A)))) = Filter then
+         for A : Asis.Element of All_Aspects loop
+            if To_Upper (Extended_Name_Image (Aspect_Mark (A))) = Filter then
                Count := Count + 1;
-               Result (Count) := All_Aspects (A);
+               Result (Count) := A;
             end if;
          end loop;
          return Result (1 .. Count);
@@ -3705,31 +3650,27 @@ package body Thick_Queries is
          return Nil_Element;
       end if;
 
-      declare
-         Reprs : constant Asis.Representation_Clause_List := Corresponding_Representation_Clauses (Decl);
-      begin
-         for R in Reprs'Range loop
-            case Representation_Clause_Kind (Reprs (R)) is
-               when An_Attribute_Definition_Clause =>
-                  if Attribute_Kind (Representation_Clause_Name (Reprs (R))) = Attribute then
-                     return Representation_Clause_Expression (Reprs (R));
-                  end if;
-               when An_At_Clause =>
-                  if Attribute = An_Address_Attribute then
-                     return Representation_Clause_Expression (Reprs (R));
-                  end if;
-               when A_Record_Representation_Clause =>
-                  if Attribute = An_Alignment_Attribute then
-                     return Mod_Clause_Expression (Reprs (R));
-                  end if;
-               when others =>
-                  null;
-            end case;
-         end loop;
+      for R : Asis.Representation_Clause of Corresponding_Representation_Clauses (Decl) loop
+         case Representation_Clause_Kind (R) is
+            when An_Attribute_Definition_Clause =>
+               if Attribute_Kind (Representation_Clause_Name (R)) = Attribute then
+                  return Representation_Clause_Expression (R);
+               end if;
+            when An_At_Clause =>
+               if Attribute = An_Address_Attribute then
+                  return Representation_Clause_Expression (R);
+               end if;
+            when A_Record_Representation_Clause =>
+               if Attribute = An_Alignment_Attribute then
+                  return Mod_Clause_Expression (R);
+               end if;
+            when others =>
+               null;
+         end case;
+      end loop;
 
-         -- Clause not found
-         return Nil_Element;
-      end;
+      -- Clause not found
+      return Nil_Element;
    end Attribute_Clause_Expression;
 
 
@@ -3748,28 +3689,19 @@ package body Thick_Queries is
          Parent_Decl := Enclosing_Element (Parent_Decl);
       end loop;
 
-      declare
-         Repr_List : constant Asis.Representation_Clause_List
-           := Corresponding_Representation_Clauses (Parent_Decl);
-      begin
-         for R in Repr_List'Range loop
-            if Representation_Clause_Kind (Repr_List (R)) = A_Record_Representation_Clause then
-               declare
-                  Components : constant Asis.Component_Clause_List := Component_Clauses (Repr_List (R));
-               begin
-                  for C in Components'Range loop
-                     if Is_Equal (Corresponding_Name_Definition (Representation_Clause_Name (Components (C))),
-                                  Component)
-                     then
-                        -- Found the clause for this component.
-                        return Components (C);
-                     end if;
-                  end loop;
-               end;
-               return Nil_Element;  -- Cannot have several record representation clauses
-            end if;
-         end loop;
-      end;
+      for R : Asis.Representation_Clause of Corresponding_Representation_Clauses (Parent_Decl) loop
+         if Representation_Clause_Kind (R) = A_Record_Representation_Clause then
+            for Compo_Clause : Asis.Component_Clause of Component_Clauses (R) loop
+               if Is_Equal (Corresponding_Name_Definition (Representation_Clause_Name (Compo_Clause)),
+                            Component)
+               then
+                  -- Found the clause for this component.
+                  return Compo_Clause;
+               end if;
+            end loop;
+            return Nil_Element;  -- Cannot have several record representation clauses
+         end if;
+      end loop;
       return Nil_Element;  -- No record representation clause found
    end Corresponding_Component_Clause;
 
@@ -3783,26 +3715,20 @@ package body Thick_Queries is
       Parent_Decl : constant Asis.Declaration := Enclosing_Element
                                                   (Enclosing_Element
                                                    (Enclosing_Element (Enumeration_Value)));
-      Repr_List   : constant Asis.Representation_Clause_List := Corresponding_Representation_Clauses (Parent_Decl);
    begin
-      for R in Repr_List'Range loop
-         if Representation_Clause_Kind (Repr_List (R)) = An_Enumeration_Representation_Clause then
-            declare
-               Assoc_List : constant Asis.Association_List := Array_Component_Associations
-                                                               (Representation_Clause_Expression (Repr_List (R)));
-            begin
-               for C in Assoc_List'Range loop
-                  for I in Array_Component_Choices (Assoc_List (C))'Range loop
-                     declare
-                        Enumeration_Literal : constant Expression := Array_Component_Choices (Assoc_List (C)) (I);
-                     begin
-                        if Is_Equal (Corresponding_Name_Definition (Enumeration_Literal), Enumeration_Value) then
-                           return Assoc_List (C);
-                        end if;
-                     end;
-                  end loop;
+      for R : Asis.Representation_Clause of Corresponding_Representation_Clauses (Parent_Decl) loop
+         if Representation_Clause_Kind (R) = An_Enumeration_Representation_Clause then
+            for Assoc : Asis.Association of Array_Component_Associations (Representation_Clause_Expression (R)) loop
+               for I in Array_Component_Choices (Assoc)'Range loop
+                  declare
+                     Enumeration_Literal : constant Expression := Array_Component_Choices (Assoc) (I);
+                  begin
+                     if Is_Equal (Corresponding_Name_Definition (Enumeration_Literal), Enumeration_Value) then
+                        return Assoc;
+                     end if;
+                  end;
                end loop;
-            end;
+            end loop;
             return Nil_Element;  -- Cannot have several record representation clauses
          end if;
       end loop;
@@ -4283,11 +4209,11 @@ package body Thick_Queries is
             Def  : Asis.Definition;
             Decl : Asis.Declaration;
          begin
-            for I in Components'Range loop
-               case Element_Kind (Components (I)) is
+            for Compo : Asis.Record_Component of Components loop
+               case Element_Kind (Compo) is
                   when A_Declaration =>
                      -- A_Component_Declaration
-                     Def := Component_Definition_View (Object_Declaration_View (Components (I)));
+                     Def := Component_Definition_View (Object_Declaration_View (Compo));
                      if Definition_Kind (Def) = An_Access_Definition then
                         Counting_Traverse (Nil_Element, Def, Counting_Control, Counting_State, Depth + 1);
                      else
@@ -4313,22 +4239,18 @@ package body Thick_Queries is
                            return;
                      end case;
                   when A_Definition =>
-                     if Definition_Kind (Components (I)) = A_Variant_Part then -- else it is A_Null_Component
-                        declare
-                           V_List : constant Asis.Variant_List := Variants (Components (I));
-                        begin
-                           for V in V_List'Range loop
-                              Traverse_Components_List (Record_Components (V_List (V)));
-                              case Counting_Control is
-                                 when Continue =>
-                                    null;
-                                 when Abandon_Children =>
-                                    Report_Error ("Traverse_Data_Structure: Abandon_Children", Components (I));
-                                 when Abandon_Siblings | Terminate_Immediately =>
-                                    return;
-                              end case;
-                           end loop;
-                        end;
+                     if Definition_Kind (Compo) = A_Variant_Part then -- else it is A_Null_Component
+                        for V : Asis.Variant of Variants (Compo) loop
+                           Traverse_Components_List (Record_Components (V));
+                           case Counting_Control is
+                              when Continue =>
+                                 null;
+                              when Abandon_Children =>
+                                 Report_Error ("Traverse_Data_Structure: Abandon_Children", Compo);
+                              when Abandon_Siblings | Terminate_Immediately =>
+                                 return;
+                           end case;
+                        end loop;
                      end if;
                   when others =>
                      -- pragma, clause
@@ -4393,35 +4315,31 @@ package body Thick_Queries is
                   Discr_Part : constant Asis.Definition := Discriminant_Part (Good_Decl);
                begin
                   if not Is_Nil (Discr_Part) and then Definition_Kind (Discr_Part) /= An_Unknown_Discriminant_Part then
-                     declare
-                        Discrs : constant Asis.Discriminant_Specification_List := Discriminants (Discr_Part);
-                     begin
-                        for D in Discrs'Range loop
-                           Comp_Def := Object_Declaration_View (Discrs (D));
-                           if Definition_Kind (Comp_Def) = An_Access_Definition then
-                              -- access discriminant
-                              Counting_Traverse (Nil_Element, Comp_Def, Counting_Control, Counting_State, Depth + 1);
-                           else
-                              Comp_Decl := Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Comp_Def)));
-                              Counting_Traverse (Comp_Decl,
-                                                 Type_Declaration_View (Comp_Decl),
-                                                 Counting_Control,
-                                                 Counting_State,
-                                                 Depth + 1);
-                           end if;
-                           case Counting_Control is
-                              when Continue =>
-                                 null;
-                              when Abandon_Children =>
-                                 Report_Error ("Traverse_Data_Structure: Abandon_Children (1)", Discrs (D));
-                              when Abandon_Siblings =>
-                                 Counting_Control := Continue;
-                                 return;
-                              when Terminate_Immediately =>
-                                 return;
-                           end case;
-                        end loop;
-                     end;
+                     for D : Asis.Declaration of Discriminants (Discr_Part) loop
+                        Comp_Def := Object_Declaration_View (D);
+                        if Definition_Kind (Comp_Def) = An_Access_Definition then
+                           -- access discriminant
+                           Counting_Traverse (Nil_Element, Comp_Def, Counting_Control, Counting_State, Depth + 1);
+                        else
+                           Comp_Decl := Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Comp_Def)));
+                           Counting_Traverse (Comp_Decl,
+                                              Type_Declaration_View (Comp_Decl),
+                                              Counting_Control,
+                                              Counting_State,
+                                              Depth + 1);
+                        end if;
+                        case Counting_Control is
+                           when Continue =>
+                              null;
+                           when Abandon_Children =>
+                              Report_Error ("Traverse_Data_Structure: Abandon_Children (1)", D);
+                           when Abandon_Siblings =>
+                              Counting_Control := Continue;
+                              return;
+                           when Terminate_Immediately =>
+                              return;
+                        end case;
+                     end loop;
                   end if;
                end;
             when others =>
@@ -5307,12 +5225,11 @@ package body Thick_Queries is
    -------------------
 
    function Matching_Name (Name : Asis.Defining_Name; Decl : Asis.Declaration) return Asis.Defining_Name is
-      Name_List : constant Asis.Defining_Name_List := Names (Decl);
       Name_Str  : constant Wide_String := To_Upper (Defining_Name_Image (Name));
    begin
-      for N in Name_List'Range loop
-         if To_Upper (Defining_Name_Image (Name_List (N))) = Name_Str then
-            return Name_List (N);
+      for N : Asis.Defining_Name of Names (Decl) loop
+         if To_Upper (Defining_Name_Image (N)) = Name_Str then
+            return N;
          end if;
       end loop;
       -- not found
@@ -6037,27 +5954,22 @@ package body Thick_Queries is
                                       & (3 .. 2 * Dimensionality (Item_Def) => Nil_Element);
                                  else
                                     -- All bounds (and ranges) static: find the extremes
-                                    for A in Assocs'Range loop
-                                       declare
-                                          Choices_List : constant Asis.Expression_List
-                                            :=  Array_Component_Choices (Assocs (A));
-                                       begin
-                                          for C in Choices_List'Range loop
-                                             Current_Bounds :=  Choice_Bounds (Choices_List (C));
-                                             -- Low
-                                             Value := Discrete_Static_Expression_Value (Current_Bounds (1));
-                                             if Value < Extreme_Vals (1) then
-                                                Extreme_Vals   (1) := Value;
-                                                Extreme_Bounds (1) := Current_Bounds (1);
-                                             end if;
-                                             --High
-                                             Value := Discrete_Static_Expression_Value (Current_Bounds (2));
-                                             if Value > Extreme_Vals (2) then
-                                                Extreme_Vals   (2) := Value;
-                                                Extreme_Bounds (2) := Current_Bounds (2);
-                                             end if;
-                                          end loop;
-                                       end;
+                                    for A : Asis.Association of Assocs loop
+                                       for C : Asis.Expression of Array_Component_Choices (A) loop
+                                          Current_Bounds :=  Choice_Bounds (C);
+                                          -- Low
+                                          Value := Discrete_Static_Expression_Value (Current_Bounds (1));
+                                          if Value < Extreme_Vals (1) then
+                                             Extreme_Vals   (1) := Value;
+                                             Extreme_Bounds (1) := Current_Bounds (1);
+                                          end if;
+                                          --High
+                                          Value := Discrete_Static_Expression_Value (Current_Bounds (2));
+                                          if Value > Extreme_Vals (2) then
+                                             Extreme_Vals   (2) := Value;
+                                             Extreme_Bounds (2) := Current_Bounds (2);
+                                          end if;
+                                       end loop;
                                     end loop;
                                     return Extreme_Bounds
                                       & (3 .. 2 * Dimensionality (Item_Def) => Nil_Element);
@@ -6382,13 +6294,13 @@ package body Thick_Queries is
 
    function Are_Null_Statements (Stats : Asis.Statement_List; Except_Labelled : Boolean := False) return Boolean is
    begin
-      for I in Stats'Range loop
-         case Statement_Kind (Stats (I)) is
+      for S : Asis.Statement of Stats loop
+         case Statement_Kind (S) is
             when A_Null_Statement =>
                null;
             when A_Block_Statement =>
-               if Block_Declarative_Items (Stats (I)) /= Nil_Element_List
-                 or else not Are_Null_Statements (Block_Statements (Stats (I)))
+               if Block_Declarative_Items (S) /= Nil_Element_List
+                 or else not Are_Null_Statements (Block_Statements (S))
                then
                   return False;
                end if;
@@ -6396,7 +6308,7 @@ package body Thick_Queries is
                return False;
          end case;
 
-         if Except_Labelled and then not Is_Nil (Label_Names (Stats (I)))then
+         if Except_Labelled and then not Is_Nil (Label_Names (S))then
             return False;
          end if;
       end loop;
@@ -6458,8 +6370,8 @@ package body Thick_Queries is
       Exiting_Stmt : Asis.Statement   := Nil_Element;
       Control      : Traverse_Control := Continue;
    begin    -- First_Exiting_Statement
-      for S in Stats'Range loop
-         Traverse (Stats (S), Control, Exiting_Stmt);
+      for S : Asis.Statement of Stats loop
+         Traverse (S, Control, Exiting_Stmt);
          exit when not Is_Nil (Exiting_Stmt);
       end loop;
       return Exiting_Stmt;
@@ -6788,8 +6700,8 @@ package body Thick_Queries is
       -- text corresponds to a float.
       function Is_Float_String(Str: Wide_String) return Boolean is
       begin
-         for I in Str'Range loop
-            if Str(I) = '.' then
+         for C : Wide_Character of Str loop
+            if C = '.' then
                return True;
             end if;
          end loop;
@@ -6863,10 +6775,10 @@ package body Thick_Queries is
          Result : Wide_String (Item'Range);
          R_Inx  : Natural := Item'First - 1;
       begin
-         for I_Inx in Item'Range loop
-            if Item (I_Inx) /= '_' then
-               R_Inx := R_Inx + 1;
-               Result (R_Inx) := Item (I_Inx);
+         for C : Wide_Character of Item loop
+            if C /= '_' then
+               R_Inx          := R_Inx + 1;
+               Result (R_Inx) := C;
             end if;
          end loop;
 
@@ -6878,13 +6790,13 @@ package body Thick_Queries is
          R_Inx  : Natural := Item'First;
          Quote  : Boolean := False;
       begin
-         for I_Inx in Natural range Item'First + 1 .. Item'Last - 1 loop
-            if Item (I_Inx) = '"' and not Quote then
+         for C : Wide_Character of Item (Item'First + 1 .. Item'Last - 1) loop
+            if C = '"' and not Quote then
                Quote := True;
-            else
+            else    -- Two quotes in a row
                Quote := False;
                R_Inx := R_Inx + 1;
-               Result (R_Inx) := Item (I_Inx);
+               Result (R_Inx) := '"';
             end if;
          end loop;
 
@@ -7177,16 +7089,16 @@ package body Thick_Queries is
                else
                   Last := If_Paths'Last;
                end if;
-               for P in List_Index range If_Paths'First .. Last loop
+               for Path : Asis.Path of If_Paths (If_Paths'First .. Last) loop
                   declare
                      Cond_Str : constant Wide_String := Static_Expression_Value_Image
-                                                        (Condition_Expression (If_Paths (P)));
+                                                        (Condition_Expression (Path));
                   begin
                      if Cond_Str = "" then
                         -- non static condition
                         return "";
                      elsif Cond_Str = "1" then
-                        return Static_Expression_Value_Image (Dependent_Expression (If_Paths (P)));
+                        return Static_Expression_Value_Image (Dependent_Expression (Path));
                      end if;
                   end;
                end loop;
@@ -7202,7 +7114,6 @@ package body Thick_Queries is
 
          when A_Case_Expression =>
             declare
-               Case_Paths    : constant Asis.Path_List := Expression_Paths (Expression);
                Case_Expr_Str : constant Wide_String    := Static_Expression_Value_Image (Case_Expression (Expression));
             begin
                if Case_Expr_Str = "" then
@@ -7211,54 +7122,48 @@ package body Thick_Queries is
                end if;
 
                Case_Paths_Loop :
-               for P in List_Index range Case_Paths'Range loop
-                  declare
-                     Choices_List : constant Asis.Element_List := Case_Statement_Alternative_Choices(Case_Paths (P));
-                     Current_Choice : Asis.Element;
-                  begin
-                     Case_Choices_Loop :
-                     for Choice_Index in List_Index range Choices_List'Range loop
-                        Current_Choice := Choices_List (Choice_Index);
-                        if (Element_Kind (Current_Choice) = An_Expression
-                            and then Case_Expr_Str = Static_Expression_Value_Image (Current_Choice))
-                          or else
-                            (Element_Kind (Current_Choice) = A_Definition
-                             and then Definition_Kind (Current_Choice) = An_Others_Choice)
-                        then
-                           return Static_Expression_Value_Image (Dependent_Expression (Case_Paths (P)));
-                        end if;
+               for Case_Path : Asis.Path of Expression_Paths (Expression) loop
+                  Case_Choices_Loop :
+                  for Current_Choice : Asis.Element of Case_Statement_Alternative_Choices (Case_Path) loop
+                     if (Element_Kind (Current_Choice) = An_Expression
+                         and then Case_Expr_Str = Static_Expression_Value_Image (Current_Choice))
+                       or else
+                         (Element_Kind (Current_Choice) = A_Definition
+                          and then Definition_Kind (Current_Choice) = An_Others_Choice)
+                     then
+                        return Static_Expression_Value_Image (Dependent_Expression (Case_Path));
+                     end if;
 
-                        if Definition_Kind (Current_Choice) = A_Discrete_Range then
-                           declare
-                              Bounds_List : constant Asis.Element_List := Discrete_Constraining_Bounds (Current_Choice);
-                              -- with negative values being possible, it is easier to compare using actual values
+                     if Definition_Kind (Current_Choice) = A_Discrete_Range then
+                        declare
+                           Bounds_List : constant Asis.Element_List := Discrete_Constraining_Bounds (Current_Choice);
+                           -- with negative values being possible, it is easier to compare using actual values
 
-                              Case_Expr_Value : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Case_Expr_Str);
-                              Lower_Bound     : constant Asis.Element         := Bounds_List (Bounds_List'First);
-                              Upper_Bound     : constant Asis.Element         := Bounds_List (Bounds_List'Last);
-                           begin
-                              if Is_Nil (Upper_Bound) then
-                                 return "";
-                              end if;
+                           Case_Expr_Value : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Case_Expr_Str);
+                           Lower_Bound     : constant Asis.Element         := Bounds_List (Bounds_List'First);
+                           Upper_Bound     : constant Asis.Element         := Bounds_List (Bounds_List'Last);
+                        begin
+                           if Is_Nil (Upper_Bound) then
+                              return "";
+                           end if;
 
-                              -- with a modular type 'Range, a Nil_Element is used as the lower bound
-                              -- being a case statement, it is the only case where the lower bound is a Nil_Element
-                              if Is_Nil (Lower_Bound)
-                                and then Case_Expr_Value in 0 .. Discrete_Static_Expression_Value (Upper_Bound)
-                              then
-                                 return Static_Expression_Value_Image (Dependent_Expression (Case_Paths (P)));
-                              end if;
+                           -- with a modular type 'Range, a Nil_Element is used as the lower bound
+                           -- being a case statement, it is the only case where the lower bound is a Nil_Element
+                           if Is_Nil (Lower_Bound)
+                             and then Case_Expr_Value in 0 .. Discrete_Static_Expression_Value (Upper_Bound)
+                           then
+                              return Static_Expression_Value_Image (Dependent_Expression (Case_Path));
+                           end if;
 
-                              if not Is_Nil (Lower_Bound)
-                                and then Case_Expr_Value in Discrete_Static_Expression_Value (Lower_Bound) ..
-                                                            Discrete_Static_Expression_Value (Upper_Bound)
-                              then
-                                 return Static_Expression_Value_Image (Dependent_Expression (Case_Paths (P)));
-                              end if;
+                           if not Is_Nil (Lower_Bound)
+                             and then Case_Expr_Value in Discrete_Static_Expression_Value (Lower_Bound) ..
+                                                         Discrete_Static_Expression_Value (Upper_Bound)
+                           then
+                              return Static_Expression_Value_Image (Dependent_Expression (Case_Path));
+                           end if;
                            end;
-                        end if;
-                     end loop Case_Choices_Loop;
-                  end;
+                     end if;
+                  end loop Case_Choices_Loop;
                end loop Case_Paths_Loop;
 
                -- something went wrong above :(, value not covered!
@@ -7269,66 +7174,61 @@ package body Thick_Queries is
             | A_Not_In_Membership_Test
             =>
             declare
-               Left_Str         : constant Wide_String       := Static_Expression_Value_Image
-                                                                 (Membership_Test_Expression (Expression));
-               Choices_List     : constant Asis.Element_List := Membership_Test_Choices (Expression);
-               Is_In_Membership : constant Boolean           := Expression_Kind (Expression) = An_In_Membership_Test;
+               Left_Str         : constant Wide_String := Static_Expression_Value_Image
+                                                            (Membership_Test_Expression (Expression));
+               Is_In_Membership : constant Boolean     := Expression_Kind (Expression) = An_In_Membership_Test;
             begin
                if Left_Str = "" then
                   -- non static case variable
                   return "";
                end if;
 
-               for Choice_Index in List_Index range Choices_List'Range loop
-                  declare
-                     Current_Choice : constant Asis.Element := Choices_List (Choice_Index);
-                  begin
-                     if Element_Kind (Current_Choice) = An_Expression then
-                        if Static_Expression_Value_Image (Current_Choice) = "" then
-                           -- subtype or class membership test not covered
+               for Current_Choice : Asis.Element of Membership_Test_Choices (Expression) loop
+                  if Element_Kind (Current_Choice) = An_Expression then
+                     if Static_Expression_Value_Image (Current_Choice) = "" then
+                        -- subtype or class membership test not covered
+                        return "";
+                     end if;
+
+                     -- beware with Float (exponent) because it is a string comparison
+                     if Left_Str = Static_Expression_Value_Image (Current_Choice) then
+                        return (if Is_In_Membership then "1" else "0");
+                     end if;
+                  end if;
+
+                  if Definition_Kind (Current_Choice) = A_Constraint then
+                     -- Constraint_Kind (Current_Choice) should be A_Simple_Expression_Range
+                     -- or A_Range_Attribute_Reference
+                     declare
+                        -- with negative values being possible, it is easier to compare using actual values
+                        Bounds_List : constant Asis.Element_List    := Discrete_Constraining_Bounds (Current_Choice);
+                        -- digits, delta, float...etc will lead to Constraint_Error
+                        Left_Value  : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Left_Str);
+                        Lower_Bound : constant Asis.Element         := Bounds_List (Bounds_List'First);
+                        Upper_Bound : constant Asis.Element         := Bounds_List (Bounds_List'Last);
+                     begin
+                        -- with a modular type 'Range, a Nil_Element is used as the lower bound
+                        -- should first check if it is really a modular type
+                        if Is_Nil (Lower_Bound)
+                          and then not Is_Nil (Upper_Bound)
+                          and then Left_Value in 0 .. Discrete_Static_Expression_Value (Upper_Bound)
+                        then
+                           return (if Is_In_Membership then "1" else "0");
+                        end if;
+
+                        if Is_Nil (Lower_Bound) or else Is_Nil (Upper_Bound) then
                            return "";
                         end if;
 
-                        -- beware with Float (exponent) because it is a string comparison
-                        if Left_Str = Static_Expression_Value_Image (Current_Choice) then
-                           return Choose (Is_In_Membership, "1", "0");
+                        if Left_Value in Discrete_Static_Expression_Value (Lower_Bound) ..
+                                         Discrete_Static_Expression_Value (Upper_Bound)
+                        then
+                           return (if Is_In_Membership then "1" else "0");
                         end if;
-                     end if;
-
-                     if Definition_Kind (Current_Choice) = A_Constraint then
-                        -- Constraint_Kind (Current_Choice) should be A_Simple_Expression_Range
-                        -- or A_Range_Attribute_Reference
-                        declare
-                           -- with negative values being possible, it is easier to compare using actual values
-                           Bounds_List : constant Asis.Element_List    := Discrete_Constraining_Bounds (Current_Choice);
-                           -- digits, delta, float...etc will lead to Constraint_Error
-                           Left_Value  : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Left_Str);
-                           Lower_Bound : constant Asis.Element         := Bounds_List (Bounds_List'First);
-                           Upper_Bound : constant Asis.Element         := Bounds_List (Bounds_List'Last);
-                        begin
-                           -- with a modular type 'Range, a Nil_Element is used as the lower bound
-                           -- should first check if it is really a modular type
-                           if Is_Nil (Lower_Bound)
-                             and then not Is_Nil (Upper_Bound)
-                             and then Left_Value in 0 .. Discrete_Static_Expression_Value (Upper_Bound)
-                           then
-                              return Choose (Is_In_Membership, "1", "0");
-                           end if;
-
-                           if Is_Nil (Lower_Bound) or else Is_Nil (Upper_Bound) then
-                              return "";
-                           end if;
-
-                           if Left_Value in Discrete_Static_Expression_Value (Lower_Bound) ..
-                                            Discrete_Static_Expression_Value (Upper_Bound)
-                           then
-                              return Choose (Is_In_Membership, "1", "0");
-                           end if;
-                        end;
-                     end if;
-                  end;
+                     end;
+                  end if;
                end loop;
-               return Choose (Is_In_Membership, "0", "1");
+               return (if Is_In_Membership then "0" else "1");
             end;
 
          when others =>
@@ -7370,8 +7270,8 @@ package body Thick_Queries is
 
       function Are_Static_Components (Compos : Asis.Association_List) return Boolean is
       begin
-         for C in Compos'Range loop
-            if not Is_Static_Expression (Component_Expression (Compos (C))) then
+         for C : Asis.Association of Compos loop
+            if not Is_Static_Expression (Component_Expression (C)) then
                return False;
             end if;
          end loop;

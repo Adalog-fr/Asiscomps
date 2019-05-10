@@ -146,8 +146,8 @@ package body Project_File.GPR is
       Project_Dirs : constant File_Array := Source_Dirs (Root_Project (Project.Tree), Recursive => True);
       Result       : Unbounded_Wide_String;
    begin
-      for D in Project_Dirs'Range loop
-         Append (Result, " -I" & To_Wide_String (+Full_Name (Project_Dirs (D))));
+      for D : Virtual_File of Project_Dirs loop
+         Append (Result, " -I" & To_Wide_String (+Full_Name (D)));
       end loop;
       return To_Wide_String (Result);
    end I_Options;
@@ -163,18 +163,18 @@ package body Project_File.GPR is
       Project_Dirs : constant File_Array := Object_Path (Root_Project (Project.Tree), Recursive => True);
       Result       : Unbounded_Wide_String;
    begin
-      for D in Project_Dirs'Range loop
-         if not Is_Directory (Project_Dirs (D)) then
+      for D : Virtual_File of Project_Dirs loop
+         if not Is_Directory (D) then
             -- These must exist since tree files are stored there
             begin
-               Make_Dir (Project_Dirs (D));
+               Make_Dir (D);
             exception
                when Vfs_Directory_Error =>
                   raise Project_Error
-                    with "Unable to create missing directory " & (+Full_Name (Project_Dirs (D)));
+                    with "Unable to create missing directory " & (+Full_Name (D));
             end;
          end if;
-         Append (Result, " -T" & To_Wide_String (+Full_Name (Project_Dirs (D))));
+         Append (Result, " -T" & To_Wide_String (+Full_Name (D)));
       end loop;
       return To_Wide_String (Result);
    end T_Options;
@@ -248,8 +248,8 @@ package body Project_File.GPR is
          end if;
       end if;
 
-      for I in Attributes'Range loop
-         if Attributes (I).all = Switch then
+      for A : Gnat.Strings.String_Access of Attributes.all loop
+         if A.all = Switch then
             GNAT.Strings.Free (Attributes);
             return True;
          end if;
