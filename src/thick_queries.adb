@@ -5913,6 +5913,7 @@ package body Thick_Queries is
                         -- Access to SP...
                         return Nil_Element_List;
                      end if;
+                     No_Unconstrained := True; -- This is an object
                   when An_Attribute_Reference =>
                      -- We cannot get to the bounds of T'Base, and taking T instead would be misleading
                      -- There is no applicable constraints for 'Class
