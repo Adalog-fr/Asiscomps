@@ -1126,7 +1126,11 @@ package Thick_Queries is
    -- Returns the list of types from The_Callable's profile for which The_Callable is a primitive operation
    -- Returned types are first named subtypes, and appear only once in the list (even if The_Callable has several
    -- parameters of the primitive type)
-   -- Appropriate Element_Kinds like Types_Profile
+   -- For entries of tasks, and protected operations, that implement interfaces, the first element is the task/protected
+   -- type, unless The_Callable belongs to a single task/protected object, in which case the task/protected object
+   -- declaration is returned instead.
+
+   -- Appropriate Element_Kinds: like Types_Profile
    --
    -- Returns Element_Kinds:
    --    A_Declaration

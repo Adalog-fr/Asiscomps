@@ -1,4 +1,3 @@
-with Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -2535,7 +2534,35 @@ package body Thick_Queries is
                end if;
             end if;
          end loop;
-         return Result (1 .. Last);
+
+         -- If the callable is a task entry or a protected operation, and the enclosing task/protected type implements
+         -- some interface, add the task/protected type to the list of primitive types - except if it is a local
+         -- subprogram of the protected body, of course.
+         -- Beware: we may be adding a task/protected OBJECT declaration, in the case of a single task/protected
+         -- declaration. Annoying, but what else can we do?
+         Decl := Enclosing_Element (The_Callable);
+         if Definition_Kind (Decl) not in A_Task_Definition | A_Protected_Definition then
+            -- normal case
+            return Result (1 .. Last);
+         end if;
+
+         Decl := Enclosing_Element (Decl);
+         if Declaration_Interface_List (Decl) = Nil_Element_List then
+            -- No interfaces => regular case
+            return Result (1 .. Last);
+         end if;
+
+         if Declaration_Kind (Decl) = A_Protected_Body_Declaration then
+            if Is_Nil (Corresponding_Declaration (The_Callable))
+              or else Definition_Kind (Enclosing_Element
+                                       (Corresponding_Declaration (The_Callable))) /= A_Protected_Definition
+            then
+               -- It's a local subprogram of a protected body
+               return Result (1 .. Last);
+            end if;
+         end if;
+
+         return Decl & Result (1..Last);
       end;
    end Corresponding_Primitive_Types;
 
@@ -3502,7 +3529,9 @@ package body Thick_Queries is
                                       return Boolean
    is
       use Asis.Definitions;
-      Decl : Asis.Declaration := The_Subtype;
+      Decl : Asis.Declaration := (if Element_Kind (The_Subtype) = A_Definition
+                                  then Enclosing_Element (The_Subtype)
+                                  else The_Subtype);
    begin
       Decl := Corresponding_First_Subtype (Decl);
       if Type_Kind (Type_Declaration_View (Decl)) = A_Derived_Type_Definition then
