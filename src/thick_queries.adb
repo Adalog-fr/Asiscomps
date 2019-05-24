@@ -2311,14 +2311,28 @@ package body Thick_Queries is
                         The_Call := Enclosing_Element (The_Call);
                      end loop;
                      declare
-                        Parameter_Type_Decl : constant Asis.Declaration := A4G_Bugs.Corresponding_Expression_Type
-                                                                            (Actual_Parameter
-                                                                             (Actual_Parameters (The_Call) (1)));
+                        Parameters : constant Asis.Association_List := (Actual_Parameters (The_Call));
+                        Parameter_Type_Decl : Asis.Declaration;
                      begin
+                        Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
+                                                                                       (Parameters (1)));
                         if Is_Nil (Parameter_Type_Decl) then
                            -- The parameter type must be of an anonymous type. The only available operations are "="
                            -- and "/=", and they are primitive!
                            return True;
+                        end if;
+                        if Is_Part_Of_Implicit (Parameter_Type_Decl) then
+                           -- The first parameter is some literal or equivalent, try the other one if any
+                           if Parameters'Length = 1 then
+                              -- unary operator on literal => not primitive
+                              return False;
+                           end if;
+                           Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
+                                                                                          (Parameters (2)));
+                           if Is_Part_Of_Implicit (Parameter_Type_Decl) then
+                              -- both literals
+                              return False;
+                           end if;
                         end if;
                         return Is_Equal (Corresponding_First_Subtype (Parameter_Type_Decl), Type_Decl);
                      end;
