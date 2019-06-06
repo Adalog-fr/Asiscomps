@@ -2409,14 +2409,19 @@ package body Thick_Queries is
       end if;
 
       -- Not an inherited callable here
-      -- The callable is primitive if it is declared immediately within the same package specification as the type
-      -- and it is an operation of the type
-      if        Declaration_Kind (Enclosing_Element (Type_Decl))         /= A_Package_Declaration
-        or else Declaration_Kind (Enclosing_Element (Inst_Or_Call_Decl)) /= A_Package_Declaration
-        or else not Is_Equal (Enclosing_Element (Type_Decl), Enclosing_Element (Inst_Or_Call_Decl))
-      then
-         return False;
-      end if;
+      -- The callable is primitive if it is declared immediately within the same (generic) package specification
+      -- as the type and it is an operation of the type
+      declare
+         T_Encl : constant Asis.Declaration := Enclosing_Element (Type_Decl);
+         C_Encl : constant Asis.Declaration := Enclosing_Element (Inst_Or_Call_Decl);
+      begin
+         if        Declaration_Kind (T_Encl) not in A_Package_Declaration | A_Generic_Package_Declaration
+           or else Declaration_Kind (C_Encl) not in A_Package_Declaration | A_Generic_Package_Declaration
+           or else not Is_Equal (T_Encl, C_Encl)
+         then
+            return False;
+         end if;
+      end;
 
       declare
          Prof : constant Profile_Descriptor := Types_Profile (Callable_Decl);
