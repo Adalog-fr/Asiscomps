@@ -2311,7 +2311,7 @@ package body Thick_Queries is
                         The_Call := Enclosing_Element (The_Call);
                      end loop;
                      declare
-                        Parameters : constant Asis.Association_List := (Actual_Parameters (The_Call));
+                        Parameters : constant Asis.Association_List := Actual_Parameters (The_Call);
                         Parameter_Type_Decl : Asis.Declaration;
                      begin
                         Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
@@ -2334,7 +2334,9 @@ package body Thick_Queries is
                               return False;
                            end if;
                         end if;
-                        return Is_Equal (Corresponding_First_Subtype (Parameter_Type_Decl), Type_Decl);
+                        return Is_Equal (Corresponding_Full_Type_Declaration (Corresponding_First_Subtype
+                                                                              (Parameter_Type_Decl)),
+                                         Corresponding_Full_Type_Declaration (Type_Decl));
                      end;
                   end if;
                when An_Enumeration_Literal | A_Character_Literal =>
@@ -2412,12 +2414,12 @@ package body Thick_Queries is
       -- The callable is primitive if it is declared immediately within the same (generic) package specification
       -- as the type and it is an operation of the type
       declare
-         T_Encl : constant Asis.Declaration := Enclosing_Element (Type_Decl);
-         C_Encl : constant Asis.Declaration := Enclosing_Element (Inst_Or_Call_Decl);
+         Encl_Type : constant Asis.Declaration := Enclosing_Element (Type_Decl);
+         Encl_Call : constant Asis.Declaration := Enclosing_Element (Inst_Or_Call_Decl);
       begin
-         if        Declaration_Kind (T_Encl) not in A_Package_Declaration | A_Generic_Package_Declaration
-           or else Declaration_Kind (C_Encl) not in A_Package_Declaration | A_Generic_Package_Declaration
-           or else not Is_Equal (T_Encl, C_Encl)
+         if        Declaration_Kind (Encl_Type) not in A_Package_Declaration | A_Generic_Package_Declaration
+           or else Declaration_Kind (Encl_Call) not in A_Package_Declaration | A_Generic_Package_Declaration
+           or else not Is_Equal (Encl_Type, Encl_Call)
          then
             return False;
          end if;
@@ -2499,9 +2501,10 @@ package body Thick_Queries is
                                  return Nil_Element_List;
                               end if;
                            end;
-                           return (1 => Param_Type);
+                           return (1 => Corresponding_First_Subtype (Param_Type));
                         when others =>
-                           return (1 => A4G_Bugs.Corresponding_Expression_Type (Enclosing_Element (The_Callable)));
+                           return (1 => Corresponding_First_Subtype (A4G_Bugs.Corresponding_Expression_Type
+                                                                     (Enclosing_Element (The_Callable))));
                      end case;
 
                   end if;
