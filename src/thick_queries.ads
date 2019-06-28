@@ -1588,4 +1588,7 @@ package Thick_Queries is
    --   Left and Right statically denote the same constant or in parameter
    --   or Left and Right are discrete and evaluate statically to the same value.
 
+   function Is_Tagged (Component : Asis.Defining_Name) return Boolean;
+   -- Return True if the component is a tagged type, False otherwise
+
 end Thick_Queries;

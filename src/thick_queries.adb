@@ -8119,4 +8119,39 @@ package body Thick_Queries is
       end if;
    end Used_Identifiers;
 
+   function Is_Tagged (Component : Asis.Defining_Name) return Boolean is
+      Category : constant Type_Categories := Type_Category (Component);
+   begin
+      case Category is
+         when A_Task_Type | A_Protected_Type =>
+            return Declaration_Interface_List (Enclosing_Element (Component))'Length > 0;
+         when A_Private_Type =>
+            declare
+               Private_Def : constant Asis.Definition := Type_Declaration_View (Enclosing_Element (Component));
+            begin
+               case Definition_Kind (Private_Def) is
+                  when A_Tagged_Private_Type_Definition
+                     | A_Private_Extension_Definition
+                     =>
+                     return True;
+                  when A_Formal_Type_Definition =>
+                     case Formal_Type_Kind (Private_Def) is
+                        when A_Formal_Tagged_Private_Type_Definition =>
+                           return True;
+                        when A_Formal_Derived_Type_Definition =>
+                           return Trait_Kind (Private_Def) = A_Private_Trait;
+                        when others =>
+                           return False;
+                     end case;
+                  when others =>
+                     return False;
+               end case;
+            end;
+         when A_Tagged_Type | An_Interface_Type =>
+            return True;
+         when others =>
+            return False;
+      end case;
+   end Is_Tagged;
+
 end Thick_Queries;
