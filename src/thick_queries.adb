@@ -5145,6 +5145,54 @@ package body Thick_Queries is
    end Ultimate_Name;
 
 
+   ----------------------
+   -- Is_Expanded_Name --
+   ----------------------
+
+   function Is_Expanded_Name (Name : Asis.Expression) return Boolean is
+      use Asis.Expressions;
+      Decl : Asis.Declaration;
+   begin
+      if Expression_Kind (Name) /= A_Selected_Component then
+         return False;
+      end if;
+
+      Decl := Corresponding_Name_Declaration (Simple_Name (Prefix (Name)));
+      case Element_Kind (Decl) is
+         when A_Statement => -- Block or loop label or accept statement
+            return True;
+         when A_Declaration =>
+            case Declaration_Kind (Decl) is
+               when A_Package_Declaration
+                  | A_Procedure_Declaration
+                  | A_Function_Declaration
+                  | An_Entry_Declaration
+                  | A_Task_Type_Declaration
+                  | A_Single_Task_Declaration
+                  | A_Protected_Type_Declaration
+                  | A_Single_Protected_Declaration
+
+                  | A_Package_Body_Declaration
+                  | A_Procedure_Body_Declaration
+                  | A_Function_Body_Declaration
+                  | An_Entry_Body_Declaration
+                  | A_Task_Body_Declaration
+                  | A_Protected_Body_Declaration
+                  | A_Body_Stub
+
+                  | A_Generic_Declaration
+                  | A_Generic_Instantiation
+                  =>
+                  return True;
+               when others =>
+                  return False;
+            end case;
+         when others =>
+            return False;
+      end case;
+   end Is_Expanded_Name;
+
+
    -------------------------
    -- First_Defining_Name --
    -------------------------
@@ -6925,8 +6973,10 @@ package body Thick_Queries is
             end case;
 
          when A_Selected_Component =>
-            -- If the prefix is not the name of an enclosing construt (i.e. record selection f.e.)
-            -- it will not be static anyway
+            if not Is_Expanded_Name (Expression) then
+               -- A record component or the like is never a static expression
+               return "";
+            end if;
             return Static_Expression_Value_Image (Selector (Expression));
 
          when A_Type_Conversion
@@ -7374,6 +7424,14 @@ package body Thick_Queries is
             | A_Named_Array_Aggregate
             =>
             return Are_Static_Components (Array_Component_Associations (Expr));
+         when An_Attribute_Reference =>
+            -- We can have attributes that are statically computable, but are not static expressions
+            -- (i.e. 'First when the prefix includes a dereference, but the component has a static constraint)
+            -- Make sure the prefix is just an expanded name
+            if not Is_Expanded_Name (Prefix (Expr)) then
+               return False;
+            end if;
+            return Static_Expression_Value_Image (Expr) /= "";
          when others =>
             return Static_Expression_Value_Image (Expr) /= "";
       end case;

@@ -908,6 +908,10 @@ package Thick_Queries is
    --    A_Selected_Component (operates on selector)
    --    An_Attribute_Reference
 
+   function Is_Expanded_Name (Name : Asis.Expression) return Boolean;
+   -- Returns True if Name is an expanded name, as defined in 4.1.3 (10..13)
+   -- Returns False otherwise
+
    function First_Defining_Name (Name : Asis.Element) return Asis.Defining_Name;
    -- Returns the first textually encountered defining name of Name (assuming normal
    -- processing order), i.e.:
