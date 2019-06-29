@@ -384,17 +384,12 @@ package body Units_List is
                end;
             end Add_Withed_Unit;
 
-            My_CC_List : constant Context_Clause_List := Context_Clause_Elements (My_Unit);
          begin   -- Process_Unit
-            for I in My_CC_List'Range loop
-               if Clause_Kind (My_CC_List (I)) = A_With_Clause then
-                  declare
-                     Withed_Units : constant Asis.Name_List := Clause_Names (My_CC_List (I));
-                  begin
-                     for J in Withed_Units'Range loop
-                        Add_Withed_Unit (Withed_Units (J));
-                     end loop;
-                  end;
+            for CC : Asis.Element of Context_Clause_Elements (My_Unit) loop
+               if Clause_Kind (CC) = A_With_Clause then
+                  for Unit : Asis.Name of Clause_Names (CC) loop
+                     Add_Withed_Unit (Unit);
+                  end loop;
                end if;
             end loop;
          end Process_Unit;
@@ -452,21 +447,17 @@ package body Units_List is
             return;
          end if;
 
-         declare
-            My_CU_List : constant Compilation_Unit_List := Asis.Compilation_Units.Subunits (My_Unit);
-         begin
-            for I in My_CU_List'Range loop
-               -- We do not add stubs if Add_Stubs is false, but if recursive, we still need
-               -- to add units that are withed by the stub
-               if Add_Stubs then
-                  Add (Unit_Full_Name (My_CU_List (I)));
-               end if;
+         for CU : Asis.Compilation_Unit of Asis.Compilation_Units.Subunits (My_Unit) loop
+            -- We do not add stubs if Add_Stubs is false, but if recursive, we still need
+            -- to add units that are withed by the stub
+            if Add_Stubs then
+               Add (Unit_Full_Name (CU));
+            end if;
 
-               if Recursion /= None then
-                  Process_Dependents (Unit_Spec => Nil_Compilation_Unit, Unit_Body => My_CU_List (I));
-               end if;
-            end loop;
-         end;
+            if Recursion /= None then
+               Process_Dependents (Unit_Spec => Nil_Compilation_Unit, Unit_Body => CU);
+            end if;
+         end loop;
       end Do_Process_Stub;
 
       procedure Process_Units_Spec (Spec : Wide_String) is
