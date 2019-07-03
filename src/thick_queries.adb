@@ -5157,6 +5157,10 @@ package body Thick_Queries is
          return False;
       end if;
 
+      if Expression_Kind (Prefix (Name)) /= A_Selected_Component then
+         -- Function calls, conversions, etc.
+         return True;
+      end if;
       Decl := Corresponding_Name_Declaration (Simple_Name (Prefix (Name)));
       case Element_Kind (Decl) is
          when A_Statement => -- Block or loop label or accept statement
@@ -7428,7 +7432,7 @@ package body Thick_Queries is
             -- We can have attributes that are statically computable, but are not static expressions
             -- (i.e. 'First when the prefix includes a dereference, but the component has a static constraint)
             -- Make sure the prefix is just an expanded name
-            if not Is_Expanded_Name (Prefix (Expr)) then
+            if Expression_Kind (Prefix (Expr)) = A_Selected_Component and then not Is_Expanded_Name (Prefix (Expr)) then
                return False;
             end if;
             return Static_Expression_Value_Image (Expr) /= "";
