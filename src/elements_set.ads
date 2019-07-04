@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
 --  Elements_Set - Package specification                            --
---  Copyright (C) 2012 Adalog                                       --
+--  Copyright (C) 2012, 2019 Adalog                                 --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -32,23 +32,39 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 
-pragma Ada_05;
-with
+with   -- Ada
+  Ada.Strings.Wide_Unbounded;
+
+with   -- Asis
   Asis;
 
+with   -- Adalog components
+  Thick_Queries;
+
 private with
-  Binary_Map,
-  Ada.Strings.Wide_Unbounded;
+  Binary_Map;
 package Elements_Set is
+   -- This package implements sets of (named) Asis elements.
+
    type Set is private;   -- Object semantic, initially empty
    Empty_Set : constant Set;
 
+   type Image_List is array (Asis.List_Index range <>) of Ada.Strings.Wide_Unbounded.Unbounded_Wide_String;
+
    procedure Add (To : in out Set; Element  : Asis.Element);
    procedure Add (To : in out Set; Elements : Asis.Element_List);
+   -- Adds Element to the set
+   -- Expected element kinds:
+   -- Whatever is appropriate for Thick_Queries.Full_Name_Image
 
+   function Size (S : Set) return Asis.ASIS_Natural;
+
+   function Names_In_Set    (S : Set) return Image_List;
+   function Elements_In_Set (S : Set) return Thick_Queries.General_Defining_Name_List;
    function Elements_In_Set (S : Set) return Asis.Defining_Name_List;
+   -- For the case where we know damn well that there are no attributes (not type names f.e.)
 
-   function Contains (To : in Set; Element : in Asis.Element) return Boolean;
+   function Contains (S : in Set; Element : in Asis.Element) return Boolean;
 
    procedure Delete (To : in out Set; Element : Asis.Element);
 
@@ -56,7 +72,7 @@ package Elements_Set is
 private
    use Ada.Strings.Wide_Unbounded;
    package Element_Map is new Binary_Map (Key_Type   => Unbounded_Wide_String,
-                                          Value_Type => Asis.Element);
+                                          Value_Type => Thick_Queries.General_Defining_Name);
    type Set is new Element_Map.Map;
    Empty_Set : constant Set := Set (Element_Map.Empty_Map);
 end Elements_Set;

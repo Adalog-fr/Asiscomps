@@ -31,9 +31,11 @@
 --  reasons why  the executable  file might be  covered by  the GNU --
 --  Public License.                                                 --
 ----------------------------------------------------------------------
-
-with
-  Thick_Queries, Utilities;
+with   -- Asis
+  Asis.Elements,
+  Asis.Expressions;
+with   -- Adalog components
+  Utilities;
 package body Elements_Set is
    use Thick_Queries;
 
@@ -42,11 +44,25 @@ package body Elements_Set is
    ---------
 
    procedure Add (To : in out Set; Element : Asis.Element) is
+      use Asis, Asis.Elements, Asis.Expressions;
       use Utilities;
    begin
-      Add (To,
-           To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Simple_Name (Element)))),
-           First_Defining_Name (Element));
+      case Attribute_Kind (Element) is
+         when A_Base_Attribute =>
+            Add (To,
+                 To_Unbounded_Wide_String (Full_Name_Image (Element)),
+                 (First_Defining_Name (Prefix (Element)), Base));
+         when A_Class_Attribute =>
+            Add (To,
+                 To_Unbounded_Wide_String (Full_Name_Image (Element)),
+                 (First_Defining_Name (Prefix (Element)), Class));
+         when Not_An_Attribute =>
+            Add (To,
+                 To_Unbounded_Wide_String (Full_Name_Image (Element)),
+                 (First_Defining_Name (Element), None));
+         when others =>
+            Failure ("Add: bad attribute", Element);
+      end case;
    end Add;
 
    ---------
@@ -60,50 +76,109 @@ package body Elements_Set is
       end loop;
    end Add;
 
-   ---------------------
-   -- Elements_In_Set --
-   ---------------------
 
-   function Elements_In_Set (S : Set) return Asis.Element_List is
+   ----------
+   -- Size --
+   ----------
+
+   function Size (S : Set) return Asis.ASIS_Natural is
       use Asis;
       use Element_Map;
 
       Local_Map : Map := Map (S);
+      Count     : Asis_Natural := 0;
 
-      Count : Asis_Natural := 0;
-      procedure Inc  (Key : Unbounded_Wide_String; Value : in out Asis.Element) is
+      procedure Inc  (Key : Unbounded_Wide_String; Value : in out Thick_Queries.General_Defining_Name) is
          pragma Unreferenced (Key, Value);
       begin
          Count := Count + 1;
       end Inc;
-      procedure Count_Set is new Iterate (Inc);
+      procedure Count_Set is new Element_Map.Iterate (Inc);
    begin
       Count_Set (Local_Map);
-      declare
-         Result : Element_List (1 .. Count);
-         Inx    : Asis_Natural := 0;
-         procedure Add_One (Key : Unbounded_Wide_String; Value : in out Asis.Element) is
-            pragma Unreferenced (Key);
-         begin
-            Inx := Inx + 1;
-            Result (Inx) := Value;
-         end Add_One;
-         procedure Populate is new Iterate (Add_One);
+      return Count;
+   end Size;
+
+
+   ------------------
+   -- Names_In_Set --
+   ------------------
+
+   function Names_In_Set (S : Set) return Image_List Is
+      use Asis;
+      use Element_Map;
+
+      Local_Map : Map := Map (S);
+      Result    : Image_List (1 .. Size (S));
+      Inx       : Asis_Natural := 0;
+      procedure Add_One (Key : Unbounded_Wide_String; Value : in out Thick_Queries.General_Defining_Name) is
+         pragma Unreferenced (Value);
       begin
-         Populate (Local_Map);
-         return Result;
-      end;
+         Inx := Inx + 1;
+         Result (Inx) := Key;
+      end Add_One;
+      procedure Populate is new Iterate (Add_One);
+   begin
+      Populate (Local_Map);
+      return Result;
+   end Names_In_Set;
+
+
+   ---------------------
+   -- Elements_In_Set --
+   ---------------------
+
+   function Elements_In_Set (S : Set) return Thick_Queries.General_Defining_Name_List is
+      use Asis;
+      use Element_Map;
+
+      Local_Map : Map := Map (S);
+      Result    : General_Defining_Name_List (1 .. Size (S));
+      Inx    : Asis_Natural := 0;
+      procedure Add_One (Key : Unbounded_Wide_String; Value : in out Thick_Queries.General_Defining_Name) is
+         pragma Unreferenced (Key);
+      begin
+         Inx := Inx + 1;
+         Result (Inx) := Value;
+      end Add_One;
+      procedure Populate is new Iterate (Add_One);
+   begin
+      Populate (Local_Map);
+      return Result;
    end Elements_In_Set;
+
+
+   ---------------------
+   -- Elements_In_Set --
+   ---------------------
+
+   function Elements_In_Set (S : Set) return Asis.Defining_Name_List is
+      use Asis;
+      use Element_Map;
+
+      Local_Map : Map := Map (S);
+      Result    : Defining_Name_List (1 .. Size (S));
+      Inx    : Asis_Natural := 0;
+      procedure Add_One (Key : Unbounded_Wide_String; Value : in out Thick_Queries.General_Defining_Name) is
+         pragma Unreferenced (Key);
+      begin
+         Inx := Inx + 1;
+         Result (Inx) := Value.Name;
+      end Add_One;
+      procedure Populate is new Iterate (Add_One);
+   begin
+      Populate (Local_Map);
+      return Result;
+   end Elements_In_Set;
+
 
    --------------
    -- Contains --
    --------------
 
-   function Contains (To : in Set; Element : in Asis.Element) return Boolean
-   is
-      use Utilities;
+   function Contains (S : in Set; Element : in Asis.Element) return Boolean is
    begin
-      return Is_Present (To, To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Simple_Name (Element)))));
+      return Is_Present (S, To_Unbounded_Wide_String (Full_Name_Image (Element)));
    end Contains;
 
    ------------
@@ -111,9 +186,8 @@ package body Elements_Set is
    ------------
 
    procedure Delete (To : in out Set; Element : Asis.Element) is
-      use Utilities;
    begin
-      Delete (To, To_Unbounded_Wide_String (To_Upper (Full_Name_Image (Simple_Name (Element)))));
+      Delete (To, To_Unbounded_Wide_String (Full_Name_Image (Element)));
    end Delete;
 
    -----------
