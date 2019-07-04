@@ -476,15 +476,13 @@ package body Thick_Queries is
                | An_Anonymous_Access_To_Protected_Procedure
                =>
                return (Access_Form  => Form,
-                       Attribute    => None,
-                       Name         => Nil_Element,
+                       General_Name => (Attribute => None, Name => Nil_Element),
                        Anon_Profile => new Profile_Descriptor'(Types_Profile (Def)));
             when An_Anonymous_Access_To_Function
                | An_Anonymous_Access_To_Protected_Function
                =>
                return (Access_Form  => Form,
-                       Attribute    => None,
-                       Name         => Nil_Element,
+                       General_Name => (Attribute => None, Name => Nil_Element),
                        Anon_Profile => new Profile_Descriptor'(Types_Profile (Def)));
          end case;
 
@@ -538,8 +536,7 @@ package body Thick_Queries is
                Decl := Corresponding_First_Subtype (Decl);
          end case;
          return (Access_Form  => Not_An_Access_Definition,
-                 Attribute    => Attribute,
-                 Name         => Names (Decl) (1),
+                 General_Name => (Attribute => Attribute, Name => Names (Decl) (1)),
                  Anon_Profile => null);
       end Build_Entry;
 
@@ -600,11 +597,12 @@ package body Thick_Queries is
             -- would choke on this.
             return (Formals_Length => 0,
                     Result_Type    => (Access_Form  => Not_An_Access_Definition,
-                                       Attribute    => None,
-                                       Name         => Names (Enclosing_Element
-                                         (Enclosing_Element (Good_Declaration))) (1),
+                                       General_Name => (Attribute => None,
+                                                        Name      => Names (Enclosing_Element
+                                                                            (Enclosing_Element
+                                                                             (Good_Declaration))) (1)),
                                        Anon_Profile => null),
-                    Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
+                    Formals        => (others => (Not_An_Access_Definition, Nil_General_Name, null)));
          when Not_A_Declaration =>
             if Definition_Kind (Good_Declaration) /= An_Access_Definition then
                Report_Error ("Types_Profile: bad declaration", Good_Declaration);
@@ -613,8 +611,7 @@ package body Thick_Queries is
             case Access_Definition_Kind (Good_Declaration) is
                when An_Anonymous_Access_To_Procedure | An_Anonymous_Access_To_Protected_Procedure =>
                   Result_Entry := (Access_Form  => Not_An_Access_Definition,
-                                   Attribute    => None,
-                                   Name         => Nil_Element,
+                                   General_Name => Nil_General_Name,
                                    Anon_Profile => null);
                when An_Anonymous_Access_To_Function  | An_Anonymous_Access_To_Protected_Function  =>
                   Result_Entry := Build_Entry (Access_To_Function_Result_Profile (Good_Declaration));
@@ -623,8 +620,7 @@ package body Thick_Queries is
             end case;
          when others => -- (generic or null) procedure, or entry declaration
             Result_Entry := (Access_Form  => Not_An_Access_Definition,
-                             Attribute    => None,
-                             Name         => Nil_Element,
+                             General_Name => Nil_General_Name,
                              Anon_Profile => null);
       end case;
 
@@ -644,7 +640,7 @@ package body Thick_Queries is
          if Parameters'Length = 0 then
             return (Formals_Length => 0,
                     Result_Type    => Result_Entry,
-                    Formals        => (others => (Not_An_Access_Definition, None, Nil_Element, null)));
+                    Formals        => (others => (Not_An_Access_Definition, Nil_General_Name, null)));
          else
             declare
                Profile : constant Profile_Table := Build_Profile (Parameters);
@@ -2428,17 +2424,17 @@ package body Thick_Queries is
       declare
          Prof : constant Profile_Descriptor := Types_Profile (Callable_Decl);
       begin
-         if not Is_Nil (Prof.Result_Type.Name)
-           and then Prof.Result_Type.Attribute /= Class
-           and then Is_Equal (Enclosing_Element (Prof.Result_Type.Name), Type_Decl)
+         if not Is_Nil (Prof.Result_Type.General_Name.Name)
+           and then Prof.Result_Type.General_Name.Attribute /= Class
+           and then Is_Equal (Enclosing_Element (Prof.Result_Type.General_Name.Name), Type_Decl)
          then
             return True;
          end if;
 
          for Param : Profile_Entry of Prof.Formals loop
-            if not Is_Nil (Param.Name)
-              and then Param.Attribute /= Class
-              and then Is_Equal (Enclosing_Element (Param.Name), Type_Decl)
+            if not Is_Nil (Param.General_Name.Name)
+              and then Param.General_Name.Attribute /= Class
+              and then Is_Equal (Enclosing_Element (Param.General_Name.Name), Type_Decl)
             then
                return True;
             end if;
@@ -2528,15 +2524,15 @@ package body Thick_Queries is
          Decl    : Asis.Declaration;
          Found   : Boolean;
       begin
-         if not Is_Nil (Profile.Result_Type.Name)             -- A function with a named result_type
-           and then Is_Primitive_Of (Profile.Result_Type.Name, The_Callable)
+         if not Is_Nil (Profile.Result_Type.General_Name.Name)             -- A function with a named result_type
+           and then Is_Primitive_Of (Profile.Result_Type.General_Name.Name, The_Callable)
          then
             Last := 1;
-            Result (Last) := Enclosing_Element (Profile.Result_Type.Name);
+            Result (Last) := Enclosing_Element (Profile.Result_Type.General_Name.Name);
          end if;
 
          for F : Profile_Entry of Profile.Formals loop
-            Decl := F.Name;
+            Decl := F.General_Name.Name;
             if not Is_Nil (Decl) then
                -- Otherwise, it is an anonymous type, can't be primitive
                Decl := Enclosing_Element (Decl);
@@ -2695,8 +2691,10 @@ package body Thick_Queries is
       Name    : constant Asis.Defining_Name := Names (Decl) (1);
       Kind    : constant Operator_Kinds := Operator_Kind (Name);
 
-      Operation_Ultimate_Type : constant Asis.Definition
-        := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (Profile.Formals (1).Name)));
+      Operation_Ultimate_Type : constant Asis.Definition := Type_Declaration_View
+                                                             (Ultimate_Type_Declaration
+                                                              (Enclosing_Element
+                                                               (Profile.Formals (1).General_Name.Name)));
 
       function Array_Dimensions (Arr_Def : Asis.Definition) return Asis.List_Index is
       -- How many dimensions in provided array declaration ?
@@ -2725,10 +2723,10 @@ package body Thick_Queries is
 
          -- Eliminate weird cases (not homogenous, access, class...) that cannot be predefined
          -- We purposedly ignore the 'Base attribute
-         if not Is_Equal (Profile.Formals (1).Name, Profile.Result_Type.Name)
+         if not Is_Equal (Profile.Formals (1).General_Name.Name, Profile.Result_Type.General_Name.Name)
            or Profile.Formals (1).Access_Form /= Not_An_Access_Definition
-           or Profile.Formals (1).Attribute = Class
-           or Profile.Result_Type.Attribute = Class
+           or Profile.Formals (1).General_Name.Attribute = Class
+           or Profile.Result_Type.General_Name.Attribute = Class
          then
             return False;
          end if;
@@ -2746,7 +2744,7 @@ package body Thick_Queries is
                return True;
             when An_Enumeration_Type_Definition =>
                -- Only Boolean has predefined operators
-               return Is_Type (Profile.Formals (1).Name, "STANDARD.BOOLEAN", Or_Derived => True)
+               return Is_Type (Profile.Formals (1).General_Name.Name, "STANDARD.BOOLEAN", Or_Derived => True)
                  and then Kind = A_Not_Operator;
             when A_Constrained_Array_Definition
                | An_Unconstrained_Array_Definition
@@ -2775,50 +2773,50 @@ package body Thick_Queries is
 
       -- Special case: "**" on floating point types
       if Kind = An_Exponentiate_Operator then
-         return Is_Equal (Profile.Formals (1).Name, Profile.Result_Type.Name)
+         return Is_Equal (Profile.Formals (1).General_Name.Name, Profile.Result_Type.General_Name.Name)
            and then Profile.Formals (1).Access_Form = Not_An_Access_Definition
            and then Profile.Formals (2).Access_Form = Not_An_Access_Definition
            and then Type_Kind (Operation_Ultimate_Type) = A_Floating_Point_Definition
-           and then Is_Type (Profile.Formals (2).Name, "STANDARD.INTEGER");
+           and then Is_Type (Profile.Formals (2).General_Name.Name, "STANDARD.INTEGER");
       end if;
 
       -- Special case: "*" and "/" on fixed point types
       if Kind in A_Multiply_Operator .. A_Divide_Operator then
-         return Is_Equal (Profile.Formals (1).Name, Profile.Result_Type.Name)
+         return Is_Equal (Profile.Formals (1).General_Name.Name, Profile.Result_Type.General_Name.Name)
            and then Profile.Formals (1).Access_Form = Not_An_Access_Definition
            and then Profile.Formals (2).Access_Form = Not_An_Access_Definition
            and then Type_Kind (Operation_Ultimate_Type) in Fixed_Type_Kinds
-           and then Is_Type (Profile.Formals (2).Name, "STANDARD.INTEGER");
+           and then Is_Type (Profile.Formals (2).General_Name.Name, "STANDARD.INTEGER");
       end if;
 
       -- Eliminate weird cases (not homogenous, access, class...) that cannot be predefined
       -- We purposedly ignore the 'Base attribute
       if Kind in Relational_Operators then
-         if not Is_Equal (Profile.Formals (1).Name, Profile.Formals (2).Name)
-           or not Is_Type (Profile.Result_Type.Name, "STANDARD.BOOLEAN", Or_Derived => True)
+         if not Is_Equal (Profile.Formals (1).General_Name.Name, Profile.Formals (2).General_Name.Name)
+           or not Is_Type (Profile.Result_Type.General_Name.Name, "STANDARD.BOOLEAN", Or_Derived => True)
            or Profile.Formals (1).Access_Form /= Not_An_Access_Definition
            or Profile.Formals (2).Access_Form /= Not_An_Access_Definition
-           or Profile.Formals (1).Attribute = Class
-           or Profile.Formals (2).Attribute = Class
-           or Profile.Result_Type.Attribute = Class
+           or Profile.Formals (1).General_Name.Attribute = Class
+           or Profile.Formals (2).General_Name.Attribute = Class
+           or Profile.Result_Type.General_Name.Attribute = Class
          then
             return False;
          end if;
       else
-         if not Is_Equal (Profile.Formals (1).Name, Profile.Formals (2).Name)
-           or not Is_Equal (Profile.Formals (1).Name, Profile.Result_Type.Name)
+         if not Is_Equal (Profile.Formals (1).General_Name.Name, Profile.Formals (2).General_Name.Name)
+           or not Is_Equal (Profile.Formals (1).General_Name.Name, Profile.Result_Type.General_Name.Name)
            or Profile.Formals (1).Access_Form /= Not_An_Access_Definition
            or Profile.Formals (2).Access_Form /= Not_An_Access_Definition
-           or Profile.Formals (1).Attribute = Class
-           or Profile.Formals (2).Attribute = Class
-           or Profile.Result_Type.Attribute = Class
+           or Profile.Formals (1).General_Name.Attribute = Class
+           or Profile.Formals (2).General_Name.Attribute = Class
+           or Profile.Result_Type.General_Name.Attribute = Class
          then
             return False;
          end if;
       end if;
 
       -- Special case: "=" and "/=" of limited types
-      if Kind in Equality_Operators and then Is_Limited (Profile.Formals (1).Name) then
+      if Kind in Equality_Operators and then Is_Limited (Profile.Formals (1).General_Name.Name) then
          return False;
       end if;
 
@@ -2882,6 +2880,30 @@ package body Thick_Queries is
             return False;
       end case;
    end Is_Task_Entry;
+
+
+   --------------------------------
+   -- Corresponding_General_Name --
+   --------------------------------
+
+   function Corresponding_General_Name (Name : Asis.Element) return General_Defining_Name is
+      use Asis.Expressions;
+   begin
+      if Element_Kind (Name) = A_Defining_Name then
+         return Nil_General_Name;
+      end if;
+
+      case Attribute_Kind (Name) is
+         when A_Class_Attribute =>
+            return (Corresponding_Name_Definition (Simple_Name (Name)), Class);
+         when A_Base_Attribute =>
+            return (Corresponding_Name_Definition (Simple_Name (Name)), Base);
+         when Not_An_Attribute =>
+            return (Corresponding_Name_Definition (Simple_Name (Name)), None);
+         when others =>
+            Report_Error ("Corresponding_General_Name: bad name", Name);
+      end case;
+   end Corresponding_General_Name;
 
 
    -------------------------
@@ -4569,9 +4591,9 @@ package body Thick_Queries is
 
       function Entry_Name (The_Entry : Profile_Entry) return Wide_String is
          function Attributed_Name return Wide_String is
-            Name_Image : constant Wide_String := Full_Name_Image (The_Entry.Name, With_Profile);
+            Name_Image : constant Wide_String := Full_Name_Image (The_Entry.General_Name.Name, With_Profile);
          begin
-            case The_Entry.Attribute is
+            case The_Entry.General_Name.Attribute is
                when None =>
                   return Name_Image;
                when Base =>
@@ -4628,7 +4650,7 @@ package body Thick_Queries is
       declare
          Profile_Names : constant Profile_Descriptor := Types_Profile (Decl_Name);
       begin
-         if Is_Nil (Profile_Names.Result_Type.Name) then
+         if Is_Nil (Profile_Names.Result_Type.General_Name.Name) then
             -- A procedure (or entry...)
             return '{' & Build_Names (Profile_Names.Formals) & '}';
          else

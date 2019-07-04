@@ -394,6 +394,28 @@ package Thick_Queries is
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
 
+   type Type_Attribute is (None, Base, Class);
+   type General_Defining_Name is    -- Like a defining name, but can handle T'Base and T'Class
+      record
+         Name      : Asis.Defining_Name;
+         Attribute : Type_Attribute;
+      end record;
+   -- A type to be used in place of a defining_name when it is necessary to differentiate between T, T'Base and T'Class
+   -- (since T'Base and T'Class have no definition of their own)
+   Nil_General_Name : constant General_Defining_Name := (Asis.Nil_Element, None);
+   type General_Defining_Name_List is array (Asis.List_Index range <>) of General_Defining_Name;
+   function Corresponding_General_Name (Name : Asis.Element) return General_Defining_Name;
+   -- Creates a General_Defining_Name from a name or defining name
+   -- If passed an attribute reference, only 'Base and 'Class are allowe
+   --
+   -- Appropriate Element_Kinds
+   --   A_Defining_Name
+   --   An_Expression
+   -- Appropriate Expression_Kinds:
+   --   An_Identifier
+   --   A_Selected_Component (works on selector)
+   --   An_Attribute_Reference (T'Base only)
+
    function Subtype_Simple_Name (Definition : Asis.Definition) return Asis.Expression;
    -- Like Subtype_Mark, but returns the selector if the subtype mark is a selected component
    -- Moreover, it avoids the ambiguity between Asis.Subtype_Mark and Asis.Definitions.Subtype_Mark
@@ -1223,14 +1245,12 @@ package Thick_Queries is
    --    A_Function_Call
 
 
-   type Type_Attribute is (None, Base, Class);
    type Profile_Descriptor (Formals_Length : Asis.ASIS_Natural);
    type Profile_Access is access Profile_Descriptor;
    type Profile_Entry is
       record
          Access_Form  : Asis.Access_Definition_Kinds;
-         Attribute    : Type_Attribute;
-         Name         : Asis.Defining_Name;
+         General_Name : General_Defining_Name;
          Anon_Profile : Profile_Access;
       end record;
    type Profile_Table is array (Asis.List_Index range <>) of Profile_Entry;
