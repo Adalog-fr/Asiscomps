@@ -54,9 +54,10 @@ package Thick_Queries is
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
-   -- Convenience subtypes (for binary operators only)                                            --
+   -- Convenience subtypes (for binary operators only) and operations                             --
    --                                                                                             --
    -------------------------------------------------------------------------------------------------
+
    subtype Logical_Operators     is Asis.Operator_Kinds range Asis.An_And_Operator     .. Asis.An_Xor_Operator;
    subtype Equality_Operators    is Asis.Operator_Kinds range Asis.An_Equal_Operator   .. Asis.A_Not_Equal_Operator;
    subtype Relational_Operators  is Asis.Operator_Kinds range Asis.An_Equal_Operator   ..
@@ -70,6 +71,10 @@ package Thick_Queries is
       range Asis.A_Signed_Integer_Type_Definition .. Asis.A_Modular_Type_Definition;
    subtype Fixed_Type_Kinds    is Asis.Type_Kinds
       range Asis.An_Ordinary_Fixed_Point_Definition .. Asis.A_Decimal_Fixed_Point_Definition;
+
+   function Is_Equal (Left, Right : Asis.Element_List) return Boolean;
+   -- There is no ASIS defined Is_Equal on Element_List, and the predefined equality raises Program_Error,
+   -- since "=" on Element is abstract
 
    -------------------------------------------------------------------------------------------------
    --                                                                                             --

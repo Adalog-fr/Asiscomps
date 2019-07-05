@@ -145,6 +145,25 @@ package body Thick_Queries is
       return True;
    end "=";
 
+   --------------
+   -- Is_Equal --
+   --------------
+
+   function Is_Equal (Left, Right : Asis.Element_List) return Boolean is
+      R_Inx : Asis.List_Index := Right'First;
+   begin
+      if Left'Length /= Right'Length then
+         return False;
+      end if;
+      for L : Asis.Element of Left loop
+         if not Is_Equal (L, Right (R_Inx)) then
+            return False;
+         end if;
+         R_Inx := R_Inx + 1;
+      end loop;
+      return True;
+   end Is_Equal;
+
    ---------------------------
    -- Access_Target_Type --
    ---------------------------
