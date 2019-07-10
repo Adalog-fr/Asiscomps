@@ -71,8 +71,8 @@ package body Elements_Set is
 
    procedure Add (To : in out Set; Elements : Asis.Element_List) is
    begin
-      for E in Elements'Range loop
-         Add (To, Elements (E));
+      for E : Asis.Element of Elements loop
+         Add (To, E);
       end loop;
    end Add;
 
@@ -94,7 +94,7 @@ package body Elements_Set is
          Count := Count + 1;
       end Inc;
       procedure Count_Set is new Element_Map.Iterate (Inc);
-   begin
+   begin  -- Size
       Count_Set (Local_Map);
       return Count;
    end Size;
@@ -104,7 +104,7 @@ package body Elements_Set is
    -- Names_In_Set --
    ------------------
 
-   function Names_In_Set (S : Set) return Image_List Is
+   function Names_In_Set (S : Set) return Image_List is
       use Asis;
       use Element_Map;
 
@@ -118,7 +118,7 @@ package body Elements_Set is
          Result (Inx) := Key;
       end Add_One;
       procedure Populate is new Iterate (Add_One);
-   begin
+   begin  -- Names_In_Set
       Populate (Local_Map);
       return Result;
    end Names_In_Set;
@@ -142,7 +142,7 @@ package body Elements_Set is
          Result (Inx) := Value;
       end Add_One;
       procedure Populate is new Iterate (Add_One);
-   begin
+   begin  -- Elements_In_Set
       Populate (Local_Map);
       return Result;
    end Elements_In_Set;
@@ -166,7 +166,7 @@ package body Elements_Set is
          Result (Inx) := Value.Name;
       end Add_One;
       procedure Populate is new Iterate (Add_One);
-   begin
+   begin  -- Elements_In_Set
       Populate (Local_Map);
       return Result;
    end Elements_In_Set;
