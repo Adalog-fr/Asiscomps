@@ -64,6 +64,8 @@ package body Thick_Queries is
    -- Internal utilities                                           --
    ------------------------------------------------------------------
 
+   subtype A_Comparison_Operator is Operator_Kinds range An_Equal_Operator .. A_Greater_Than_Or_Equal_Operator;
+
    ------------------
    -- Report_Error --
    ------------------
@@ -2329,25 +2331,30 @@ package body Thick_Queries is
                         Parameters : constant Asis.Association_List := Actual_Parameters (The_Call);
                         Parameter_Type_Decl : Asis.Declaration;
                      begin
-                        Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
-                                                                                       (Parameters (1)));
-                        if Is_Nil (Parameter_Type_Decl) then
-                           -- The parameter type must be of an anonymous type. The only available operations are "="
-                           -- and "/=", and they are primitive!
-                           return True;
-                        end if;
-                        if Is_Part_Of_Implicit (Parameter_Type_Decl) then
-                           -- The first parameter is some literal or equivalent, try the other one if any
-                           if Parameters'Length = 1 then
-                              -- unary operator on literal => not primitive
-                              return False;
-                           end if;
+                        if Operator_Kind (The_Callable) in A_Comparison_Operator then
                            Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
-                                                                                          (Parameters (2)));
-                           if Is_Part_Of_Implicit (Parameter_Type_Decl) then
-                              -- both literals
-                              return False;
+                                                                                       (Parameters (1)));
+                           if Is_Nil (Parameter_Type_Decl) then
+                              -- The parameter type must be of an anonymous type. The only available operations are "="
+                              -- and "/=", and they are primitive!
+                              return True;
                            end if;
+                           if Is_Part_Of_Implicit (Parameter_Type_Decl) then
+                              -- The first parameter is some literal or equivalent, try the other one if any
+                              if Parameters'Length = 1 then
+                                 -- unary operator on literal => not primitive
+                                 return False;
+                              end if;
+                              Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
+                                                                                             (Parameters (2)));
+                              if Is_Part_Of_Implicit (Parameter_Type_Decl) then
+                                 -- both literals
+                                 return False;
+                              end if;
+                           end if;
+                        else
+                           -- not a comparison, get the type from the result type of the expression
+                           Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (The_Call);
                         end if;
                         return Is_Equal (Corresponding_Full_Type_Declaration (Corresponding_First_Subtype
                                                                               (Parameter_Type_Decl)),
@@ -2469,8 +2476,6 @@ package body Thick_Queries is
 
    function Corresponding_Primitive_Types (The_Callable : Asis.Element) return Asis.Element_List is
       use Asis.Expressions;
-
-      subtype A_Comparison_Operator is Operator_Kinds range An_Equal_Operator .. A_Greater_Than_Or_Equal_Operator;
 
       The_Declaration : Asis.Element;
       Param_Type      : Asis.Declaration;
