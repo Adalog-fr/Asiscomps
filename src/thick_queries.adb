@@ -2504,8 +2504,7 @@ package body Thick_Queries is
                               Parameters : constant Asis.Element_List := Function_Call_Parameters (Enclosing_Element
                                                                                                    (The_Callable));
                            begin
-                              Param_Type := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
-                                                                                    (Parameters (1)));
+                              Param_Type := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter (Parameters (1)));
                               if (Is_Nil (Param_Type)
                                   or else Type_Kind (Type_Declaration_View (Param_Type)) = A_Root_Type_Definition)
                                 and Parameters'Length > 1
@@ -3667,12 +3666,17 @@ package body Thick_Queries is
             Decl := Enclosing_Element (Elem);
          when An_Expression =>
             if Expression_Kind (Elem) = An_Indexed_Component then
-               -- Array of array => the component cannot depend on discriminants, since it had to be constrained
+               -- Array => the component cannot depend on discriminants, since it had to be constrained
                -- at the point of the declaration of the enclosing array
                return Nil_Element_List;
             end if;
             Decl := Corresponding_Name_Declaration (Simple_Name (Elem));
+            if Declaration_Kind (Elem) = An_Element_Iterator_Specification then
+               -- Same as An_Indexed_Component
+               return Nil_Element_List;
+            end if;
          when others =>
+
             Report_Error ("Governing_Discriminants: Incorrect parameter", Elem);
       end case;
 
