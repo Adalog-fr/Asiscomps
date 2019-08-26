@@ -206,7 +206,8 @@ package body Project_File.GPR is
          end if;
       end if;
 
-      for I in Attributes'Range loop
+      for I in Attributes'First .. Attributes'Last - 1 loop
+         -- if After is the last parameter, there is no value after it
          if Attributes (I).all = After then
             declare  -- Could use an extended return...
                Result : constant String := Attributes (I + 1).all;
