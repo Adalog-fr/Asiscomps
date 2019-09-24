@@ -3676,9 +3676,13 @@ package body Thick_Queries is
                return Nil_Element_List;
             end if;
          when others =>
-
             Report_Error ("Governing_Discriminants: Incorrect parameter", Elem);
       end case;
+
+      if Declaration_Kind (Decl) /= A_Component_Declaration then
+         -- Only components can depend on discriminants
+         return Nil_Element_List;
+      end if;
 
       Traverse (Object_Declaration_View (Decl), Control, State);
       return Elements_In_Set (Discrs_Set);
