@@ -411,7 +411,7 @@ package Thick_Queries is
    type General_Defining_Name_List is array (Asis.List_Index range <>) of General_Defining_Name;
    function Corresponding_General_Name (Name : Asis.Element) return General_Defining_Name;
    -- Creates a General_Defining_Name from a name or defining name
-   -- If passed an attribute reference, only 'Base and 'Class are allowe
+   -- If passed an attribute reference, only 'Base and 'Class are allowed
    --
    -- Appropriate Element_Kinds
    --   A_Defining_Name
@@ -1008,6 +1008,7 @@ package Thick_Queries is
    -- return the (full) type definition of the type of The_Element
    -- Unlike Corresponding_Expression_Type, works if the the type of The_Element is
    -- an anonymous type and unwinds subtypes (but not derived types)
+   --
    -- This query is a candidate for ASIS05, and already provided by ASIS-for-GNAT,
    -- but we don't use it as long as it is not standard
    --

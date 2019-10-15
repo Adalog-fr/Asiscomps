@@ -1976,8 +1976,17 @@ package body Thick_Queries is
                      -- privacy. And of course, it cannot be a tagged incomplete type.
                      Decl := Corresponding_Full_Type_Declaration (Decl);
 
+                  when An_Element_Iterator_Specification =>
+                     Decl := Corresponding_Name_Declaration
+                       (Subtype_Simple_Name
+                          (Component_Subtype_Indication
+                               (Array_Component_Definition
+                                    (Corresponding_Expression_Type_Definition
+                                       (Iteration_Scheme_Name (Decl))))));
+
                   when others =>
-                     Report_Error ("Range_Ultimate_Name: unexpected declaration", Decl);
+                     Report_Error ("Range_Ultimate_Name: unexpected declaration "
+                                   & Declaration_Kinds'Wide_Image (Declaration_Kind (Decl)), Decl);
                end case;
             end loop;
 
