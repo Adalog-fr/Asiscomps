@@ -1977,12 +1977,11 @@ package body Thick_Queries is
                      Decl := Corresponding_Full_Type_Declaration (Decl);
 
                   when An_Element_Iterator_Specification =>
-                     Decl := Corresponding_Name_Declaration
-                       (Subtype_Simple_Name
-                          (Component_Subtype_Indication
-                               (Array_Component_Definition
-                                    (Corresponding_Expression_Type_Definition
-                                       (Iteration_Scheme_Name (Decl))))));
+                     Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                             (Component_Subtype_Indication
+                                                              (Array_Component_Definition
+                                                               (Corresponding_Expression_Type_Definition
+                                                                (Iteration_Scheme_Name (Decl))))));
 
                   when others =>
                      Report_Error ("Range_Ultimate_Name: unexpected declaration "
@@ -3909,7 +3908,9 @@ package body Thick_Queries is
             else
                Good_Elem := Corresponding_Expression_Type_Definition (Elem);
                if Is_Nil (Good_Elem) then
-                  -- Annoying special case: a task of the form "task type TT;" has no definition
+                  -- Annoying special cases:
+                  --  a task of the form "task type TT;" has no definition
+                  --  the result type of a fixed point multiplication/division has no definition
                   case Expression_Kind (Elem) is
                      when An_Identifier | A_Selected_Component =>
                         -- Only these can be type names
@@ -3922,6 +3923,9 @@ package body Thick_Queries is
                               return Not_A_Type;
                            end if;
                         end;
+                     when A_Function_Call =>
+                        -- A function call with no type? Must be a fixed point "*" or "/"
+                        return A_Fixed_Point_Type;
                      when others =>
                         return Not_A_Type;
                   end case;
@@ -4829,6 +4833,22 @@ package body Thick_Queries is
                   return Nil_Element;
                end if;
                return Component_Definition_View (Array_Component_Definition (Def));
+            when An_Explicit_Dereference =>
+               Def := Corresponding_Expression_Type_Definition (Prefix (Local_Elem));
+               if Access_Type_Kind (Def) in Asis.Access_To_Object_Definition then
+                  return Corresponding_Expression_Type_Definition (Strip_Attributes     -- Can only be 'Class or 'Base
+                                                                   (Subtype_Simple_Name
+                                                                    (Definitions.Access_To_Object_Definition
+                                                                     (Def))));
+               elsif Access_Definition_Kind (Def) in An_Anonymous_Access_To_Constant | An_Anonymous_Access_To_Variable
+               then
+                  return Corresponding_Expression_Type_Definition (Strip_Attributes     -- Can only be 'Class or 'Base
+                                                                   (Simple_Name
+                                                                    (Anonymous_Access_To_Object_Subtype_Mark (Def))));
+               else  -- access to subprogram, no type definition for the designated element
+                  return Nil_Element;
+               end if;
+
             when A_Function_Call =>
                Def := Corresponding_Name_Declaration (Simple_Name (Prefix (Local_Elem)));
                if Declaration_Kind (Def) = A_Function_Instantiation then
@@ -4842,6 +4862,12 @@ package body Thick_Queries is
                   -- An identifier, selected name, or attribute
                   return Type_Declaration_View (Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Def))));
                end if;
+            when A_Type_Conversion =>
+               -- Presumably, a conversion to a class wide type, since Corresponding_Expression_Type is Nil_Element
+               return Type_Declaration_View (Corresponding_Name_Declaration
+                                             (Simple_Name
+                                              (Strip_Attributes
+                                               (Converted_Or_Qualified_Subtype_Mark (Local_Elem)))));
             when others =>
                -- TBSL This unfortunately covers the case of an aggregate of an anonymous array type, like in:
                --   Tab : array (1..10) of Integer := (1..10 => 0);
@@ -4886,8 +4912,8 @@ package body Thick_Queries is
                when others =>
                   return Type_Declaration_View (Corresponding_Name_Declaration
                                                 (Simple_Name
-                                                   (Strip_Attributes   -- Ignore 'Base and 'Class if any
-                                                      (Subtype_Simple_Name (Def)))));
+                                                 (Strip_Attributes   -- Ignore 'Base and 'Class if any
+                                                  (Subtype_Simple_Name (Def)))));
             end case;
          when A_Discriminant_Specification
             | A_Parameter_Specification
@@ -4896,7 +4922,7 @@ package body Thick_Queries is
             if Definition_Kind (Def) = An_Access_Definition then
                return Def;
             end if;
-            return Type_Declaration_View (Corresponding_Name_Declaration (Strip_Attributes (Simple_Name (Def))));
+            return Type_Declaration_View (Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Def))));
          when A_Loop_Parameter_Specification =>
             Def := Specification_Subtype_Definition (The_Declaration);
             case Discrete_Range_Kind (Def) is
@@ -4927,7 +4953,7 @@ package body Thick_Queries is
                -- A component whose type is an anonymous access type
                return Def;
             else
-               return Type_Declaration_View (Corresponding_Name_Declaration (Strip_Attributes (Simple_Name (Def))));
+               return Type_Declaration_View (Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Def))));
             end if;
          when A_Single_Protected_Declaration
             | A_Single_Task_Declaration
