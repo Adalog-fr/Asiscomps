@@ -1020,6 +1020,7 @@ package Thick_Queries is
 
    function Corresponding_Declaration_Type_Definition (The_Declaration : Asis.Declaration) return Asis.Definition;
    -- returns the (full) type definition of the object declared by this declaration
+   -- returns the definition of the associated type for a class-wide (or base) type
    -- returns Nil_Element for any other declaration
    --
    -- Appropriate declaration kinds:

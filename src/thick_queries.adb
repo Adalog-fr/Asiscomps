@@ -1978,7 +1978,7 @@ package body Thick_Queries is
 
                   when An_Element_Iterator_Specification =>
                      Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                             (Component_Subtype_Indication
+                                                             (Component_Definition_View
                                                               (Array_Component_Definition
                                                                (Corresponding_Expression_Type_Definition
                                                                 (Iteration_Scheme_Name (Decl))))));
