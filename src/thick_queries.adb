@@ -2341,7 +2341,7 @@ package body Thick_Queries is
                      begin
                         if Operator_Kind (The_Callable) in A_Comparison_Operator then
                            Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (Actual_Parameter
-                                                                                       (Parameters (1)));
+                                                                                          (Parameters (1)));
                            if Is_Nil (Parameter_Type_Decl) then
                               -- The parameter type must be of an anonymous type. The only available operations are "="
                               -- and "/=", and they are primitive!
@@ -2425,7 +2425,9 @@ package body Thick_Queries is
          Inst_Or_Call_Decl := Callable_Decl;
       end if;
 
-      if Type_Kind (Enclosing_Element (Callable_Decl)) = A_Derived_Type_Definition then
+      if Type_Kind (Enclosing_Element (Callable_Decl))
+            in A_Derived_Type_Definition | A_Derived_Record_Extension_Definition
+      then
          -- This is an inherited subprogram => primitive of the enclosing type
          return Is_Equal (Type_Decl, Enclosing_Element (Enclosing_Element (Callable_Decl)));
       end if;
