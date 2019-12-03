@@ -561,7 +561,10 @@ package body Utilities is
    -- Quote --
    -----------
 
-   function Quote (Item : Wide_String; Add_Outer : Boolean := True) return Wide_String is
+   function Quote (Item        : in Wide_String;
+                   Escape_With : Wide_Character := '"';
+                   Add_Outer   : Boolean := True) return Wide_String
+   is
       Result : Wide_String (Item'First .. Item'Last + Ada.Strings.Wide_Fixed.Count (Item, """") + 2);
       Index  : Natural;
    begin
@@ -575,7 +578,7 @@ package body Utilities is
       for Current_C : Wide_Character of Item loop
          if Current_C = '"' then
             Index := Index + 1;
-            Result (Index) := '"';
+            Result (Index) := Escape_With;
          end if;
          Index := Index + 1;
          Result (Index) := Current_C;

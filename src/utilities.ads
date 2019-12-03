@@ -88,9 +88,11 @@ package Utilities is
    --  Similar to To_Upper, but makes the string Title_Case
    pragma Inline (To_Title);
 
-   function Quote (Item : in Wide_String; Add_Outer : Boolean := True) return Wide_String;
+   function Quote (Item        : in Wide_String;
+                   Escape_With : Wide_Character := '"';
+                   Add_Outer  : Boolean := True) return Wide_String;
    -- If Add_Outer, surrounds Item with double quotes;
-   -- In any case, any inner double quote is doubled
+   -- In any case, any inner double quote is prefixed with the Escape_With Character
    -- Result has same 'First as Item (but is longer)
 
    function Trim_All (Item : in Wide_String) return Wide_String;
