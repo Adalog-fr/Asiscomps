@@ -1147,7 +1147,7 @@ package Thick_Queries is
    --    A_Declaration
    --    A_Defining_Name
    --    An_Expression
-   -- Appropriate Expression_Kinds for The_Type:
+   -- Appropriate Expression_Kinds for The_Callable:
    --    An_Identifier
    --    An_Attribute_Reference
    --    A_Selected_Component (applies to the selector)

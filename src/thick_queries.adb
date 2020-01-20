@@ -1871,12 +1871,12 @@ package body Thick_Queries is
       Def  : Asis.Definition;
 
       function Range_Position return ASIS_Positive is
-         Range_Index : constant Asis.Expression_List := Attribute_Designator_Expressions
-           (Range_Attribute (Range_Def));
+         Range_Index : constant Asis.Expression_List := Attribute_Designator_Expressions (Range_Attribute (Range_Def));
       begin
          if Range_Index = Nil_Element_List then
             return 1;
          else
+            -- Indexes of a 'Range attribute are always static
             return ASIS_Positive'Wide_Value (Static_Expression_Value_Image (Range_Index (1)));
          end if;
       end Range_Position;
@@ -8009,7 +8009,7 @@ package body Thick_Queries is
                return Is_Equal (Corresponding_Name_Definition (Left_C),
                                 Corresponding_Name_Definition (Right_C));
             when A_Parameter_Specification =>
-               if Mode_Kind (Decl) in A_Default_In_Mode .. An_In_Mode then
+               if Mode_Kind (Decl) in A_Default_In_Mode | An_In_Mode then
                   return Is_Equal (Corresponding_Name_Definition (Left_C),
                                    Corresponding_Name_Definition (Right_C));
                else
