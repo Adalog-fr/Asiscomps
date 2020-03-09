@@ -32,8 +32,14 @@
 --  Public License.                                                 --
 ----------------------------------------------------------------------
 with -- Standard Ada units
+  Ada.Characters.Handling,
+  Ada.Directories,
+  Ada.Command_Line,
   Ada.Strings.Wide_Fixed,
   Ada.Strings.Wide_Unbounded;
+
+with -- Adalog units
+  Utilities;
 
 package body Implementation_Options is
 
@@ -58,29 +64,53 @@ package body Implementation_Options is
    function Parameters_String (Project       : Project_File.Class_Access := null;
                                Other_Options : Wide_String := "") return Wide_String
    is
-      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
+      use Ada.Characters.Handling, Ada.Command_Line,
+          Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
       use Project_File;
 
-      Default_Options : Unbounded_Wide_String;
-   begin
+      Asis_Gcc_Path   : constant String := "/../libexec/asis-gnsa/bin/asis-gcc";
+      Default_Options : Unbounded_Wide_String := Null_Unbounded_Wide_String;
+
+      function Command_Directory (Command : String) return String is
+         use Ada.Directories, Utilities;
+         Full_Path_Command : constant Wide_String := Locate_Regular_File (To_Wide_String (Command), "PATH");
+      begin
+         if Full_Path_Command = "" then -- not found
+            return "";
+         end if;
+         return Containing_Directory (To_String (Full_Path_Command));
+      end Command_Directory;
+   begin  -- Parameters_String
       if Index (Other_Options, "-C") = 0 then
-         Default_Options := To_Unbounded_Wide_String ("-C" & Default_C_Parameter);
-      end if;
-      if Index (Other_Options, "-F") = 0 then
-         Default_Options := Default_Options & To_Unbounded_Wide_String (" -F" & Default_F_Parameter);
+         Append (Default_Options, "-C" & Default_C_Parameter);
       end if;
 
-      if Project = null then  -- No project file
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Other_Options;
-      else
-         return
-           To_Wide_String (Default_Options)
-           & ' ' & Project.I_Options
-           & ' ' & Project.T_Options
-           & ' ' & Other_Options;
+      if Index (Other_Options, "-F") = 0 then
+         Append (Default_Options, " -F" & Default_F_Parameter);
       end if;
+
+      -- Case of new ASIS: must provide the executable for asis-gcc
+      -- We assume it is installed in the same tree as AdaControl or in the same tree as gcc
+      -- If not found, we assume it is the old ASIS technology, using regular gcc.
+
+      if        Command_Directory (Command_Name & Asis_Gcc_Path)          /= ""
+        or else Command_Directory (Command_Name & Asis_Gcc_Path & ".exe") /= ""
+      then
+         Append (Default_Options,
+                 " --GCC=" & To_Wide_String (Command_Directory (Command_Name) & Asis_Gcc_Path));
+
+      elsif        Command_Directory ("gcc" & Asis_Gcc_Path)          /= ""
+           or else Command_Directory ("gcc" & Asis_Gcc_Path & ".exe") /= ""
+      then
+            Append (Default_Options,
+                    " --GCC=" & To_Wide_String (Command_Directory ("gcc") & Asis_Gcc_Path));
+      end if;
+
+      if Project /= null then  -- There is a project file
+         Append (Default_Options, ' ' & Project.I_Options & ' ' & Project.T_Options);
+      end if;
+
+      return To_Wide_String (Default_Options) & ' ' & Other_Options;
    end Parameters_String;
 
 end Implementation_Options;
