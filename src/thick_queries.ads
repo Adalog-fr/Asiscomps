@@ -916,7 +916,7 @@ package Thick_Queries is
    --     array object
    --        (i.e. X : T renames V.Field (2) => Field if No_Component is false,
      --                                      => V if No_Component is True).
-   --   - In the case of a renaming whose target is An_Explicit_Dereference, returns Nil_Element
+   --   - In the case of a renaming whose target is (or includes) a dereference, returns Nil_Element
    --     (the target is statically unknown)
    --   - In the case of a renaming whose target is A_Function_Call, returns Nil_Element
    --     (the target is statically unknown, it designates the result of the function call)
@@ -1306,7 +1306,7 @@ package Thick_Queries is
    --
    -- Returns a nil element if:
    --   Actual is greater than the number of actuals in the call
-   --   The call is to a dispatching operation
+   --   The call is to a dispatching operation or an attribute subprogram
 
 
    function Formal_Name (Assoc : Asis.Association) return Asis.Defining_Name;

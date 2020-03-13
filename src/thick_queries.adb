@@ -3998,6 +3998,7 @@ package body Thick_Queries is
                      when others =>
                         Report_Error ("Type category: attribute should be type", Good_Elem);
                   end case;
+
                when A_Component_Declaration =>
                   Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
                                                                (Component_Definition_View
@@ -7048,7 +7049,7 @@ package body Thick_Queries is
             return Strip_Quotes (Value_Image (Expression));
 
          when An_Enumeration_Literal
-           | A_Character_Literal
+            | A_Character_Literal
            =>
             return Position_Number_Image (Corresponding_Name_Definition (Expression));
 
@@ -7075,11 +7076,12 @@ package body Thick_Queries is
             return Static_Expression_Value_Image (Selector (Expression));
 
          when A_Type_Conversion
-           | A_Qualified_Expression
-           =>
+            | A_Qualified_Expression
+            =>
             return Static_Expression_Value_Image (Converted_Or_Qualified_Expression (Expression));
 
          when A_Function_Call =>
+
             declare
                Params  : constant Association_List := Function_Call_Parameters (Expression);
                Op_Name : constant Asis.Expression := Simple_Name (Prefix (Expression));
@@ -7103,19 +7105,19 @@ package body Thick_Queries is
 
                         when A_Unary_Minus_Operator =>
                            return "0"
-                             - Static_Expression_Value_Image (Actual_Parameter (Params (1)));
+                                - Static_Expression_Value_Image (Actual_Parameter (Params (1)));
 
                         when A_Plus_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             + Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                                + Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when A_Minus_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             - Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                                - Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when A_Concatenate_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             & Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                                & Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when A_Multiply_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
@@ -7123,35 +7125,35 @@ package body Thick_Queries is
 
                         when A_Divide_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             / Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                                / Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when An_Exponentiate_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             ** Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                               ** Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when An_Equal_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             = Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                                = Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when A_Not_Equal_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             /= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                               /= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when A_Less_Than_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             < Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                                < Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when A_Less_Than_Or_Equal_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             <= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                               <= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when A_Greater_Than_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             > Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                                > Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when A_Greater_Than_Or_Equal_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             >= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                               >= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
 
                         when others =>
                            -- Not implemented, or Not_An_Operator
