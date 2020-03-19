@@ -3978,7 +3978,9 @@ package body Thick_Queries is
                   Good_Elem := Object_Declaration_View (Elem);
                   case Definition_Kind (Good_Elem) is
                      when A_Type_Definition =>
-                        if Type_Kind (Good_Elem) /= A_Constrained_Array_Definition then
+                        if Type_Kind (Good_Elem)
+                           not in A_Constrained_Array_Definition | An_Unconstrained_Array_Definition
+                        then
                            Report_Error ("Type_Category: anonymous type not array", Good_Elem);
                         end if;
                         return An_Array_Type;
