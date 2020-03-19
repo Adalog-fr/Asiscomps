@@ -1375,6 +1375,10 @@ package Thick_Queries is
    -- Like Biggest_Int'Wide_Image, without the !*#!! initial space.
    -- (avoids depending on the Gnat specific attribute 'Img)
    -- Note: Item is of type Extended_Biggest_Int because it may be needed in intermediate computations
+   function Debug_Img (Item : Extended_Biggest_Int) return Wide_String is
+      (if Item = Not_Static then "not static" else Biggest_Int_Img (Item));
+   -- Like Biggest_Int_Img, but returns "not static" when Item = Not_Static
+   -- (More convenient for debugging, inappropriate for arithmetic)
 
    type Extended_Biggest_Int_List is array (Asis.List_Index range <>) of Extended_Biggest_Int;
    Nil_Extended_Biggest_Int_List : constant Extended_Biggest_Int_List (1 .. 0) := (others => 0);
