@@ -3969,6 +3969,7 @@ package body Thick_Queries is
                      Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
                end case;
             end if;
+
          when A_Declaration =>
             case Declaration_Kind (Elem) is
                when A_Variable_Declaration
@@ -4010,6 +4011,32 @@ package body Thick_Queries is
                   Good_Elem := Corresponding_Name_Declaration (Strip_Attributes
                                                                (Simple_Name (Object_Declaration_View (Elem))));
 
+               when A_Loop_Parameter_Specification =>
+                  Good_Elem := Specification_Subtype_Definition (Elem);
+                  case Discrete_Range_Kind (Good_Elem) is
+                     when Not_A_Discrete_Range =>
+                        Report_Error ("Type category: unknown loop parameter specification", Good_Elem);
+                     when A_Discrete_Subtype_Indication =>
+                        Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name (Good_Elem));
+                     when A_Discrete_Range_Attribute_Reference
+                        | A_Discrete_Simple_Expression_Range =>
+                        -- Get the category from the bounds
+                        declare
+                           Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Good_Elem);
+                        begin
+                           if Is_Nil (Bounds (1)) then
+                              if Is_Nil (Bounds (2)) then
+                                 -- No know bounds, can be a generic formal type, no idea what it is...
+                                 return Not_A_Type;
+                              else
+                                 return Type_Category (Bounds (2));
+                              end if;
+                           else
+                              return Type_Category (Bounds (1));
+                           end if;
+                        end;
+                  end case;
+
                when An_Ordinary_Type_Declaration
                   | A_Task_Type_Declaration
                   | A_Protected_Type_Declaration
@@ -4019,9 +4046,11 @@ package body Thick_Queries is
                   | A_Formal_Type_Declaration
                     =>
                   Good_Elem := Elem;
+
                when others =>
                   return Not_A_Type;
             end case;
+
          when A_Definition =>
             case Definition_Kind (Elem) is
                when A_Type_Definition =>
@@ -4047,6 +4076,7 @@ package body Thick_Queries is
                   | A_Formal_Type_Definition
                   =>
                   Good_Elem := Enclosing_Element (Elem);
+
                when others =>
                   Report_Error ("Type category: wrong definition_kind", Elem);
             end case;
@@ -4929,21 +4959,7 @@ package body Thick_Queries is
             end if;
             return Type_Declaration_View (Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Def))));
          when A_Loop_Parameter_Specification =>
-            Def := Specification_Subtype_Definition (The_Declaration);
-            case Discrete_Range_Kind (Def) is
-               when Not_A_Discrete_Range =>
-                  Report_Error ("Corresponding_declaration_type_definition: Bad discrete range", Def);
-               when A_Discrete_Subtype_Indication =>
-                  return Type_Declaration_View (Corresponding_Name_Declaration
-                                                (Simple_Name
-                                                   (Strip_Attributes   -- Ignore 'Base and 'Class if any
-                                                      (Subtype_Simple_Name (Def)))));
-               when A_Discrete_Range_Attribute_Reference =>
-                  return Corresponding_Expression_Type_Definition (Prefix (Range_Attribute (Def)));
-               when A_Discrete_Simple_Expression_Range =>
-                  -- No type name in sight, guess the type from the lower bound
-                  return Corresponding_Expression_Type_Definition (Lower_Bound (Def));
-            end case;
+            return Specification_Subtype_Definition (The_Declaration);
          when A_Formal_Object_Declaration =>
             if Definition_Kind (Object_Declaration_View (The_Declaration)) = An_Access_Definition then
                -- Must be an anonymous formal type
@@ -6324,7 +6340,8 @@ package body Thick_Queries is
    -----------------------------------
 
    function Discrete_Constraining_Values (Elem          : Asis.Element;
-                                          Follow_Access : Boolean := False)
+                                          Follow_Access : Boolean := False;
+                                          Static_Only   : Boolean := True)
                                           return Extended_Biggest_Int_List
    is
       Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Elem, Follow_Access);
@@ -6339,7 +6356,7 @@ package body Thick_Queries is
          begin
             case Element_Kind (Bounds (I)) is
                when An_Expression =>
-                  Result (I) := Discrete_Static_Expression_Value (Bounds (I));
+                  Result (I) := Discrete_Static_Expression_Value (Bounds (I), RM_Static => Static_Only);
                   if Modular_Type then
                      -- The value returned for the upper bound by discrete_constraining_bounds is the mod expression
                      -- => 1 more than the upper bound
@@ -6924,7 +6941,11 @@ package body Thick_Queries is
    -- Static_Expression_Value_Image --
    -----------------------------------
 
-   function Static_Expression_Value_Image (Expression : Asis.Expression) return Wide_String is
+   function Static_Expression_Value_Image (Expression : Asis.Expression;
+                                           Wanted     : Expression_Info := Exact;
+                                           RM_Static  : Boolean         := False)
+                                           return Wide_String
+   is
       use Asis.Expressions;
 
       -- The function Is_Float_String returns true if, and only if, the argument
@@ -6938,6 +6959,12 @@ package body Thick_Queries is
          end loop;
          return False;
       end Is_Float_String;
+
+      function Opposite (Wanted : Expression_Info) return Expression_Info is
+        (case Wanted is
+            when Exact => Exact,
+            when Minimum => Maximum,
+            when Maximum => Minimum);
 
       generic
          with function Op_Int (Left, Right : Biggest_Int) return Biggest_Int;
@@ -7001,6 +7028,36 @@ package body Thick_Queries is
       function ">"  is new String_Logical_Op (">",  ">");
       function ">=" is new String_Logical_Op (">=", ">=");
 
+      function String_Is_True (Left : Wide_String) return Boolean is
+         (Left = Bool_Pos (True));
+
+      function String_Min (S1, S2, S3, S4 : Wide_String) return Wide_String is
+      -- we compare only integer values, due to the necessity of handling signs
+         function Min (Left, Right : Extended_Biggest_Int) return Extended_Biggest_Int renames Extended_Biggest_Int'Min;
+      begin
+         if S1 = "" or S2 = "" or S3 = "" or S4 = "" then
+            return "";
+         end if;
+
+         return Biggest_Int_Img (Min (Biggest_Int'Wide_Value (S1),
+                                      Min (Biggest_Int'Wide_Value (S2),
+                                           Min (Biggest_Int'Wide_Value (S3),
+                                                Biggest_Int'Wide_Value (S4)))));
+      end String_Min;
+
+      function String_Max (S1, S2, S3, S4 : Wide_String) return Wide_String is
+      -- we compare only integer values, due to the necessity of handling signs
+         function Max (Left, Right : Extended_Biggest_Int) return Extended_Biggest_Int renames Extended_Biggest_Int'Max;
+      begin
+         if S1 = "" or S2 = "" or S3 = "" or S4 = "" then
+            return "";
+         end if;
+
+         return Biggest_Int_Img (Max (Biggest_Int'Wide_Value (S1),
+                                      Max (Biggest_Int'Wide_Value (S2),
+                                           Max (Biggest_Int'Wide_Value (S3),
+                                                Biggest_Int'Wide_Value (S4)))));
+      end String_Max;
 
       function Strip_Underscores (Item : Wide_String) return Wide_String is
          Result : Wide_String (Item'Range);
@@ -7056,16 +7113,35 @@ package body Thick_Queries is
             return Position_Number_Image (Corresponding_Name_Definition (Expression));
 
          when A_Parenthesized_Expression =>
-            return Static_Expression_Value_Image (Expression_Parenthesized (Expression));
+            return Static_Expression_Value_Image (Expression_Parenthesized (Expression), Wanted);
 
          when An_Identifier =>
             Decl := Corresponding_Name_Declaration (Expression);
             case Declaration_Kind (Decl) is
                when An_Integer_Number_Declaration
-                 | A_Real_Number_Declaration
-                 | A_Constant_Declaration
-                 =>
-                  return Static_Expression_Value_Image (Initialization_Expression (Decl));
+                  | A_Real_Number_Declaration
+                  =>
+                  -- These are always RM_Static
+                  return Static_Expression_Value_Image (Initialization_Expression (Decl), Wanted, RM_Static => True);
+               when A_Constant_Declaration =>
+                  -- A constant may be initialized with a dynamic value, containing a reference to a variable f.e.
+                  -- If there is a user-provided Object_Value_Image, assume it deals with this case
+                  -- Otherwise, force to RM_Static, since at the point of evaluation of the constant, the variable
+                  -- may have changed
+                  if Object_Value_Image = Def_Object_Value_Image'Access then
+                     return Static_Expression_Value_Image (Initialization_Expression (Decl), Wanted, RM_Static => True);
+                  else
+                     return Object_Value_Image (Expression, Wanted);
+                  end if;
+
+               when A_Variable_Declaration
+                  | A_Loop_Parameter_Specification
+                  =>
+                  if RM_Static then
+                     return "";
+                  else
+                     return Object_Value_Image (Expression, Wanted);
+                  end if;
                when others =>
                   return "";
             end case;
@@ -7075,18 +7151,27 @@ package body Thick_Queries is
                -- A record component or the like is never a static expression
                return "";
             end if;
-            return Static_Expression_Value_Image (Selector (Expression));
+            return Static_Expression_Value_Image (Selector (Expression), Wanted);
 
          when A_Type_Conversion
             | A_Qualified_Expression
             =>
-            return Static_Expression_Value_Image (Converted_Or_Qualified_Expression (Expression));
+            return Static_Expression_Value_Image (Converted_Or_Qualified_Expression (Expression), Wanted);
 
          when A_Function_Call =>
+            -- If an expression function, replace with the corresponding expression
+            Decl := Corresponding_Called_Function (Expression);
+            if not Is_Nil (Decl) and then Declaration_Kind (Decl) /= A_Formal_Function_Declaration then
+               Decl := Corresponding_Body (Decl);
+               if Declaration_Kind (Decl) = An_Expression_Function_Declaration then
+                  return Static_Expression_Value_Image (Result_Expression (Decl), Wanted);
+               end if;
+            end if;
 
+            -- Evaluate predefined operators
             declare
                Params  : constant Association_List := Function_Call_Parameters (Expression);
-               Op_Name : constant Asis.Expression := Simple_Name (Prefix (Expression));
+               Op_Name : constant Asis.Expression  := Simple_Name (Prefix (Expression));
             begin
                case Expression_Kind (Op_Name) is
                   when An_Operator_Symbol =>
@@ -7103,59 +7188,205 @@ package body Thick_Queries is
 
                      case Operator_Kind (Op_Name) is
                         when A_Unary_Plus_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)));
-
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted);
                         when A_Unary_Minus_Operator =>
                            return "0"
-                                - Static_Expression_Value_Image (Actual_Parameter (Params (1)));
+                                  - Static_Expression_Value_Image (Actual_Parameter (Params (1)), Opposite (Wanted));
 
                         when A_Plus_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                                + Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted)
+                                + Static_Expression_Value_Image (Actual_Parameter (Params (2)), Wanted);
 
                         when A_Minus_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                                - Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted)
+                                - Static_Expression_Value_Image (Actual_Parameter (Params (2)), Opposite (Wanted));
 
-                        when A_Concatenate_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                                & Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                        when A_Concatenate_Operator =>   -- Only Exact makes sense anyway
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                                & Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
 
                         when A_Multiply_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                             * Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           case Wanted is
+                              when Exact =>
+                                 return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                                      * Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
+                              when Minimum =>
+                                 declare
+                                    L_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Minimum);
+                                    L_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Maximum);
+                                    R_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Minimum);
+                                    R_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Maximum);
+                                 begin
+                                    return String_Min (L_Min * R_Min, L_Min * R_Max, L_Max * R_Min, L_Max * R_Max);
+                                 end;
+                              when Maximum =>
+                                 declare
+                                    L_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Minimum);
+                                    L_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Maximum);
+                                    R_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Minimum);
+                                    R_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Maximum);
+                                 begin
+                                    return String_Max (L_Min * R_Min, L_Min * R_Max, L_Max * R_Min, L_Max * R_Max);
+                                 end;
+                           end case;
 
                         when A_Divide_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                                / Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           case Wanted is
+                              when Exact =>
+                                 return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                                      / Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
+                              when Minimum =>
+                                 declare
+                                    L_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Minimum);
+                                    L_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Maximum);
+                                    R_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Minimum);
+                                    R_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Maximum);
+                                 begin
+                                    return String_Min (L_Min / R_Min, L_Min / R_Max, L_Max / R_Min, L_Max / R_Max);
+                                 end;
+                              when Maximum =>
+                                 declare
+                                    L_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Minimum);
+                                    L_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Maximum);
+                                    R_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Minimum);
+                                    R_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Maximum);
+                                 begin
+                                    return String_Max (L_Min / R_Min, L_Min / R_Max, L_Max / R_Min, L_Max / R_Max);
+                                 end;
+                           end case;
 
                         when An_Exponentiate_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                               ** Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           case Wanted is
+                              when Exact =>
+                                 return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                                     ** Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
+                              when Minimum =>
+                                 declare
+                                    L_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Minimum);
+                                    L_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Maximum);
+                                    R_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Minimum);
+                                    R_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Maximum);
+                                 begin
+                                    return String_Min (L_Min / R_Min, L_Min / R_Max, L_Max / R_Min, L_Max / R_Max);
+                                 end;
+                              when Maximum =>
+                                 declare
+                                    L_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Minimum);
+                                    L_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (1)), Maximum);
+                                    R_Min : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Minimum);
+                                    R_Max : constant Wide_String := Static_Expression_Value_Image
+                                                                     (Actual_Parameter (Params (2)), Maximum);
+                                 begin
+                                    return String_Max (L_Min ** R_Min, L_Min ** R_Max, L_Max ** R_Min, L_Max ** R_Max);
+                                 end;
+                           end case;
 
                         when An_Equal_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                                = Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                                = Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
 
                         when A_Not_Equal_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                               /= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           if String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Maximum)
+                              < Static_Expression_Value_Image (Actual_Parameter (Params (2)), Minimum))
+                           then
+                              return Bool_Pos (True);
+                           elsif String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Minimum)
+                              > Static_Expression_Value_Image (Actual_Parameter (Params (2)), Maximum))
+                           then
+                              return Bool_Pos (True);
+                           elsif String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                              = Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact))
+                           then
+                              return Bool_Pos (False);
+                           else
+                              return "";
+                           end if;
 
                         when A_Less_Than_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                                < Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           if String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Maximum)
+                              < Static_Expression_Value_Image (Actual_Parameter (Params (2)), Minimum))
+                           then
+                              return Bool_Pos (True);
+                           elsif String_Is_True
+                             (   Static_Expression_Value_Image (Actual_Parameter (Params (1)), Minimum)
+                              >= Static_Expression_Value_Image (Actual_Parameter (Params (2)), Maximum))
+                           then
+                              return Bool_Pos (False);
+                           else
+                              return "";
+                           end if;
 
                         when A_Less_Than_Or_Equal_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                               <= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           if String_Is_True
+                             (   Static_Expression_Value_Image (Actual_Parameter (Params (1)), Maximum)
+                              <= Static_Expression_Value_Image (Actual_Parameter (Params (2)), Minimum))
+                           then
+                              return Bool_Pos (True);
+                           elsif String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Minimum)
+                              > Static_Expression_Value_Image (Actual_Parameter (Params (2)), Maximum))
+                           then
+                              return Bool_Pos (False);
+                           else
+                              return "";
+                           end if;
 
                         when A_Greater_Than_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                                > Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           if String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Minimum)
+                              > Static_Expression_Value_Image (Actual_Parameter (Params (2)), Maximum))
+                           then
+                              return Bool_Pos (True);
+                           elsif String_Is_True
+                             (   Static_Expression_Value_Image (Actual_Parameter (Params (1)), Maximum)
+                              <= Static_Expression_Value_Image (Actual_Parameter (Params (2)), Minimum))
+                           then
+                              return Bool_Pos (False);
+                           else
+                              return "";
+                           end if;
 
                         when A_Greater_Than_Or_Equal_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
-                               >= Static_Expression_Value_Image (Actual_Parameter (Params (2)));
+                           if String_Is_True
+                             (   Static_Expression_Value_Image (Actual_Parameter (Params (1)), Minimum)
+                              >= Static_Expression_Value_Image (Actual_Parameter (Params (2)), Maximum))
+                           then
+                              return Bool_Pos (True);
+                           elsif String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Maximum)
+                              < Static_Expression_Value_Image (Actual_Parameter (Params (2)), Minimum))
+                           then
+                              return Bool_Pos (False);
+                           else
+                              return "";
+                           end if;
 
                         when others =>
                            -- Not implemented, or Not_An_Operator
@@ -7165,16 +7396,16 @@ package body Thick_Queries is
                   when An_Attribute_Reference =>
                      case Attribute_Kind (Prefix (Expression)) is
                         when A_Succ_Attribute =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted)
                              + "1";
                         when A_Pred_Attribute =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)))
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted)
                              - "1";
                         when A_Pos_Attribute
-                          | A_Val_Attribute
+                           | A_Val_Attribute
                           =>
                            -- Since we keep the Pos, these are no-ops
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)));
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted);
                         when others =>
                            -- Not implemented, or Not_An_Attribute
                            return "";
@@ -7207,7 +7438,7 @@ package body Thick_Queries is
 
                         case Element_Kind (Bounds (2 * Dim - 1)) is
                            when An_Expression =>
-                              return Static_Expression_Value_Image (Bounds (2 * Dim - 1));
+                              return Static_Expression_Value_Image (Bounds (2 * Dim - 1), Wanted);
                            when A_Defining_Name =>
                               -- Enumeration
                               return Position_Number_Image (Bounds (2 * Dim - 1));
@@ -7250,18 +7481,18 @@ package body Thick_Queries is
                            -- In the extremely unlikely case where the static expression Dim_Expr is
                            -- too complicated for us to evaluate, the following will raise Constraint_Error,
                            -- and thus we will return "", which is appropriate.
-                           Dim := ASIS_Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
+                           Dim := ASIS_Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1), Wanted));
                         end if;
 
                         case Element_Kind (Bounds (2 * Dim - 1)) is
                            when An_Expression =>
-                              return Static_Expression_Value_Image (Bounds (2 * Dim));
+                              return Static_Expression_Value_Image (Bounds (2 * Dim), Wanted);
                            when A_Defining_Name =>
                               -- Enumeration
                               return Position_Number_Image (Bounds (2 * Dim));
                            when Not_An_Element =>
                               -- Modular type
-                              return Static_Expression_Value_Image (Bounds (2 * Dim)) - "1";
+                              return Static_Expression_Value_Image (Bounds (2 * Dim), Wanted) - "1";
                            when others =>
                               Report_Error ("Bad return from Discrete_Constraining_Bounds", Bounds (2 * Dim - 1));
                         end case;
@@ -7292,7 +7523,7 @@ package body Thick_Queries is
                         -- In the extremely unlikely case where the static expression Dim_Expr is
                         -- too complicated for us to evaluate, the following will raise Constraint_Error,
                         -- and thus we will return "", which is appropriate.
-                        Dim := ASIS_Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1)));
+                        Dim := ASIS_Integer'Wide_Value (Static_Expression_Value_Image (Dim_Expr (1), Wanted));
                      end if;
                      if Lengths (Dim) = Not_Static then
                         return "";
@@ -7304,7 +7535,7 @@ package body Thick_Queries is
                   declare
                      Type_Definition : constant Definition := Ultimate_Expression_Type (Prefix (Expression));
                   begin
-                     return Static_Expression_Value_Image (Definitions.Mod_Static_Expression (Type_Definition));
+                     return Static_Expression_Value_Image (Definitions.Mod_Static_Expression (Type_Definition), Wanted);
                   end;
                when A_Size_Attribute =>
                   return Size_Value_Image (Simple_Name (Prefix (Expression)));
@@ -7325,30 +7556,32 @@ package body Thick_Queries is
                end if;
                for Path : Asis.Path of If_Paths (If_Paths'First .. Last) loop
                   declare
-                     Cond_Str : constant Wide_String := Static_Expression_Value_Image
-                                                        (Condition_Expression (Path));
+                     Cond_Str : constant Wide_String := Static_Expression_Value_Image (Condition_Expression (Path),
+                                                                                       Exact);
                   begin
                      if Cond_Str = "" then
                         -- non static condition
                         return "";
-                     elsif Cond_Str = "1" then
-                        return Static_Expression_Value_Image (Dependent_Expression (Path));
+                     elsif Cond_Str = Bool_Pos (True) then
+                        return Static_Expression_Value_Image (Dependent_Expression (Path), Wanted);
                      end if;
                   end;
                end loop;
 
+               -- All if/elsif statically false
                if Has_Else then
-                  return Static_Expression_Value_Image (Dependent_Expression (If_Paths (If_Paths'Last)));
+                  return Static_Expression_Value_Image (Dependent_Expression (If_Paths (If_Paths'Last)), Wanted);
+               else
+                  -- An else expression path can be omitted only if the expression is boolean
+                  -- In this case, the if-expression evaluates to False
+                  return Bool_Pos (False);
                end if;
-
-               -- An else expression path can be omitted only if the expression is boolean, and the default is
-               -- False whose 'Pos is 0
-               return "0";
             end;
 
          when A_Case_Expression =>
             declare
-               Case_Expr_Str : constant Wide_String    := Static_Expression_Value_Image (Case_Expression (Expression));
+               Case_Expr_Str : constant Wide_String := Static_Expression_Value_Image (Case_Expression (Expression),
+                                                                                      Exact);
             begin
                if Case_Expr_Str = "" then
                   -- non static case variable
@@ -7360,12 +7593,12 @@ package body Thick_Queries is
                   Case_Choices_Loop :
                   for Current_Choice : Asis.Element of Case_Statement_Alternative_Choices (Case_Path) loop
                      if (Element_Kind (Current_Choice) = An_Expression
-                         and then Case_Expr_Str = Static_Expression_Value_Image (Current_Choice))
+                         and then Case_Expr_Str = Static_Expression_Value_Image (Current_Choice, Exact))
                        or else
                          (Element_Kind (Current_Choice) = A_Definition
                           and then Definition_Kind (Current_Choice) = An_Others_Choice)
                      then
-                        return Static_Expression_Value_Image (Dependent_Expression (Case_Path));
+                        return Static_Expression_Value_Image (Dependent_Expression (Case_Path), Wanted);
                      end if;
 
                      if Definition_Kind (Current_Choice) = A_Discrete_Range then
@@ -7386,14 +7619,14 @@ package body Thick_Queries is
                            if Is_Nil (Lower_Bound)
                              and then Case_Expr_Value in 0 .. Discrete_Static_Expression_Value (Upper_Bound)
                            then
-                              return Static_Expression_Value_Image (Dependent_Expression (Case_Path));
+                              return Static_Expression_Value_Image (Dependent_Expression (Case_Path), Wanted);
                            end if;
 
                            if not Is_Nil (Lower_Bound)
                              and then Case_Expr_Value in Discrete_Static_Expression_Value (Lower_Bound) ..
                                                          Discrete_Static_Expression_Value (Upper_Bound)
                            then
-                              return Static_Expression_Value_Image (Dependent_Expression (Case_Path));
+                              return Static_Expression_Value_Image (Dependent_Expression (Case_Path), Wanted);
                            end if;
                            end;
                      end if;
@@ -7408,25 +7641,30 @@ package body Thick_Queries is
             | A_Not_In_Membership_Test
             =>
             declare
-               Left_Str         : constant Wide_String := Static_Expression_Value_Image
-                                                            (Membership_Test_Expression (Expression));
+               Min_Left_Str     : constant Wide_String := Static_Expression_Value_Image
+                                                            (Membership_Test_Expression (Expression), Minimum);
+               Max_Left_Str     : constant Wide_String := Static_Expression_Value_Image
+                                                            (Membership_Test_Expression (Expression), Maximum);
                Is_In_Membership : constant Boolean     := Expression_Kind (Expression) = An_In_Membership_Test;
             begin
-               if Left_Str = "" then
+               if Min_Left_Str = "" and Max_Left_Str = "" then
                   -- non static case variable
                   return "";
                end if;
 
                for Current_Choice : Asis.Element of Membership_Test_Choices (Expression) loop
                   if Element_Kind (Current_Choice) = An_Expression then
+                     -- Single value
                      if Static_Expression_Value_Image (Current_Choice) = "" then
-                        -- subtype or class membership test not covered
+                        -- TBSL subtype or class membership test not (yet) covered
                         return "";
                      end if;
 
                      -- beware with Float (exponent) because it is a string comparison
-                     if Left_Str = Static_Expression_Value_Image (Current_Choice) then
-                        return (if Is_In_Membership then "1" else "0");
+                     if Min_Left_Str = Max_Left_Str
+                        and then Min_Left_Str = Static_Expression_Value_Image (Current_Choice, Exact)
+                     then
+                        return Bool_Pos (Is_In_Membership);
                      end if;
                   end if;
 
@@ -7435,34 +7673,72 @@ package body Thick_Queries is
                      -- or A_Range_Attribute_Reference
                      declare
                         -- with negative values being possible, it is easier to compare using actual values
-                        Bounds_List : constant Asis.Element_List    := Discrete_Constraining_Bounds (Current_Choice);
+                        Bounds_List : constant Asis.Element_List       := Discrete_Constraining_Bounds (Current_Choice);
                         -- digits, delta, float...etc will lead to Constraint_Error
-                        Left_Value  : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Left_Str);
-                        Lower_Bound : constant Asis.Element         := Bounds_List (Bounds_List'First);
-                        Upper_Bound : constant Asis.Element         := Bounds_List (Bounds_List'Last);
+                        Min_Left_Value  : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Min_Left_Str);
+                        Max_Left_Value  : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Max_Left_Str);
+                        Min_Right_Value : constant Extended_Biggest_Int := Discrete_Static_Expression_Value
+                                                                            (Bounds_List (1), Minimum);
+                        Max_Right_Value : constant Extended_Biggest_Int := Discrete_Static_Expression_Value
+                                                                            (Bounds_List (2), Maximum);
                      begin
                         -- with a modular type 'Range, a Nil_Element is used as the lower bound
                         -- should first check if it is really a modular type
-                        if Is_Nil (Lower_Bound)
-                          and then not Is_Nil (Upper_Bound)
-                          and then Left_Value in 0 .. Discrete_Static_Expression_Value (Upper_Bound)
-                        then
-                           return (if Is_In_Membership then "1" else "0");
+                        -- The lower bound of a modular type is always 0, the upper bound is always static
+                        if Is_Nil (Bounds_List (1)) and then not Is_Nil (Bounds_List (2)) then
+                           if Max_Left_Value = Not_Static then
+                              return "";
+                           end if;
+                           if Max_Left_Value in 0 .. Max_Right_Value then
+                              return Bool_Pos (Is_In_Membership);
+                           elsif Min_Left_Value >  Max_Right_Value then
+                              return Bool_Pos (not Is_In_Membership);
+                           else
+                              return "";
+                           end if;
                         end if;
 
-                        if Is_Nil (Lower_Bound) or else Is_Nil (Upper_Bound) then
-                           return "";
+                        if Is_Nil (Bounds_List (1)) then
+                           if Min_Left_Value > Max_Right_Value then
+                              return Bool_Pos (Is_In_Membership);
+                           else
+                              return "";
+                           end if;
                         end if;
 
-                        if Left_Value in Discrete_Static_Expression_Value (Lower_Bound) ..
-                                         Discrete_Static_Expression_Value (Upper_Bound)
+                        if    Max_Left_Value  /= Not_Static
+                          and Min_Right_Value /= Not_Static
+                          and Max_Left_Value  <  Min_Right_Value
                         then
-                           return (if Is_In_Membership then "1" else "0");
+                           -- Left known to be strictly less than right
+                           return Bool_Pos (not Is_In_Membership);
                         end if;
+
+                        if    Min_Left_Value  /= Not_Static
+                          and Max_Right_Value /= Not_Static
+                          and Min_Left_Value  >  Max_Right_Value
+                        then
+                           -- Left known to be strictly greater than right
+                           return Bool_Pos (not Is_In_Membership);
+                        end if;
+
+                        if    Min_Left_Value  /= Not_Static
+                          and Max_Left_Value  /= Not_Static
+                          and Min_Right_Value /= Not_Static
+                          and Max_Right_Value /= Not_Static
+                          and Min_Left_Value  >= Min_Right_Value
+                          and Max_Left_Value  <= Max_Right_Value
+                        then
+                           -- Left known to be within interval of right
+                           return Bool_Pos (Is_In_Membership);
+                        end if;
+
+                        -- Nothing certain...
+                        return "";
                      end;
                   end if;
                end loop;
-               return (if Is_In_Membership then "0" else "1");
+               return Bool_Pos (not Is_In_Membership);
             end;
 
          when others =>
@@ -7481,8 +7757,11 @@ package body Thick_Queries is
    -- Discrete_Static_Expression_Value --
    --------------------------------------
 
-   function Discrete_Static_Expression_Value (Expression : Asis.Expression) return Extended_Biggest_Int is
-      Str_Val : constant Wide_String := Static_Expression_Value_Image (Expression);
+   function Discrete_Static_Expression_Value (Expression : Asis.Expression;
+                                              Wanted     : Expression_Info := Exact;
+                                              RM_Static  : Boolean := False) return Extended_Biggest_Int
+   is
+      Str_Val : constant Wide_String := Static_Expression_Value_Image (Expression, Wanted, RM_Static);
    begin
       if Str_Val = "" then
          return Not_Static;
@@ -7530,9 +7809,9 @@ package body Thick_Queries is
             if Expression_Kind (Prefix (Expr)) = A_Selected_Component and then not Is_Expanded_Name (Prefix (Expr)) then
                return False;
             end if;
-            return Static_Expression_Value_Image (Expr) /= "";
+            return Static_Expression_Value_Image (Expr, RM_Static => True) /= "";
          when others =>
-            return Static_Expression_Value_Image (Expr) /= "";
+            return Static_Expression_Value_Image (Expr, RM_Static => True) /= "";
       end case;
    end Is_Static_Expression;
 

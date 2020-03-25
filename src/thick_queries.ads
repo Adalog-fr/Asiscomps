@@ -880,6 +880,7 @@ package Thick_Queries is
    function Corresponding_Static_Predicates (List : in Asis.Element_List) return Asis.Element_List;
    -- Return the catenation of Corresponding_Static_Predicates for all elements in List
 
+
    -------------------------------------------------------------------------------------------------
    --                                                                                             --
    -- Queries about names and expressions                                                         --
@@ -1390,12 +1391,28 @@ package Thick_Queries is
 
    type Biggest_Float is digits System.Max_Digits; -- The same for floatting point numbers
 
-   function Static_Expression_Value_Image (Expression : Asis.Expression) return Wide_String;
+
+   type Expression_Info is (Exact, Minimum, Maximum);
+   -- For the static computation of an expression, variables are considered to hold unknown values.
+   -- However, if an application is more clever than that, it can replace the following default by a function
+   -- that returns the current value of the given variable.
+   function Def_Object_Value_Image (Id : Asis.Expression; Wanted : Expression_Info) return Wide_String is ("");
+   Object_Value_Image : access function (Id : Asis.Expression; Wanted : Expression_Info) return Wide_String
+                        := Def_Object_Value_Image'Access;
+
+   function Static_Expression_Value_Image (Expression : Asis.Expression;
+                                           Wanted     : Expression_Info := Exact;
+                                           RM_Static  : Boolean         := False)
+                                           return Wide_String;
    --  Computes the value of Expression if it is a static expression
    --  and represents it as a (wide) string. For enumeration expressions, the
    --  image of the Pos value of the defining enumeration or character literal
    --  corresponding to the  value of the expression is returned.
    --  There is NO leading space for positive values!
+   --  If variables values propagation is provided, it can be asserted whether we want the exact value (if known)
+   --  or the upper or lower bound of possible values (Wanted)
+   --  If RM_Static is True, there is no attempt to evaluate the value of variables (i.e. it is more or less
+   --  static as defined in the RM, rather than statically determinable).
    --
    --  For non-static expressions, or expressions that we cannot (yet) evaluate,
    --  an empty string is returned.
@@ -1427,13 +1444,11 @@ package Thick_Queries is
    --
    --  Appropriate Element_Kinds:
    --     An_Expression
-   --
-   --  The specification of this function is derived (and compatible with) the one
-   --  declared in the GNAT extension ASIS.Extensions
-   --  (except that we do not have the same set of implemented/non-implemented features)
 
 
-   function Discrete_Static_Expression_Value (Expression : Asis.Expression) return Extended_Biggest_Int;
+   function Discrete_Static_Expression_Value (Expression : Asis.Expression;
+                                              Wanted     : Expression_Info := Exact;
+                                              RM_Static  : Boolean := False) return Extended_Biggest_Int;
    -- Like Static_Expression_Value_Image, but returns the actual value for static discrete expressions.
    -- Returns Not_Static for other cases
 
@@ -1557,7 +1572,8 @@ package Thick_Queries is
 
 
    function Discrete_Constraining_Values (Elem          : Asis.Element;
-                                          Follow_Access : Boolean := False)
+                                          Follow_Access : Boolean := False;
+                                          Static_Only   : Boolean := True)
                                           return Extended_Biggest_Int_List;
    -- Like Discrete_Constraining_Bounds, but returns the actual values of the bounds
    -- if statically determinable.
