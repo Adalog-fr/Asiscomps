@@ -5726,15 +5726,27 @@ package body Thick_Queries is
         or  Statement_Kind (Element) = An_Entry_Call_Statement
       then
          return Call_Statement_Parameters (Element, Normalized => Normalized);
-      elsif Declaration_Kind (Element) in A_Generic_Instantiation or
-        Declaration_Kind (Element) = A_Formal_Package_Declaration
-      then
+      elsif Declaration_Kind (Element) in A_Generic_Instantiation | A_Formal_Package_Declaration then
          return Generic_Actual_Part (Element, Normalized => Normalized);
       else
          Report_Error ("Unexpected element in Actual_Parameters", Element);
       end if;
    end Actual_Parameters;
 
+   ------------------------
+   -- Actual_Expressions --
+   ------------------------
+
+   function Actual_Expressions (Element : Asis.Element; Normalized : Boolean := False) return Asis.Expression_List is
+      use Asis.Expressions;
+      Assocs : constant Asis.Association_List := Actual_Parameters (Element, Normalized);
+      Result : Asis.Expression_List (Assocs'Range);
+   begin
+      for R in Result'Range loop
+         Result (R) := Actual_Parameter (Assocs (R));
+      end loop;
+      return Result;
+   end Actual_Expressions;
 
    -----------------------------
    -- Constraining_Definition --

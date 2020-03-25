@@ -1338,6 +1338,9 @@ package Thick_Queries is
    -- Returns the actual parameters of a procedure, entry, or function call, or of
    -- a generic instantiation
 
+   function Actual_Expressions (Element : Asis.Element; Normalized : Boolean := False) return Asis.Expression_List;
+   -- Like Actual_Parameters, but returns the list of associated expressions
+
 
    function External_Call_Target (Call : Asis.Element) return Asis.Expression;
    -- Returns the prefix of the call that designates the target object
