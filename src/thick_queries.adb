@@ -1,3 +1,4 @@
+with Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -2666,9 +2667,13 @@ package body Thick_Queries is
               and then Discrete_Constraining_Lengths (Slice_Range (Obj), Follow_Access => False) (1) /= Not_Static;
          when A_Selected_Component =>
             declare
-               Pfx : constant Asis.Element := Prefix (Obj);
+               Pfx : Asis.Element := Prefix (Obj);
             begin
-               if Expression_Kind (Pfx) = A_Function_Call then
+               if Expression_Kind (Pfx) in A_Type_Conversion | A_Qualified_Expression then
+                  Pfx := Converted_Or_Qualified_Expression (Pfx);
+               end if;
+
+               if Expression_Kind (Pfx) in A_Function_Call | An_Explicit_Dereference then
                   -- Dynamic prefix
                   return False;
                end if;
@@ -5882,9 +5887,9 @@ package body Thick_Queries is
             when Not_A_Constraint =>
                Report_Error ("Constraint_Bounds: Not a constraint", Def);
             when A_Digits_Constraint
-              | A_Delta_Constraint
-              | A_Discriminant_Constraint
-              =>
+               | A_Delta_Constraint
+               | A_Discriminant_Constraint
+               =>
                return Nil_Element_List; -- Not discrete
             when An_Index_Constraint =>
                declare
@@ -7124,6 +7129,9 @@ package body Thick_Queries is
            =>
             return Position_Number_Image (Corresponding_Name_Definition (Expression));
 
+         when A_Null_Literal =>
+            return "0";
+
          when A_Parenthesized_Expression =>
             return Static_Expression_Value_Image (Expression_Parenthesized (Expression), Wanted);
 
@@ -7660,27 +7668,27 @@ package body Thick_Queries is
                Is_In_Membership : constant Boolean     := Expression_Kind (Expression) = An_In_Membership_Test;
             begin
                if Min_Left_Str = "" and Max_Left_Str = "" then
-                  -- non static case variable
+                  -- non static membership variable
                   return "";
                end if;
 
                for Current_Choice : Asis.Element of Membership_Test_Choices (Expression) loop
                   if Element_Kind (Current_Choice) = An_Expression then
                      -- Single value
-                     if Static_Expression_Value_Image (Current_Choice) = "" then
-                        -- TBSL subtype or class membership test not (yet) covered
-                        return "";
-                     end if;
-
-                     -- beware with Float (exponent) because it is a string comparison
-                     if Min_Left_Str = Max_Left_Str
-                        and then Min_Left_Str = Static_Expression_Value_Image (Current_Choice, Exact)
-                     then
-                        return Bool_Pos (Is_In_Membership);
-                     end if;
+                     declare
+                        Value : constant Wide_String := Static_Expression_Value_Image (Current_Choice, Exact);
+                     begin
+                        if Value /= "" and then Min_Left_Str = Max_Left_Str and then Min_Left_Str = Value then
+                           -- beware with Float (exponent) because it is a string comparison
+                           return Bool_Pos (Is_In_Membership);
+                        end if;
+                     end;
                   end if;
 
-                  if Definition_Kind (Current_Choice) = A_Constraint then
+                  -- If current_choice is still a (selected) name here, it is the name of a subtype
+                  if        Expression_Kind (Simple_Name (Current_Choice)) = An_Identifier
+                    or else Definition_Kind (Current_Choice) = A_Constraint
+                  then
                      -- Constraint_Kind (Current_Choice) should be A_Simple_Expression_Range
                      -- or A_Range_Attribute_Reference
                      declare
