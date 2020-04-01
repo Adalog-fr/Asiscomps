@@ -1,4 +1,3 @@
-with Utilities;
 ----------------------------------------------------------------------
 --  Thick_Queries - Package body                                    --
 --  Copyright (C) 2002-2009 Adalog                                  --
@@ -3905,7 +3904,9 @@ package body Thick_Queries is
       case Element_Kind (Elem) is
          when An_Expression =>
             Good_Elem := Simple_Name (Elem);
-            if Expression_Kind (Good_Elem) = An_Identifier
+            if Expression_Kind (Good_Elem) = An_Enumeration_Literal then
+               return An_Enumeration_Type;
+            elsif Expression_Kind (Good_Elem) = An_Identifier
               and then Declaration_Kind
                         (Corresponding_Name_Declaration
                          (Good_Elem)) in An_Ordinary_Type_Declaration ..  A_Subtype_Declaration
@@ -4029,15 +4030,13 @@ package body Thick_Queries is
                         declare
                            Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Good_Elem);
                         begin
-                           if Is_Nil (Bounds (1)) then
-                              if Is_Nil (Bounds (2)) then
-                                 -- No know bounds, can be a generic formal type, no idea what it is...
-                                 return Not_A_Type;
-                              else
-                                 return Type_Category (Bounds (2));
-                              end if;
-                           else
+                           if not Is_Nil (Bounds (1)) then
                               return Type_Category (Bounds (1));
+                           elsif not Is_Nil (Bounds (2)) then
+                              return Type_Category (Bounds (2));
+                           else
+                              -- No know bounds, can be a generic formal type, no idea what it is...
+                                 return Not_A_Type;
                            end if;
                         end;
                   end case;
@@ -4086,6 +4085,9 @@ package body Thick_Queries is
                   Report_Error ("Type category: wrong definition_kind", Elem);
             end case;
          when A_Defining_Name =>
+            if Defining_Name_Kind (Elem) = A_Defining_Enumeration_Literal then
+               return An_Enumeration_Type;
+            end if;
             Good_Elem := Enclosing_Element (Elem);
             if Declaration_Kind (Good_Elem) = A_Deferred_Constant_Declaration then
                Good_Elem := Corresponding_Constant_Declaration (Good_Elem);
@@ -6977,8 +6979,8 @@ package body Thick_Queries is
          return False;
       end Is_Float_String;
 
-      function Opposite (Wanted : Expression_Info) return Expression_Info is
-        (case Wanted is
+      function Opposite (Info : Expression_Info) return Expression_Info is
+        (case Info is
             when Exact => Exact,
             when Minimum => Maximum,
             when Maximum => Minimum);
