@@ -6960,6 +6960,12 @@ package body Thick_Queries is
    -- Static_Expression_Value_Image --
    -----------------------------------
 
+   Pointer_Count : Thick_Queries.Biggest_Natural := 0;
+   -- A null pointer is represented with a value of 0.
+   -- Each call to an allocator is represented by a non null value, obtained from the above counter.
+   -- This allows "=" and "/=" comparisons to work as expected, and those are the only operations allowed
+   -- on pointers.
+
    function Static_Expression_Value_Image (Expression : Asis.Expression;
                                            Wanted     : Expression_Info := Exact;
                                            RM_Static  : Boolean         := False)
@@ -7327,8 +7333,24 @@ package body Thick_Queries is
                            end case;
 
                         when An_Equal_Operator =>
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
-                                = Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
+                           if String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Maximum)
+                              < Static_Expression_Value_Image (Actual_Parameter (Params (2)), Minimum))
+                           then
+                              return Bool_Pos (False);
+                           elsif String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Minimum)
+                              > Static_Expression_Value_Image (Actual_Parameter (Params (2)), Maximum))
+                           then
+                              return Bool_Pos (False);
+                           elsif String_Is_True
+                             (  Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                              = Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact))
+                           then
+                              return Bool_Pos (True);
+                           else
+                              return "";
+                           end if;
 
                         when A_Not_Equal_Operator =>
                            if String_Is_True
@@ -7438,6 +7460,10 @@ package body Thick_Queries is
                      return "";
                end case;
             end;
+
+         when An_Allocation_From_Subtype | An_Allocation_From_Qualified_Expression =>
+            Pointer_Count := Pointer_Count + 1;
+            return Biggest_Int_Img (Pointer_Count);
 
          when An_Attribute_Reference =>
             case Attribute_Kind (Expression) is
