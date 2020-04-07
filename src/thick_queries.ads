@@ -965,6 +965,10 @@ package Thick_Queries is
    -- return Nil_Element if not found
    -- Useful to check defining names between spec and body, f.e.
 
+   function Is_Real_Expression (Expr : Asis.Expression) return Boolean;
+   -- Returns True if Expr is a real expression with a value
+   -- Returns False if Expr is a name that ultimately denotes a type, a label, a subprogram, etc.
+
    function Ultimate_Expression (Expr : Asis.Expression) return Asis.Expression;
    -- Returns Simple_name (Expr), unless Expr is the name of constant, in which case it returns
    -- the Ultimate_Expression of the initialization expression of the constant.
@@ -1581,6 +1585,7 @@ package Thick_Queries is
    -- Like Discrete_Constraining_Bounds, but returns the actual values of the bounds
    -- if statically determinable.
    -- Returns Not_Static if not statically determinable
+   -- For a modular type, returns the true bounds, i.e. 0 for the lower bound, and (mod_expr - 1) for the upper bound
 
 
    function Discrete_Constraining_Lengths (Elem          : Asis.Element;

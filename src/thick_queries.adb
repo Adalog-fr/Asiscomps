@@ -5473,6 +5473,21 @@ package body Thick_Queries is
       end case;
    end First_Defining_Name;
 
+   ------------------------
+   -- Is_Real_Expression --
+   ------------------------
+
+   function Is_Real_Expression (Expr : Asis.Expression) return Boolean is
+      use Asis.Expressions;
+   begin
+      if Expression_Kind (Expr) not in An_Identifier | A_Selected_Component then
+         return True;
+      end if;
+
+      return Declaration_Kind (Corresponding_Name_Declaration (Ultimate_Name (Expr)))
+             in A_Variable_Declaration .. An_Element_Iterator_Specification;
+   end Is_Real_Expression;
+
    -------------------
    -- Matching_Name --
    -------------------
@@ -7462,8 +7477,12 @@ package body Thick_Queries is
             end;
 
          when An_Allocation_From_Subtype | An_Allocation_From_Qualified_Expression =>
-            Pointer_Count := Pointer_Count + 1;
-            return Biggest_Int_Img (Pointer_Count);
+            if RM_Static then
+               return "";
+            else
+               Pointer_Count := Pointer_Count + 1;
+               return Biggest_Int_Img (Pointer_Count);
+            end if;
 
          when An_Attribute_Reference =>
             case Attribute_Kind (Expression) is
@@ -7681,7 +7700,7 @@ package body Thick_Queries is
                   end loop Case_Choices_Loop;
                end loop Case_Paths_Loop;
 
-               -- something went wrong above :(, value not covered!
+               -- something went wrong above :-(, value not covered!
                Report_Error ("Uncovered value in case expression", Expression);
             end;
 
@@ -7694,6 +7713,8 @@ package body Thick_Queries is
                Max_Left_Str     : constant Wide_String := Static_Expression_Value_Image
                                                             (Membership_Test_Expression (Expression), Maximum);
                Is_In_Membership : constant Boolean     := Expression_Kind (Expression) = An_In_Membership_Test;
+               Unsure           :          Boolean     := False;
+               Bounds           :          Extended_Biggest_Int_List (1 .. 2);
             begin
                if Min_Left_Str = "" and Max_Left_Str = "" then
                   -- non static membership variable
@@ -7701,91 +7722,48 @@ package body Thick_Queries is
                end if;
 
                for Current_Choice : Asis.Element of Membership_Test_Choices (Expression) loop
-                  if Element_Kind (Current_Choice) = An_Expression then
+                  -- Current choice can be:
+                  -- 1) A true expression with a value
+                  -- 2) A name denoting a (sub)type
+                  -- 3) A constraint as a 'Range attribute or A..B range
+
+                  -- TBSL check case of real values
+                  -- Constraint_Kind (Current_Choice) is A_Simple_Expression_Range or A_Range_Attribute_Reference
+                  if Element_Kind (Current_Choice) = An_Expression and then Is_Real_Expression (Current_Choice) then
                      -- Single value
-                     declare
-                        Value : constant Wide_String := Static_Expression_Value_Image (Current_Choice, Exact);
-                     begin
-                        if Value /= "" and then Min_Left_Str = Max_Left_Str and then Min_Left_Str = Value then
-                           -- beware with Float (exponent) because it is a string comparison
-                           return Bool_Pos (Is_In_Membership);
-                        end if;
-                     end;
+                     Bounds := (Discrete_Static_Expression_Value (Current_Choice, Minimum),
+                                Discrete_Static_Expression_Value (Current_Choice, Maximum));
+                  else
+                     Bounds := Discrete_Constraining_Values (Current_Choice);
                   end if;
-
-                  -- If current_choice is still a (selected) name here, it is the name of a subtype
-                  if        Expression_Kind (Simple_Name (Current_Choice)) = An_Identifier
-                    or else Definition_Kind (Current_Choice) = A_Constraint
-                  then
-                     -- Constraint_Kind (Current_Choice) should be A_Simple_Expression_Range
-                     -- or A_Range_Attribute_Reference
-                     declare
-                        -- with negative values being possible, it is easier to compare using actual values
-                        Bounds_List : constant Asis.Element_List       := Discrete_Constraining_Bounds (Current_Choice);
-                        -- digits, delta, float...etc will lead to Constraint_Error
-                        Min_Left_Value  : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Min_Left_Str);
-                        Max_Left_Value  : constant Extended_Biggest_Int := Biggest_Int'Wide_Value (Max_Left_Str);
-                        Min_Right_Value : constant Extended_Biggest_Int := Discrete_Static_Expression_Value
-                                                                            (Bounds_List (1), Minimum);
-                        Max_Right_Value : constant Extended_Biggest_Int := Discrete_Static_Expression_Value
-                                                                            (Bounds_List (2), Maximum);
-                     begin
-                        -- with a modular type 'Range, a Nil_Element is used as the lower bound
-                        -- should first check if it is really a modular type
-                        -- The lower bound of a modular type is always 0, the upper bound is always static
-                        if Is_Nil (Bounds_List (1)) and then not Is_Nil (Bounds_List (2)) then
-                           if Max_Left_Value = Not_Static then
-                              return "";
-                           end if;
-                           if Max_Left_Value in 0 .. Max_Right_Value then
-                              return Bool_Pos (Is_In_Membership);
-                           elsif Min_Left_Value >  Max_Right_Value then
-                              return Bool_Pos (not Is_In_Membership);
-                           else
-                              return "";
-                           end if;
-                        end if;
-
-                        if Is_Nil (Bounds_List (1)) then
-                           if Min_Left_Value > Max_Right_Value then
-                              return Bool_Pos (Is_In_Membership);
-                           else
-                              return "";
-                           end if;
-                        end if;
-
-                        if    Max_Left_Value  /= Not_Static
-                          and Min_Right_Value /= Not_Static
-                          and Max_Left_Value  <  Min_Right_Value
-                        then
-                           -- Left known to be strictly less than right
-                           return Bool_Pos (not Is_In_Membership);
-                        end if;
-
-                        if    Min_Left_Value  /= Not_Static
-                          and Max_Right_Value /= Not_Static
-                          and Min_Left_Value  >  Max_Right_Value
-                        then
-                           -- Left known to be strictly greater than right
-                           return Bool_Pos (not Is_In_Membership);
-                        end if;
-
-                        if    Min_Left_Value  /= Not_Static
-                          and Max_Left_Value  /= Not_Static
-                          and Min_Right_Value /= Not_Static
-                          and Max_Right_Value /= Not_Static
-                          and Min_Left_Value  >= Min_Right_Value
-                          and Max_Left_Value  <= Max_Right_Value
-                        then
-                           -- Left known to be within interval of right
-                           return Bool_Pos (Is_In_Membership);
-                        end if;
-
-                        -- Nothing certain...
+                  declare
+                     -- with negative values being possible, it is easier to compare using actual values
+                     -- digits, delta, float...etc will lead to Constraint_Error
+                     Min_Left  : constant Extended_Biggest_Int      := Biggest_Int'Wide_Value (Min_Left_Str);
+                     Max_Left  : constant Extended_Biggest_Int      := Biggest_Int'Wide_Value (Max_Left_Str);
+                     Min_Right :          Extended_Biggest_Int renames Bounds (1);
+                     Max_Right :          Extended_Biggest_Int renames Bounds (2);
+                  begin
+                     if (    Min_Left  /= Not_Static
+                         and Max_Left  /= Not_Static
+                         and Min_Right /= Not_Static
+                         and Max_Right /= Not_Static)
+                       and then (Min_Left >= Min_Right and Max_Left <= Max_Right)
+                     then
+                        -- Left known to be within interval of right
+                        return Bool_Pos (Is_In_Membership);
+                     elsif (Max_Left /= Not_Static and Min_Right /= Not_Static) and then Max_Left < Min_Right then
+                        -- sure not applicable
+                        null;
+                     elsif (Min_Left /= Not_Static and Max_Right /= Not_Static) and then Min_Left > Max_Right then
+                        -- sure not applicable
+                        null;
+                     else
                         return "";
-                     end;
-                  end if;
+                     end if;
+                  end;
                end loop;
+
                return Bool_Pos (not Is_In_Membership);
             end;
 
