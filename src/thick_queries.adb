@@ -7071,33 +7071,37 @@ package body Thick_Queries is
       function String_Is_True (Left : Wide_String) return Boolean is
          (Left = Bool_Pos (True));
 
-      function String_Min (S1, S2, S3, S4 : Wide_String) return Wide_String is
+      function String_Min (S1, S2 : Wide_String) return Wide_String is
       -- we compare only integer values, due to the necessity of handling signs
-         function Min (Left, Right : Extended_Biggest_Int) return Extended_Biggest_Int renames Extended_Biggest_Int'Min;
       begin
-         if S1 = "" or S2 = "" or S3 = "" or S4 = "" then
-            return "";
+         if S1 = "" then
+            return S2;
+         elsif S2 = "" then
+            return S1;
+         else
+            return Biggest_Int_Img (Extended_Biggest_Int'Min (Biggest_Int'Wide_Value (S1),
+                                                              Biggest_Int'Wide_Value (S2)));
          end if;
-
-         return Biggest_Int_Img (Min (Biggest_Int'Wide_Value (S1),
-                                      Min (Biggest_Int'Wide_Value (S2),
-                                           Min (Biggest_Int'Wide_Value (S3),
-                                                Biggest_Int'Wide_Value (S4)))));
       end String_Min;
 
-      function String_Max (S1, S2, S3, S4 : Wide_String) return Wide_String is
-      -- we compare only integer values, due to the necessity of handling signs
-         function Max (Left, Right : Extended_Biggest_Int) return Extended_Biggest_Int renames Extended_Biggest_Int'Max;
-      begin
-         if S1 = "" or S2 = "" or S3 = "" or S4 = "" then
-            return "";
-         end if;
+      function String_Min (S1, S2, S3, S4 : Wide_String) return Wide_String is
+        (String_Min (String_Min (S1, S2), String_Min (S3, S4)));
 
-         return Biggest_Int_Img (Max (Biggest_Int'Wide_Value (S1),
-                                      Max (Biggest_Int'Wide_Value (S2),
-                                           Max (Biggest_Int'Wide_Value (S3),
-                                                Biggest_Int'Wide_Value (S4)))));
+      function String_Max (S1, S2 : Wide_String) return Wide_String is
+      -- we compare only integer values, due to the necessity of handling signs
+      begin
+         if S1 = "" then
+            return S2;
+         elsif S2 = "" then
+            return S1;
+         else
+            return Biggest_Int_Img (Extended_Biggest_Int'Max (Biggest_Int'Wide_Value (S1),
+                                                              Biggest_Int'Wide_Value (S2)));
+         end if;
       end String_Max;
+
+      function String_Max (S1, S2, S3, S4 : Wide_String) return Wide_String is
+        (String_Max (String_Max (S1, S2), String_Max (S3, S4)));
 
       function Strip_Underscores (Item : Wide_String) return Wide_String is
          Result : Wide_String (Item'Range);
@@ -7199,7 +7203,20 @@ package body Thick_Queries is
          when A_Type_Conversion
             | A_Qualified_Expression
             =>
-            return Static_Expression_Value_Image (Converted_Or_Qualified_Expression (Expression), Wanted);
+            case Wanted is
+               when Exact =>
+                  return Static_Expression_Value_Image (Converted_Or_Qualified_Expression (Expression), Wanted);
+               when Minimum =>
+                  return String_Max
+                    (Static_Expression_Value_Image (Discrete_Constraining_Bounds
+                                                    (Converted_Or_Qualified_Subtype_Mark (Expression)) (1), Minimum),
+                     Static_Expression_Value_Image (Converted_Or_Qualified_Expression (Expression), Minimum));
+               when Maximum =>
+                  return String_Min
+                    (Static_Expression_Value_Image (Discrete_Constraining_Bounds
+                                                    (Converted_Or_Qualified_Subtype_Mark (Expression)) (2), Maximum),
+                     Static_Expression_Value_Image (Converted_Or_Qualified_Expression (Expression), Maximum));
+            end case;
 
          when A_Function_Call =>
             -- If an expression function, replace with the corresponding expression
