@@ -3961,8 +3961,8 @@ package body Thick_Queries is
                      --       change the category of the type
                      Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
                                                                (Simple_Name
-                                                                  (Strip_Attributes
-                                                                     (Subtype_Simple_Name (Good_Elem)))));
+                                                                (Strip_Attributes
+                                                                 (Subtype_Simple_Name (Good_Elem)))));
                   when A_Component_Definition =>
                      Good_Elem := Component_Definition_View (Good_Elem);
                      if Definition_Kind (Good_Elem) = An_Access_Definition then
@@ -8009,7 +8009,9 @@ package body Thick_Queries is
             L_Decl, R_Decl : Asis.Declaration;
          begin
             case Definition_Kind (L) is
-               when A_Subtype_Indication =>
+               when A_Subtype_Indication
+                  | A_Discrete_Subtype_Definition
+                  =>
                   L_Decl := Corresponding_Name_Declaration (Simple_Name
                                                             (Strip_Attributes
                                                              (Subtype_Simple_Name (L))));
@@ -8059,7 +8061,9 @@ package body Thick_Queries is
             end case;
 
             case Definition_Kind (R) is
-               when A_Subtype_Indication =>
+               when A_Subtype_Indication
+                  | A_Discrete_Subtype_Definition
+                  =>
                   R_Decl := Corresponding_Name_Declaration
                              (Simple_Name
                               (Strip_Attributes
