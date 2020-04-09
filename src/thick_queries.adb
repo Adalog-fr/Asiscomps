@@ -4031,9 +4031,9 @@ package body Thick_Queries is
                            Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Good_Elem);
                         begin
                            if not Is_Nil (Bounds (1)) then
-                              return Type_Category (Bounds (1));
+                              return Type_Category (Bounds (1), Follow_Derived, Privacy, Separate_Extension);
                            elsif not Is_Nil (Bounds (2)) then
-                              return Type_Category (Bounds (2));
+                              return Type_Category (Bounds (2), Follow_Derived, Privacy, Separate_Extension);
                            else
                               -- No know bounds, can be a generic formal type, no idea what it is...
                                  return Not_A_Type;
