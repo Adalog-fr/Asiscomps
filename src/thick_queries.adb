@@ -3970,7 +3970,7 @@ package body Thick_Queries is
                      end if;
                      Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
                                                                (Strip_Attributes
-                                                                  (Subtype_Simple_Name (Good_Elem))));
+                                                                (Subtype_Simple_Name (Good_Elem))));
                   when others =>
                      Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
                end case;
@@ -4073,8 +4073,8 @@ package body Thick_Queries is
                   --       change the category of the type
                   Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
                                                             (Simple_Name
-                                                               (Strip_Attributes
-                                                                  (Subtype_Simple_Name (Elem)))));
+                                                             (Strip_Attributes
+                                                              (Subtype_Simple_Name (Elem)))));
                when A_Private_Type_Definition
                   | A_Private_Extension_Definition
                   | A_Formal_Type_Definition
@@ -4085,7 +4085,7 @@ package body Thick_Queries is
                   Report_Error ("Type category: wrong definition_kind", Elem);
             end case;
          when A_Defining_Name =>
-            if Defining_Name_Kind (Elem) = A_Defining_Enumeration_Literal then
+            if Defining_Name_Kind (Elem) in A_Defining_Enumeration_Literal | A_Defining_Character_Literal then
                return An_Enumeration_Type;
             end if;
             Good_Elem := Enclosing_Element (Elem);
@@ -8009,15 +8009,17 @@ package body Thick_Queries is
             L_Decl, R_Decl : Asis.Declaration;
          begin
             case Definition_Kind (L) is
-               when A_Subtype_Indication
-                  | A_Discrete_Subtype_Definition
-                  =>
+               when A_Subtype_Indication =>
                   L_Decl := Corresponding_Name_Declaration (Simple_Name
                                                             (Strip_Attributes
-                                                             (Subtype_Simple_Name (L))));
+                                                               (Subtype_Simple_Name (L))));
+               when A_Discrete_Subtype_Definition =>
+                  L_Decl := Range_Ultimate_Name (L);
+                  if not Is_Nil (L_Decl) then
+                     L_Decl := Enclosing_Element (L_Decl);
+                  end if;
                when A_Component_Definition =>
-                  L_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name
-                                                            (Component_Definition_View (L)));
+                  L_Decl := Corresponding_Name_Declaration (Subtype_Simple_Name (Component_Definition_View (L)));
                when A_Type_Definition
                   | A_Task_Definition
                   | A_Protected_Definition
@@ -8061,13 +8063,15 @@ package body Thick_Queries is
             end case;
 
             case Definition_Kind (R) is
-               when A_Subtype_Indication
-                  | A_Discrete_Subtype_Definition
-                  =>
-                  R_Decl := Corresponding_Name_Declaration
-                             (Simple_Name
-                              (Strip_Attributes
-                               (Subtype_Simple_Name (R))));
+               when A_Subtype_Indication =>
+                  R_Decl := Corresponding_Name_Declaration (Simple_Name
+                                                            (Strip_Attributes
+                                                             (Subtype_Simple_Name (R))));
+               when A_Discrete_Subtype_Definition =>
+                  R_Decl := Range_Ultimate_Name (R);
+                  if not Is_Nil (R_Decl) then
+                    R_Decl := Enclosing_Element (R_Decl);
+                  end if;
                when A_Component_Definition =>
                   R_Decl := Corresponding_Name_Declaration
                              (Subtype_Simple_Name
@@ -8104,7 +8108,15 @@ package body Thick_Queries is
                   Report_Error ("Compatible_Types: Bad kind for R", R);
             end case;
 
-            return Is_Equal (Ultimate_Type_Declaration (L_Decl), Ultimate_Type_Declaration (R_Decl));
+            -- L_Decl and/or R_Decl is nil if a range of integer literals (implicit Integer)
+            if Is_Nil (L_Decl) then
+               return Is_Nil (R_Decl)
+                      or else Full_Name_Image (Names (Ultimate_Type_Declaration (R_Decl)) (1)) = "STANDARD.INTEGER";
+            elsif Is_Nil (R_Decl) then
+               return Full_Name_Image (Names (Ultimate_Type_Declaration (L_Decl)) (1)) = "STANDARD.INTEGER";
+            else
+               return Is_Equal (Ultimate_Type_Declaration (L_Decl), Ultimate_Type_Declaration (R_Decl));
+            end if;
          end Compatible_Types;
 
          function Name_Type_Definition (Elem : Asis.Element) return Asis.Definition is
