@@ -7125,10 +7125,10 @@ package body Thick_Queries is
          for C : Wide_Character of Item (Item'First + 1 .. Item'Last - 1) loop
             if C = '"' and not Quote then
                Quote := True;
-            else    -- Two quotes in a row
+            else    -- Normal character, or second of two quotes in a row
                Quote := False;
                R_Inx := R_Inx + 1;
-               Result (R_Inx) := '"';
+               Result (R_Inx) := C;
             end if;
          end loop;
 
