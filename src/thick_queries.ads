@@ -1403,6 +1403,9 @@ package Thick_Queries is
    -- For the static computation of an expression, variables are considered to hold unknown values.
    -- However, if an application is more clever than that, it can replace the following default by a function
    -- that returns the current value of the given variable.
+   -- The Id passed to the function is:
+   --    - The simple name of a variable
+   --    - The selected name (Variable.Component) of a record component (including discriminants)
    function Def_Object_Value_Image (Id : Asis.Expression; Wanted : Expression_Info) return Wide_String is ("");
    Object_Value_Image : access function (Id : Asis.Expression; Wanted : Expression_Info) return Wide_String
                         := Def_Object_Value_Image'Access;

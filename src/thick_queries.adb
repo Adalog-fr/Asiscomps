@@ -5274,7 +5274,7 @@ package body Thick_Queries is
          return False;
       end if;
 
-      if Expression_Kind (Prefix (Name)) /= A_Selected_Component then
+      if Expression_Kind (Prefix (Name)) not in An_Identifier | A_Selected_Component then
          -- Function calls, conversions, etc.
          return True;
       end if;
@@ -7163,7 +7163,11 @@ package body Thick_Queries is
             return Static_Expression_Value_Image (Expression_Parenthesized (Expression), Wanted);
 
          when An_Identifier =>
-            Decl := Corresponding_Name_Declaration (Expression);
+            Decl := Ultimate_Name (Expression);
+            if Is_Nil (Decl) then   -- Dynamic name...
+               return "";
+            end if;
+            Decl := Corresponding_Name_Declaration (Decl);
             case Declaration_Kind (Decl) is
                when An_Integer_Number_Declaration
                   | A_Real_Number_Declaration
@@ -7194,11 +7198,11 @@ package body Thick_Queries is
             end case;
 
          when A_Selected_Component =>
-            if not Is_Expanded_Name (Expression) then
-               -- A record component or the like is never a static expression
-               return "";
+            if Is_Expanded_Name (Expression) then
+               return Static_Expression_Value_Image (Selector (Expression), Wanted);
+            else
+               return Object_Value_Image (Expression, Wanted);
             end if;
-            return Static_Expression_Value_Image (Selector (Expression), Wanted);
 
          when A_Type_Conversion
             | A_Qualified_Expression
