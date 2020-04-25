@@ -5214,7 +5214,7 @@ package body Thick_Queries is
                   else
                      if No_Component
                        and then Declaration_Kind (Corresponding_Name_Declaration (Selector (Result)))
-                     in A_Discriminant_Specification .. A_Component_Declaration
+                                in A_Discriminant_Specification | A_Component_Declaration
                      then
                         Result := Prefix (Result);
                      else
@@ -7047,8 +7047,8 @@ package body Thick_Queries is
       generic
          with function Op_Int (Left, Right : Biggest_Int) return Boolean;
          with function Op_Float (Left, Right : Biggest_Float) return Boolean;
-      function String_Logical_Op (Left, Right : Wide_String) return Wide_String;
-      function String_Logical_Op (Left, Right : Wide_String) return Wide_String is
+      function String_Comparison_Op (Left, Right : Wide_String) return Wide_String;
+      function String_Comparison_Op (Left, Right : Wide_String) return Wide_String is
       begin
          if Left = "" or Right = "" then
             return "";
@@ -7060,16 +7060,30 @@ package body Thick_Queries is
             return Bool_Pos (Op_Int (Biggest_Int'Wide_Value (Left),
                                      Biggest_Int'Wide_Value (Right)));
          end if;
-      end String_Logical_Op;
-      function "="  is new String_Logical_Op ("=",  "=");
-      function "/=" is new String_Logical_Op ("/=", "/=");
-      function "<"  is new String_Logical_Op ("<",  "<");
-      function "<=" is new String_Logical_Op ("<=", "<=");
-      function ">"  is new String_Logical_Op (">",  ">");
-      function ">=" is new String_Logical_Op (">=", ">=");
+      end String_Comparison_Op;
+      function "="  is new String_Comparison_Op ("=",  "=");
+      function "/=" is new String_Comparison_Op ("/=", "/=");
+      function "<"  is new String_Comparison_Op ("<",  "<");
+      function "<=" is new String_Comparison_Op ("<=", "<=");
+      function ">"  is new String_Comparison_Op (">",  ">");
+      function ">=" is new String_Comparison_Op (">=", ">=");
 
       function String_Is_True (Left : Wide_String) return Boolean is
-         (Left = Bool_Pos (True));
+        (Left = Bool_Pos (True));
+
+      generic
+         with function Logical_Op (Left, Right : Boolean) return Boolean;
+      function String_Logical_Op (Left, Right : Wide_String) return Wide_String;
+      function String_Logical_Op (Left, Right : Wide_String) return Wide_String is
+         begin
+         if Left = "" or Right = "" then
+            return "";
+         end if;
+         return Bool_Pos (Logical_Op (String_Is_True (Left), String_Is_True (Right)));
+      end String_Logical_Op;
+      function "and" is new String_Logical_Op ("and");
+      function "or"  is new String_Logical_Op ("or");
+      function "xor" is new String_Logical_Op ("xor");
 
       function String_Min (S1, S2 : Wide_String) return Wide_String is
       -- we compare only integer values, due to the necessity of handling signs
@@ -7468,8 +7482,26 @@ package body Thick_Queries is
                               return "";
                            end if;
 
+                        when An_And_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                             and Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
+
+                        when An_Or_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                               or Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
+
+                        when An_Xor_Operator =>
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                             xor Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact);
+
+                        when A_Not_Operator =>
+                           -- Too lazy to write the function, lazybone solution:
+                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact)
+                             xor "1";   -- i.e. True
+
                         when others =>
                            -- Not implemented, or Not_An_Operator
+
                            return "";
                      end case;
 
