@@ -1455,6 +1455,12 @@ package Thick_Queries is
    --  Appropriate Element_Kinds:
    --     An_Expression
 
+   procedure Force_New_Evaluation;
+   -- When the same expression is evaluated several times from Static_Expression_Value_Image above, the
+   -- same result is returned. However, if the same expression needs to be reevaluated in several contexts
+   -- (like the initial expression of a variable declaration with several names, an "others => " association...)
+   -- this procedure will force a new "clean" evaluation.
+   -- Currently, there is a difference only for allocators.
 
    function Discrete_Static_Expression_Value (Expression : Asis.Expression;
                                               Wanted     : Expression_Info := Exact;

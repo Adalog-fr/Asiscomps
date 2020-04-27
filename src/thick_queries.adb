@@ -6980,6 +6980,10 @@ package body Thick_Queries is
    -- Each call to an allocator is represented by a non null value, obtained from the above counter.
    -- This allows "=" and "/=" comparisons to work as expected, and those are the only operations allowed
    -- on pointers.
+   Last_Pointer_Expression : Asis.Expression := Nil_Element;
+   -- The last expression that incremented Pointer_Count.
+   -- Therefore, if one queries Minimum and Maximum in a row for the same allocator, it won't return
+   -- different values. Not perfectly fool proof, but sufficient in practice.
 
    function Static_Expression_Value_Image (Expression : Asis.Expression;
                                            Wanted     : Expression_Info := Exact;
@@ -7533,7 +7537,10 @@ package body Thick_Queries is
             if RM_Static then
                return "";
             else
-               Pointer_Count := Pointer_Count + 1;
+               if not Is_Equal (Expression, Last_Pointer_Expression) then
+                  Pointer_Count           := Pointer_Count + 1;
+                  Last_Pointer_Expression := Expression;
+               end if;
                return Biggest_Int_Img (Pointer_Count);
             end if;
 
@@ -7830,6 +7837,16 @@ package body Thick_Queries is
          -- Out of range of Biggest_Int f.e., give up
          return "";
    end Static_Expression_Value_Image;
+
+
+   --------------------------
+   -- Force_New_Evaluation --
+   --------------------------
+
+   procedure Force_New_Evaluation is
+   begin
+      Last_Pointer_Expression := Nil_Element;
+   end Force_New_Evaluation;
 
 
    --------------------------------------
