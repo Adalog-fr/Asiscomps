@@ -1468,12 +1468,13 @@ package Thick_Queries is
    -- Like Static_Expression_Value_Image, but returns the actual value for static discrete expressions.
    -- Returns Not_Static for other cases
 
-   function Is_Static_Expression (Expr : Asis.Expression) return Boolean;
+   function Is_Static_Expression (Expr : Asis.Expression; RM_Static : Boolean := False) return Boolean;
    -- Returns True if Expr is a static expression
    -- TBH: if it is a static expression that Static_Expression_Value_Image is able to evaluate
 
    function Size_Value_Image (Name : Asis.Element) return Wide_String;
    -- Name must be the name of a type or object
+   -- Since a size is always RM_Static, there is no corresponding parameter
    --
    -- For a type:
    --   - If a Size clause applies to the type, returns the value from the clause (including
@@ -1589,7 +1590,7 @@ package Thick_Queries is
 
    function Discrete_Constraining_Values (Elem          : Asis.Element;
                                           Follow_Access : Boolean := False;
-                                          Static_Only   : Boolean := True)
+                                          RM_Static     : Boolean := False)
                                           return Extended_Biggest_Int_List;
    -- Like Discrete_Constraining_Bounds, but returns the actual values of the bounds
    -- if statically determinable.
@@ -1598,7 +1599,8 @@ package Thick_Queries is
 
 
    function Discrete_Constraining_Lengths (Elem          : Asis.Element;
-                                           Follow_Access : Boolean := False)
+                                           Follow_Access : Boolean := False;
+                                           RM_Static     : Boolean := False)
                                            return Extended_Biggest_Natural_List;
    -- Like Discrete_Constraining_Bounds, but returns the number of values in the range instead of
    -- the bounds if statically determinable
@@ -1646,7 +1648,7 @@ package Thick_Queries is
    --   An_Expression
    --   A_Defining_Name
 
-   function Same_Value (Left, Right : Asis.Expression) return Boolean;
+   function Same_Value (Left, Right   : Asis.Expression; RM_Static : Boolean := False) return Boolean;
    -- Determines if Left and Right statically have the same value.
    -- Returns True if:
    --   Left and Right statically denote the same constant or in parameter

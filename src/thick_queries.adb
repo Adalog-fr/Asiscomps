@@ -2651,7 +2651,7 @@ package body Thick_Queries is
             end if;
 
             for Index : Asis.Expression of Index_Expressions (Obj) loop
-               if  not Is_Static_Expression (Index) then
+               if  not Is_Static_Expression (Index, RM_Static => True) then
                   return False;
                end if;
             end loop;
@@ -2663,7 +2663,9 @@ package body Thick_Queries is
             end if;
 
             return Is_Static_Object (Prefix (Obj))
-              and then Discrete_Constraining_Lengths (Slice_Range (Obj), Follow_Access => False) (1) /= Not_Static;
+              and then Discrete_Constraining_Lengths (Slice_Range (Obj),
+                                                      Follow_Access => False,
+                                                      RM_Static     => True) (1) /= Not_Static;
          when A_Selected_Component =>
             declare
                Pfx : Asis.Element := Prefix (Obj);
@@ -6375,7 +6377,7 @@ package body Thick_Queries is
 
    function Discrete_Constraining_Values (Elem          : Asis.Element;
                                           Follow_Access : Boolean := False;
-                                          Static_Only   : Boolean := True)
+                                          RM_Static     : Boolean := False)
                                           return Extended_Biggest_Int_List
    is
       Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Elem, Follow_Access);
@@ -6390,7 +6392,7 @@ package body Thick_Queries is
          begin
             case Element_Kind (Bounds (I)) is
                when An_Expression =>
-                  Result (I) := Discrete_Static_Expression_Value (Bounds (I), RM_Static => Static_Only);
+                  Result (I) := Discrete_Static_Expression_Value (Bounds (I), RM_Static => RM_Static);
                   if Modular_Type then
                      -- The value returned for the upper bound by discrete_constraining_bounds is the mod expression
                      -- => 1 more than the upper bound
@@ -6430,10 +6432,11 @@ package body Thick_Queries is
    -----------------------------------
 
    function Discrete_Constraining_Lengths (Elem          : Asis.Element;
-                                           Follow_Access : Boolean := False)
+                                           Follow_Access : Boolean := False;
+                                           RM_Static     : Boolean := False)
                                            return Extended_Biggest_Natural_List
    is
-      Bounds : constant Extended_Biggest_Int_List := Discrete_Constraining_Values (Elem, Follow_Access);
+      Bounds : constant Extended_Biggest_Int_List := Discrete_Constraining_Values (Elem, Follow_Access, RM_Static);
       Result : Extended_Biggest_Natural_List (1 .. Bounds'Length / 2);
    begin
       if Result'Length = 0 then
@@ -6794,7 +6797,7 @@ package body Thick_Queries is
                   if Is_Nil (Expr) then
                      return "";
                   end if;
-                  return Static_Expression_Value_Image (Expr);
+                  return Static_Expression_Value_Image (Expr, RM_Static => True);
 
                when A_Slice =>
                   -- Yes, taking Tab(1..5)'Size is allowed.
@@ -6873,7 +6876,7 @@ package body Thick_Queries is
       Expr := Attribute_Clause_Expression (A_Size_Attribute, Good_Name);
       if not Is_Nil (Expr) then
          -- we have a size clauseie
-         return Static_Expression_Value_Image (Expr);
+         return Static_Expression_Value_Image (Expr, RM_Static => True);
       end if;
 
       case Declaration_Kind (Decl) is
@@ -6936,8 +6939,8 @@ package body Thick_Queries is
                end if;
 
                R := Component_Clause_Range (Compo_Clause);
-               L := Discrete_Static_Expression_Value (Lower_Bound (R));
-               H := Discrete_Static_Expression_Value (Upper_Bound (R));
+               L := Discrete_Static_Expression_Value (Lower_Bound (R), RM_Static => True);
+               H := Discrete_Static_Expression_Value (Upper_Bound (R), RM_Static => True);
                if L /= Not_Static and H /= Not_Static then
                   return Extended_Biggest_Int'Wide_Image (H - L + 1);
                else
@@ -7773,7 +7776,6 @@ package body Thick_Queries is
                Max_Left_Str     : constant Wide_String := Static_Expression_Value_Image
                                                             (Membership_Test_Expression (Expression), Maximum);
                Is_In_Membership : constant Boolean     := Expression_Kind (Expression) = An_In_Membership_Test;
-               Unsure           :          Boolean     := False;
                Bounds           :          Extended_Biggest_Int_List (1 .. 2);
             begin
                if Min_Left_Str = "" and Max_Left_Str = "" then
@@ -7874,7 +7876,7 @@ package body Thick_Queries is
    -- Is_Static_Expression --
    --------------------------
 
-   function Is_Static_Expression (Expr : Asis.Expression) return Boolean is
+   function Is_Static_Expression (Expr : Asis.Expression; RM_Static : Boolean := False) return Boolean is
       use Asis.Expressions;
 
       function Are_Static_Components (Compos : Asis.Association_List) return Boolean is
@@ -7905,9 +7907,9 @@ package body Thick_Queries is
             if Expression_Kind (Prefix (Expr)) = A_Selected_Component and then not Is_Expanded_Name (Prefix (Expr)) then
                return False;
             end if;
-            return Static_Expression_Value_Image (Expr, RM_Static => True) /= "";
+            return Static_Expression_Value_Image (Expr, RM_Static => RM_Static) /= "";
          when others =>
-            return Static_Expression_Value_Image (Expr, RM_Static => True) /= "";
+            return Static_Expression_Value_Image (Expr, RM_Static => RM_Static) /= "";
       end case;
    end Is_Static_Expression;
 
@@ -8388,7 +8390,7 @@ package body Thick_Queries is
    -- Same_Value --
    ----------------
 
-   function Same_Value (Left, Right : Asis.Expression) return Boolean is
+   function Same_Value (Left, Right   : Asis.Expression; RM_Static : Boolean := False) return Boolean is
       Good_Left, Good_Right : Asis.Expression;
 
       function Same_Constant (Left_C, Right_C : Asis.Expression) return Boolean is
@@ -8443,8 +8445,8 @@ package body Thick_Queries is
 
       -- Here, Left and Right do not refer to the same constant or "in" parameter
       declare
-         Left_Value : constant Wide_String := Static_Expression_Value_Image (Left);
-         Right_Value :constant Wide_String := Static_Expression_Value_Image (Right);
+         Left_Value : constant Wide_String := Static_Expression_Value_Image (Left,  RM_Static => RM_Static);
+         Right_Value :constant Wide_String := Static_Expression_Value_Image (Right, RM_Static => RM_Static);
       begin
          return Left_Value /= "" and then Left_Value = Right_Value;
       end;
