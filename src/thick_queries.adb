@@ -6290,7 +6290,19 @@ package body Thick_Queries is
                   when others =>
                      -- Assume it's a name, but it can be a type name, therefore
                      -- we cannot take directly Corresponding_Expression_Type
-                     Item := Corresponding_Name_Declaration (Item);
+
+                     -- If it is of an access type and Follow_Access is true, it is an implicit dereference
+                     -- => do like an explicit dereference
+                     if Follow_Access and then Is_Access_Expression (Item) then
+                        Item := Access_Target_Type (Corresponding_Expression_Type_Definition (Item));
+                        if Is_Nil (Item) then
+                           -- Access to SP...
+                           return Nil_Element_List;
+                        end if;
+                        No_Unconstrained := True; -- This is an object
+                     else
+                        Item := Corresponding_Name_Declaration (Item);
+                     end if;
                end case;                         ----------------- Expressions
 
             when A_Defining_Name =>              ----------------- Defining name
