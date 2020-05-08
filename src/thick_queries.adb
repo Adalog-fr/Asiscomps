@@ -4926,6 +4926,12 @@ package body Thick_Queries is
          return Corresponding_Declaration_Type_Definition (Corresponding_Name_Declaration (Local_Elem));
       end if;
 
+   exception
+      when Asis.Exceptions.ASIS_Inappropriate_Element =>
+         -- Raised by Corresponding_Name_Definition of predefined "special" identifiers, like the
+         -- ones that are part of pragmas.
+         -- Anyway, these have no type definition.
+         return Nil_Element;
    end Corresponding_Expression_Type_Definition;
 
 
