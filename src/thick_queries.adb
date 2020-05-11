@@ -4010,6 +4010,10 @@ package body Thick_Queries is
                         Report_Error ("Type category: attribute should be type", Good_Elem);
                   end case;
 
+               when A_Parameter_Specification =>
+                  -- Object_Declaration view returns a name, not a definition
+                  return Type_Category (Object_Declaration_View (Elem), Follow_Derived, Privacy, Separate_Extension);
+
                when A_Component_Declaration =>
                   Good_Elem := Corresponding_Name_Declaration (Subtype_Simple_Name
                                                                (Component_Definition_View
