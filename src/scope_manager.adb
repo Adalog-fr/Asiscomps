@@ -133,6 +133,7 @@ package body Scope_Manager is
                   | A_Package_Instantiation
                   | A_Procedure_Instantiation
                   | A_Function_Instantiation
+                  | A_Body_Stub
                     =>
                   return True;
                when others =>
