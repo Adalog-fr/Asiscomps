@@ -3704,6 +3704,35 @@ package body Thick_Queries is
       return Elements_In_Set (Discrs_Set);
    end Governing_Discriminants;
 
+   --------------------------------
+   -- Matching_Discriminant_Name --
+   --------------------------------
+
+   function Matching_Discriminant_Name (Name      : Asis.Defining_Name;
+                                        From_Decl : Asis.Declaration)
+                                        return Asis.Defining_Name
+   is
+      use Asis.Definitions;
+      Discr_Part : constant Asis.Definition := Discriminant_Part (From_Decl);
+   begin
+      if Definition_Kind (Discr_Part) /= A_Known_Discriminant_Part then
+         return Name;
+      end if;
+
+      declare
+         This_Name : constant Wide_String := To_Upper (Defining_Name_Image (Name));
+      begin
+         for Discr_Decl : Asis.Declaration of Discriminants (Discr_Part) loop
+            for N : Asis.Defining_Name of Names (Discr_Decl) loop
+               if This_Name = To_Upper (Defining_Name_Image (N)) then
+                  return N;
+               end if;
+            end loop;
+         end loop;
+      end;
+
+      return Name;
+   end Matching_Discriminant_Name;
 
    ---------------------------
    -- Corresponding_Aspects --
@@ -5365,6 +5394,14 @@ package body Thick_Queries is
                return Def;
             else
                return Matching_Name (Def, Other_Decl);
+            end if;
+         when A_Discriminant_Specification =>
+            -- The discriminant specification is inside a discriminant part inside the type declaration
+            Other_Decl := Corresponding_Type_Partial_View (Enclosing_Element (Enclosing_Element (Decl)));
+            if Is_Nil (Other_Decl) then
+               return Def;
+            else
+               return Matching_Discriminant_Name (Def, Other_Decl);
             end if;
          when An_Ordinary_Type_Declaration
             | A_Task_Type_Declaration

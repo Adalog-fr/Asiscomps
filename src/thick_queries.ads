@@ -704,8 +704,8 @@ package Thick_Queries is
    --  Nil_Element is allowed and returns No_Discriminant_Part
 
    function Governing_Discriminants (Elem : Asis.Element) return Asis.Defining_Name_List;
-   -- returns the declarations of discriminants that appear within the constraint of the declaration of Elem.
-   -- returns Nil_Element_List if Elem is not constrained, or if its constraint does not contain discriminants
+   -- returns the defining names of discriminants that appear within the constraint of the declaration of Elem.
+   -- returns Nil_Element_List if Elem is not constrained, or if its constraint does not contain discriminants.
    --
    -- Appropriate Element_Kinds:
    --     A_Declaration
@@ -716,6 +716,12 @@ package Thick_Queries is
    --       An_Identifier
    --       A_Selected_Component (applies to selector)
 
+   function Matching_Discriminant_Name (Name      : Asis.Defining_Name;
+                                        From_Decl : Asis.Declaration)
+                                        return Asis.Defining_Name;
+   -- Returns the defining name of a discriminant from From_Decl with the same name as Name
+   -- Returns Name if not found, or if From_Decl has no discriminants
+   -- Note: From_Decl needs not be the same type as where Name originates from
 
    function Corresponding_Aspects (Elem : Asis.Element; Filter : Wide_String := "") return Asis.Definition_List;
    -- Returns the list of aspects that apply to the indicated declaration (or of name's declaration)
@@ -948,6 +954,9 @@ package Thick_Queries is
    -- For a subprogram without a spec: the defining name from the body (given same input)
    -- For a private or incomplete or deferred declaration, or the full declaration of one
    --     of these: the defining name of the private or incomplete or deferred declaration.
+   -- For a discriminant: if the discriminant is from the full declaration of a private or
+   --     incomplete type, and the partial declaration has discriminants, the defining name
+   --     from the partial declaration; the given one otherwise
    -- For a formal parameter of a body: the corresponding formal parameter of the spec if
    --     there is one, the one from the body otherwise.
    -- For a formal parameter of a proper body: the corresponding formal parameter of the spec if
