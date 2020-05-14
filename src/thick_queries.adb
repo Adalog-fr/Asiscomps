@@ -2693,6 +2693,7 @@ package body Thick_Queries is
                      | A_Variable_Declaration
                      | A_Parameter_Specification
                      | A_Formal_Object_Declaration
+                     | A_Renaming_Declaration
                      =>
                      -- Prefix is an object
                      if Is_Access_Expression (Pfx) then
