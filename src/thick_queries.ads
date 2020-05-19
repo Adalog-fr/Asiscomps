@@ -1088,6 +1088,12 @@ package Thick_Queries is
    -- if passed Integer_Pointer.all, it will return Write;
    -- if passed Integer_Pointer, it will return Read.
 
+   function Are_Equivalent_Expressions (Left, Right : Asis.Expression) return Boolean;
+   -- Checks whether left and right are structurally identical expressions, except that
+   --   - names are considered equivalent if they denote the same element (i.e. not fooled by renamings)
+   --   - static subexpressions are considered equivalent if they have the same value
+   -- i.e. two equivalent expressions always provide the same result
+
    function Includes_Renaming (Path : Asis.Expression) return Boolean;
    -- Checks whether any element in the Path is a renaming
    --

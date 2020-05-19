@@ -1657,6 +1657,182 @@ package body Thick_Queries is
       end loop;
    end Full_Name_Image;
 
+   --------------------------------
+   -- Are_Equivalent_Expressions --
+   --------------------------------
+
+   function Are_Equivalent_Expressions (Left, Right : Asis.Expression) return Boolean is
+      use Asis.Expressions;
+
+      Called_Left  : Asis.Element;
+      Called_Right : Asis.Element;
+      Def_Left     : Asis.Defining_Name;
+      Def_Right    : Asis.Defining_Name;
+   begin
+      -- Parentheses don't count
+      if Expression_Kind (Left) = A_Parenthesized_Expression then
+         return Are_Equivalent_Expressions (Expression_Parenthesized (Left), Right);
+      end if;
+      if Expression_Kind (Right) = A_Parenthesized_Expression then
+         return Are_Equivalent_Expressions (Left, Expression_Parenthesized (Right));
+      end if;
+
+      if Same_Value (Left, Right) then
+         -- Statically same value
+         return True;
+      end if;
+
+      if Expression_Kind (Left) /= Expression_Kind (Right) then
+         return False;
+      end if;
+
+      case Expression_Kind (Left) is
+         when An_Enumeration_Literal
+            | A_Character_Literal
+            | An_Integer_Literal
+            | A_Real_Literal
+            | A_String_Literal
+            =>
+            -- If Execution comes to here, Left and Right have different values
+            return False;
+
+         when An_Identifier =>
+            return Variables_Proximity (Left, Right).Confidence = Certain;
+
+         when An_And_Then_Short_Circuit | An_Or_Else_Short_Circuit =>
+            return Are_Equivalent_Expressions (Short_Circuit_Operation_Left_Expression (Left),
+                                               Short_Circuit_Operation_Left_Expression (Right))
+              and then
+                   Are_Equivalent_Expressions (Short_Circuit_Operation_Right_Expression (Left),
+                                               Short_Circuit_Operation_Right_Expression (Right));
+
+         when A_Function_Call =>
+            if Is_Dispatching_Call (Left) or else Is_Dispatching_Call (Right) then
+               return False;
+            end if;
+
+            Called_Left := Ultimate_Name (Called_Simple_Name (Left));
+            if Is_Nil (Called_Left) then -- access to function
+               return False;
+            end if;
+            Called_Right := Ultimate_Name (Called_Simple_Name (Right));
+            if Is_Nil (Called_Right) then -- access to function
+               return False;
+            end if;
+
+            -- Check that it's the same function
+            if Expression_Kind (Called_Left) = An_Attribute_Reference then
+               if Attribute_Kind (Called_Left) /= Attribute_Kind (Called_Right) then
+                  return False;
+               end if;
+               Def_Left  := First_Defining_Name (Prefix (Called_Left));
+               Def_Right := First_Defining_Name (Prefix (Called_Right));
+            else
+               Def_Left  := First_Defining_Name (Called_Left);
+               Def_Right := First_Defining_Name (Called_Right);
+               -- Predefined operators have no declaration, hence no First_Defining_Name
+               if Is_Nil (Def_Left) then
+                  -- Predefined op. left
+                  if not Is_Nil (Def_Right) then
+                     -- Not predefined right
+                     return False;
+                  end if;
+                  if Operator_Kind (Called_Left) /= Operator_Kind (Called_Right) then
+                     -- Both predefined, not same
+                     return False;
+                  end if;
+               elsif Is_Nil (Def_Right) then
+                  -- Predefined op. right, not left
+                  return False;
+               end if;
+            end if;
+            if not Is_Equal (Def_Left, Def_Right) then
+               -- Not same function
+               return False;
+            end if;
+
+            -- Check that parameters are equivalent
+            declare
+               function Safe_Call_Parameters (Call : Asis.Expression) return Asis.Association_List is
+               begin
+                  if Expression_Kind (Prefix (Call)) = An_Attribute_Reference then
+                     -- No normalized association for attribute calls
+                     -- Since attribute functions have no parameter names, they can be called only in order
+                     return Function_Call_Parameters (Call, Normalized => False);
+                  end if;
+                  declare
+                     Result : constant Asis.Association_List := Function_Call_Parameters (Call,  Normalized => True);
+                  begin
+                     if Result'Length = 0 then
+                        -- Either there are really no parameters, or it's a call to a predefined operator
+                        -- (Unfortunately, ASIS for Gnat does not support normalized associations for predefined ops)
+                        -- Normalization means nothing if there are no parameters
+                        -- Predefined operators have no default parameters, so using a not normalized form is
+                        -- equivalent.
+
+                        -- TBH : this could be fooled if the user writes : "+" (Right => X, Left => Y);
+                        -- Let's put a kludge for this case:'
+                        if Expression_Kind (Simple_Name (Prefix (Call))) = An_Operator_Symbol then
+                           declare
+                              Kludge : constant Asis.Association_List := Function_Call_Parameters (Call,
+                                                                                                   Normalized => False);
+                              Formal : constant Asis.Expression := Formal_Parameter (Kludge (1));
+                           begin
+                              if not Is_Nil (Formal) and then To_Upper (Name_Image (Formal)) = "RIGHT" then
+                                 return (Kludge (2), Kludge (1));
+                              else
+                                 return Kludge;
+                              end if;
+                           end;
+                        else
+                           return Function_Call_Parameters (Call,  Normalized => False);
+                        end if;
+                     else
+                        return Result;
+                     end if;
+                  end;
+               end Safe_Call_Parameters;
+
+               Params_Left  : constant Asis.Association_List := Safe_Call_Parameters (Left);
+               Params_Right : constant Asis.Association_List := Safe_Call_Parameters (Right);
+            begin
+               for Index in Params_Left'Range loop
+                  if not Are_Equivalent_Expressions (Actual_Parameter (Params_Left  (Index)),
+                                                     Actual_Parameter (Params_Right (Index)))
+                  then
+                     return False;
+                  end if;
+               end loop;
+            end;
+            return True;
+         when An_Explicit_Dereference =>
+            return Variables_Proximity (Prefix (Left), Prefix (Right)) = Same_Variable;
+         when A_Record_Aggregate
+            | An_Extension_Aggregate
+            | A_Positional_Array_Aggregate
+            | A_Named_Array_Aggregate
+            | An_Indexed_Component
+            | A_Slice
+            | A_Selected_Component
+            | An_Attribute_Reference
+            | An_In_Membership_Test
+            | A_Not_In_Membership_Test
+            | A_Raise_Expression
+            | A_Type_Conversion
+            | A_Qualified_Expression
+            | An_Allocation_From_Subtype
+            | An_Allocation_From_Qualified_Expression
+            | A_Case_Expression
+            | An_If_Expression
+            | A_For_All_Quantified_Expression
+            | A_For_Some_Quantified_Expression
+            =>
+            -- TBSL
+            return False;
+         when others =>
+            Report_Error ("Expression should have been handled", Left);
+      end case;
+   end Are_Equivalent_Expressions;
 
    -----------------------
    -- Includes_Renaming --
@@ -5398,7 +5574,10 @@ package body Thick_Queries is
             end if;
          when A_Discriminant_Specification =>
             -- The discriminant specification is inside a discriminant part inside the type declaration
-            Other_Decl := Corresponding_Type_Partial_View (Enclosing_Element (Enclosing_Element (Decl)));
+            Other_Decl := Enclosing_Element (Enclosing_Element (Decl));
+            if Declaration_Kind (Other_Decl) /= An_Incomplete_Type_Declaration then
+               Other_Decl := Corresponding_Type_Partial_View (Other_Decl);
+            end if;
             if Is_Nil (Other_Decl) then
                return Def;
             else
