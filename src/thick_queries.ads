@@ -1434,9 +1434,10 @@ package Thick_Queries is
    -- The Id passed to the function is:
    --    - The simple name of a variable
    --    - The selected name (Variable.Component) of a record component (including discriminants)
+   type Object_Evaluator_Function Is
+     access function (Id : Asis.Expression; Wanted : Expression_Info) return Wide_String;
    function Def_Object_Value_Image (Id : Asis.Expression; Wanted : Expression_Info) return Wide_String is ("");
-   Object_Value_Image : access function (Id : Asis.Expression; Wanted : Expression_Info) return Wide_String
-                        := Def_Object_Value_Image'Access;
+   Object_Value_Image : Object_Evaluator_Function := Def_Object_Value_Image'Access;
 
    function Static_Expression_Value_Image (Expression : Asis.Expression;
                                            Wanted     : Expression_Info := Exact;
