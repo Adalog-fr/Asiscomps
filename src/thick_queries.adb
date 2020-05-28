@@ -1697,7 +1697,7 @@ package body Thick_Queries is
             return False;
 
          when An_Identifier =>
-            return Variables_Proximity (Left, Right).Confidence = Certain;
+            return Variables_Proximity (Left, Right) = Same_Variable;
 
          when An_And_Then_Short_Circuit | An_Or_Else_Short_Circuit =>
             return Are_Equivalent_Expressions (Short_Circuit_Operation_Left_Expression (Left),
@@ -1763,33 +1763,33 @@ package body Thick_Queries is
                   declare
                      Result : constant Asis.Association_List := Function_Call_Parameters (Call,  Normalized => True);
                   begin
-                     if Result'Length = 0 then
-                        -- Either there are really no parameters, or it's a call to a predefined operator
-                        -- (Unfortunately, ASIS for Gnat does not support normalized associations for predefined ops)
-                        -- Normalization means nothing if there are no parameters
-                        -- Predefined operators have no default parameters, so using a not normalized form is
-                        -- equivalent.
-
-                        -- TBH : this could be fooled if the user writes : "+" (Right => X, Left => Y);
-                        -- Let's put a kludge for this case:'
-                        if Expression_Kind (Simple_Name (Prefix (Call))) = An_Operator_Symbol then
-                           declare
-                              Kludge : constant Asis.Association_List := Function_Call_Parameters (Call,
-                                                                                                   Normalized => False);
-                              Formal : constant Asis.Expression := Formal_Parameter (Kludge (1));
-                           begin
-                              if not Is_Nil (Formal) and then To_Upper (Name_Image (Formal)) = "RIGHT" then
-                                 return (Kludge (2), Kludge (1));
-                              else
-                                 return Kludge;
-                              end if;
-                           end;
-                        else
-                           return Function_Call_Parameters (Call,  Normalized => False);
-                        end if;
-                     else
+                     if Result'Length /= 0 then
                         return Result;
                      end if;
+
+                     -- Either there are really no parameters, or it's a call to a predefined operator
+                     -- (Unfortunately, ASIS for Gnat does not support normalized associations for predefined ops)
+                     -- Normalization means nothing if there are no parameters
+                     -- Predefined operators have no default parameters, so using a not normalized form is
+                     -- equivalent.
+
+                     -- TBH : this could be fooled if the user writes : "+" (Right => X, Left => Y);
+                     -- Let's put a kludge for this case:'
+                     if Expression_Kind (Simple_Name (Prefix (Call))) /= An_Operator_Symbol then
+                        return Function_Call_Parameters (Call,  Normalized => False);
+                     end if;
+
+                     declare
+                        Kludge : constant Asis.Association_List := Function_Call_Parameters (Call,
+                                                                                             Normalized => False);
+                        Formal : constant Asis.Expression := Formal_Parameter (Kludge (1));
+                     begin
+                        if not Is_Nil (Formal) and then To_Upper (Name_Image (Formal)) = "RIGHT" then
+                           return (Kludge (2), Kludge (1));
+                        else
+                           return Kludge;
+                        end if;
+                     end;
                   end;
                end Safe_Call_Parameters;
 
@@ -3074,6 +3074,45 @@ package body Thick_Queries is
             return Kind in Equality_Operators;
       end case;
    end Is_Predefined_Operator;
+
+   ---------------
+   -- Is_Tagged --
+   ---------------
+
+   function Is_Tagged (Component : Asis.Defining_Name) return Boolean is
+      Category : constant Type_Categories := Type_Category (Component);
+   begin
+      case Category is
+         when A_Task_Type | A_Protected_Type =>
+            return Declaration_Interface_List (Enclosing_Element (Component))'Length > 0;
+         when A_Private_Type =>
+            declare
+               Private_Def : constant Asis.Definition := Type_Declaration_View (Enclosing_Element (Component));
+            begin
+               case Definition_Kind (Private_Def) is
+                  when A_Tagged_Private_Type_Definition
+                     | A_Private_Extension_Definition
+                     =>
+                     return True;
+                  when A_Formal_Type_Definition =>
+                     case Formal_Type_Kind (Private_Def) is
+                        when A_Formal_Tagged_Private_Type_Definition =>
+                           return True;
+                        when A_Formal_Derived_Type_Definition =>
+                           return Trait_Kind (Private_Def) = A_Private_Trait;
+                        when others =>
+                           return False;
+                     end case;
+                  when others =>
+                     return False;
+               end case;
+            end;
+         when A_Tagged_Type | An_Interface_Type =>
+            return True;
+         when others =>
+            return False;
+      end case;
+   end Is_Tagged;
 
    -------------------
    -- Is_Task_Entry --
@@ -8849,40 +8888,5 @@ package body Thick_Queries is
          return (1 => Name);
       end if;
    end Used_Identifiers;
-
-   function Is_Tagged (Component : Asis.Defining_Name) return Boolean is
-      Category : constant Type_Categories := Type_Category (Component);
-   begin
-      case Category is
-         when A_Task_Type | A_Protected_Type =>
-            return Declaration_Interface_List (Enclosing_Element (Component))'Length > 0;
-         when A_Private_Type =>
-            declare
-               Private_Def : constant Asis.Definition := Type_Declaration_View (Enclosing_Element (Component));
-            begin
-               case Definition_Kind (Private_Def) is
-                  when A_Tagged_Private_Type_Definition
-                     | A_Private_Extension_Definition
-                     =>
-                     return True;
-                  when A_Formal_Type_Definition =>
-                     case Formal_Type_Kind (Private_Def) is
-                        when A_Formal_Tagged_Private_Type_Definition =>
-                           return True;
-                        when A_Formal_Derived_Type_Definition =>
-                           return Trait_Kind (Private_Def) = A_Private_Trait;
-                        when others =>
-                           return False;
-                     end case;
-                  when others =>
-                     return False;
-               end case;
-            end;
-         when A_Tagged_Type | An_Interface_Type =>
-            return True;
-         when others =>
-            return False;
-      end case;
-   end Is_Tagged;
 
 end Thick_Queries;

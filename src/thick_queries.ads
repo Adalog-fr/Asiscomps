@@ -523,6 +523,9 @@ package Thick_Queries is
    --    A_Selected_Component (applies on selector)
    --    An_Attribute_Reference
 
+   function Is_Tagged (Component : Asis.Defining_Name) return Boolean;
+   -- Return True if the component is a tagged type, False otherwise
+
    function Is_Controlled (The_Element : Asis.Element) return Boolean;
    -- Returns True if The_Element is a defining_name, declaration or definition of a controlled
    -- type, of an object of a controlled type, or an expression whose type is controlled.
@@ -722,6 +725,16 @@ package Thick_Queries is
    -- Returns the defining name of a discriminant from From_Decl with the same name as Name
    -- Returns Name if not found, or if From_Decl has no discriminants
    -- Note: From_Decl needs not be the same type as where Name originates from
+
+   function Constraining_Definition (E : Asis.Element) return Asis.Definition;
+   -- Like Corresponding_Last_Constraint, except that it does not unwind subtypes at least once,
+   -- accepts pretty much anything on input, and returns the first definition that imposes a constraint.
+   --
+   -- Appropriate Element_Kinds:
+   --   An_Expression
+   --   A_Declaration
+   --   A_Definition
+   --   A_Defining_Name
 
    function Corresponding_Aspects (Elem : Asis.Element; Filter : Wide_String := "") return Asis.Definition_List;
    -- Returns the list of aspects that apply to the indicated declaration (or of name's declaration)
@@ -1523,17 +1536,6 @@ package Thick_Queries is
    -- Returns Not_Static if Size_Value_Image is ""
 
 
-   function Constraining_Definition (E : Asis.Element) return Asis.Definition;
-   -- Like Corresponding_Last_Constraint, except that it does not unwind subtypes at least once,
-   -- accepts pretty much anything on input, and returns the first definition that imposes a constraint.
-   --
-   -- Appropriate Element_Kinds:
-   --   An_Expression
-   --   A_Declaration
-   --   A_Definition
-   --   A_Defining_Name
-
-
    function Discrete_Constraining_Bounds (Elem          : Asis.Element;
                                           Follow_Access : Boolean := False)
                                           return Asis.Element_List;
@@ -1668,8 +1670,5 @@ package Thick_Queries is
    -- Returns True if:
    --   Left and Right statically denote the same constant or in parameter
    --   or Left and Right are discrete and evaluate statically to the same value.
-
-   function Is_Tagged (Component : Asis.Defining_Name) return Boolean;
-   -- Return True if the component is a tagged type, False otherwise
 
 end Thick_Queries;
