@@ -48,7 +48,7 @@ package body Implementation_Options is
    -----------------------
 
    function Initialize_String (Debug_Mode : Boolean := False) return Wide_String is
-      Default : constant Wide_String := "-ws -k -asis05";
+      Default : constant Wide_String := "-ws -wv -k -asis05";
    begin
       if Debug_Mode then
          return Default;
@@ -64,22 +64,11 @@ package body Implementation_Options is
    function Parameters_String (Project       : Project_File.Class_Access := null;
                                Other_Options : Wide_String := "") return Wide_String
    is
-      use Ada.Characters.Handling, Ada.Command_Line,
-          Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
+      use Ada.Strings.Wide_Fixed, Ada.Strings.Wide_Unbounded;
       use Project_File;
 
-      Asis_Gcc_Path   : constant String := "/../libexec/asis-gnsa/bin/asis-gcc";
       Default_Options : Unbounded_Wide_String := Null_Unbounded_Wide_String;
 
-      function Command_Directory (Command : String) return String is
-         use Ada.Directories, Utilities;
-         Full_Path_Command : constant Wide_String := Locate_Regular_File (To_Wide_String (Command), "PATH");
-      begin
-         if Full_Path_Command = "" then -- not found
-            return "";
-         end if;
-         return Containing_Directory (To_String (Full_Path_Command));
-      end Command_Directory;
    begin  -- Parameters_String
       if Index (Other_Options, "-C") = 0 then
          Append (Default_Options, "-C" & Default_C_Parameter);
@@ -90,21 +79,7 @@ package body Implementation_Options is
       end if;
 
       -- Case of new ASIS: must provide the executable for asis-gcc
-      -- We assume it is installed in the same tree as AdaControl or in the same tree as gcc
-      -- If not found, we assume it is the old ASIS technology, using regular gcc.
-
-      if        Command_Directory (Command_Name & Asis_Gcc_Path)          /= ""
-        or else Command_Directory (Command_Name & Asis_Gcc_Path & ".exe") /= ""
-      then
-         Append (Default_Options,
-                 " --GCC=" & To_Wide_String (Command_Directory (Command_Name) & Asis_Gcc_Path));
-
-      elsif        Command_Directory ("gcc" & Asis_Gcc_Path)          /= ""
-           or else Command_Directory ("gcc" & Asis_Gcc_Path & ".exe") /= ""
-      then
-            Append (Default_Options,
-                    " --GCC=" & To_Wide_String (Command_Directory ("gcc") & Asis_Gcc_Path));
-      end if;
+      Append (Default_Options, " --GCC=" & Tree_Generator);
 
       if Project /= null then  -- There is a project file
          Append (Default_Options, ' ' & Project.I_Options & ' ' & Project.T_Options);
@@ -112,5 +87,48 @@ package body Implementation_Options is
 
       return To_Wide_String (Default_Options) & ' ' & Other_Options;
    end Parameters_String;
+
+   --------------------
+   -- Tree_Generator --
+   --------------------
+
+   function Tree_Generator return Wide_String is
+      use Ada.Characters.Handling, Ada.Command_Line, Ada.Directories;
+      use Utilities;
+
+      Asis_Gcc_Path   : constant String       := "/../libexec/asis-gnsa/bin/asis-gcc";
+
+      function Command_Directory (Command : String) return String is
+         Full_Path_Command : constant Wide_String := Locate_Regular_File (To_Wide_String (Command), "PATH");
+      begin
+         if Full_Path_Command = "" then -- not found
+            return "";
+         end if;
+         return Containing_Directory (To_String (Full_Path_Command));
+      end Command_Directory;
+   begin  -- Tree_Generator
+      -- We assume asis-gcc is installed in the same tree as AdaControl or in the same tree as gcc
+      -- If not found, we assume it is the old ASIS technology, using regular gcc.
+      if        Exists (Command_Directory (Command_Name) & Asis_Gcc_Path)
+        or else Exists (Command_Directory (Command_Name) & Asis_Gcc_Path & ".exe")
+      then
+         return To_Wide_String (Command_Directory (Command_Name) & Asis_Gcc_Path);
+
+      elsif     Exists (Command_Directory ("gcc") & Asis_Gcc_Path)
+        or else Exists (Command_Directory ("gcc") & Asis_Gcc_Path & ".exe")
+      then
+         return To_Wide_String (Command_Directory ("gcc") & Asis_Gcc_Path);
+
+      -- assume gcc
+      elsif Locate_Regular_File ("gcc", "PATH") /= "" then
+         return Locate_Regular_File ("gcc", "PATH");
+
+      elsif Locate_Regular_File ("gcc.exe", "PATH") /= "" then
+         return Locate_Regular_File ("gcc.exe", "PATH");
+
+      else
+         return "";
+      end if;
+   end Tree_Generator;
 
 end Implementation_Options;

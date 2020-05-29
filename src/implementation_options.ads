@@ -46,9 +46,15 @@ package Implementation_Options is
    Default_C_Parameter : Wide_Character := 'A';   -- -CA
    Default_F_Parameter : Wide_Character := 'M';   -- -FM
 
+
    -- Parameters for Wide_Text_IO:
    Form_Parameters : constant String := "WCEM=h"; -- Use Hex encoding
 
-   Implementation_Error : exception;
 
+   -- Implementation dependant information
+   function Tree_Generator return Wide_String;
+   -- Full path to Gnat tree generator (gcc or asis-gcc)
+
+
+   Implementation_Error : exception;
 end Implementation_Options;
