@@ -1727,6 +1727,9 @@ package body Thick_Queries is
                end if;
                Def_Left  := First_Defining_Name (Prefix (Called_Left));
                Def_Right := First_Defining_Name (Prefix (Called_Right));
+            elsif Expression_Kind (Called_Right) = An_Attribute_Reference then
+               -- Right is an attribute, but Left isn't
+               return False;
             else
                Def_Left  := First_Defining_Name (Called_Left);
                Def_Right := First_Defining_Name (Called_Right);
