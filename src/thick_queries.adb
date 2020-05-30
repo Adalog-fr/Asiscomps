@@ -5617,7 +5617,7 @@ package body Thick_Queries is
          when A_Discriminant_Specification =>
             -- The discriminant specification is inside a discriminant part inside the type declaration
             Other_Decl := Enclosing_Element (Enclosing_Element (Decl));
-            if Declaration_Kind (Other_Decl) /= An_Incomplete_Type_Declaration then
+            if Declaration_Kind (Other_Decl) not in An_Incomplete_Type_Declaration | A_Formal_Type_Declaration then
                Other_Decl := Corresponding_Type_Partial_View (Other_Decl);
             end if;
             if Is_Nil (Other_Decl) then
