@@ -43,7 +43,7 @@
 -- When a bug has been fixed, we leave the entry as comments (with an indication of AdaControl's
 -- version where the entry has been removed). This may prove useful in case of regression.
 -- The entry is removed from the body however; should it need to be resurected, we can get it
--- from VCS
+-- from Git
 --
 -- The replacements are written in such a way that they still work correctly if the
 -- bug is fixed; i.e. there is no harm in still using the replacements after the bug
@@ -154,6 +154,17 @@ package A4G_Bugs is  --##rule line off NAMING_CONVENTION -- This is an acronym f
    -- Fixed in    : 6.1.?
    -- Removed from: AdaCtl 1.14b8
    -- function Name_Image (Expression : Asis.Expression) return Asis.Program_Text;
+
+   --
+   -- From Asis.Limited_Views
+   --
+
+   -- Reason      : For a defining name, returns the declaration instead of the defining name
+   -- Bug report  : [T619-003]
+   -- Gnat version: GnatPro 20.1
+   -- Fixed in    :
+   -- Removed from:
+   function Get_Nonlimited_View (D : Asis.Element) return Asis.Element;
 
    --
    -- From Asis.Statements

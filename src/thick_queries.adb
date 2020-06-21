@@ -535,7 +535,7 @@ package body Thick_Queries is
 
          Decl := Corresponding_Name_Declaration (Good_Mark);
          if Is_From_Limited_View (Decl) then
-            Decl := Get_Nonlimited_View (Decl);
+            Decl := A4G_Bugs.Get_Nonlimited_View (Decl);
          end if;
 
          case Declaration_Kind (Decl) is
@@ -3719,7 +3719,7 @@ package body Thick_Queries is
    begin
       -- Get rid of limited views
       if Is_From_Limited_View (Result) then
-         Result := Get_Nonlimited_View (Result);
+         Result := A4G_Bugs.Get_Nonlimited_View (Result);
       end if;
 
       -- Ada 2012: Decl can be incomplete, then private, hence the loop
@@ -4405,7 +4405,7 @@ package body Thick_Queries is
       -- If an incomplete type, go to full type declaration   #0000041
       if Declaration_Kind (Good_Elem) in An_Incomplete_Type_Declaration .. A_Tagged_Incomplete_Type_Declaration then
          if Is_From_Limited_View (Good_Elem) then
-            Good_Elem := Get_Nonlimited_View (Good_Elem);
+            Good_Elem := A4G_Bugs.Get_Nonlimited_View (Good_Elem);
          end if;
          Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
       end if;

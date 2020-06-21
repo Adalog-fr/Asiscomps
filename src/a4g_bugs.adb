@@ -39,6 +39,7 @@ with   -- ASIS
   Asis.Definitions,
   Asis.Elements,
   Asis.Expressions,
+  Asis.Limited_Views,
   Asis.Statements;
 
 with   -- Adalog
@@ -164,6 +165,37 @@ package body A4G_Bugs is
    begin
       return A4G_Bugs.Element_Span (Element).First_Line;
    end First_Line_Number;
+
+   -------------------------
+   -- Get_Nonlimited_View --
+   -------------------------
+
+   function Get_Nonlimited_View (D : Asis.Element) return Asis.Element is
+      use Asis.Declarations, Asis.Elements;
+      use Utilities;
+
+      Result : constant Asis.Element := Asis.Limited_Views.Get_Nonlimited_View (D);
+      D_Kind : constant Asis.Element_Kinds := Element_Kind (D);
+      R_Kind : constant Asis.Element_Kinds := Element_Kind (Result);
+   begin
+      -- Known cases:
+      if D_Kind = A_Defining_Name and R_Kind = A_Declaration then
+         Trace_Bug ("Get_Nonlimited_View declaration");
+         return Names (Result) (1);
+      end if;
+
+      if Defining_Name_Kind (D) /= A_Defining_Expanded_Name and Defining_Name_Kind (Result) = A_Defining_Expanded_Name
+      then
+         Trace_Bug ("Get_Nonlimited_View defining name");
+         return Defining_Selector (Result);
+      end if;
+
+      if Asis.Limited_Views.Is_From_Limited_View (Result) then
+         Trace ("Get_Nonlimited_View of ", D);                  --## rule line off no_trace
+         Failure ("Get_Nonlimited_View still limited", Result);
+      end if;
+      return Result;
+   end Get_Nonlimited_View;
 
    ----------------------
    -- Last_Line_Number --
