@@ -102,7 +102,10 @@ package body Implementation_Options is
          Full_Path_Command : constant Wide_String := Locate_Regular_File (To_Wide_String (Command), "PATH");
       begin
          if Full_Path_Command = "" then -- not found
-            return "";
+            if Command'Length <= 4 or else To_Upper (Command (Command'Last - 3 .. Command'Last)) /= ".EXE" then
+               -- retry with ".exe"
+               return Command_Directory (Command & ".exe");
+            end if;
          end if;
          return Containing_Directory (To_String (Full_Path_Command));
       end Command_Directory;
