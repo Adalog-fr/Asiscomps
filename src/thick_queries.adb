@@ -6060,7 +6060,9 @@ package body Thick_Queries is
                      =>
                      Current := Type_Declaration_View (Current);
                   when A_Variable_Declaration
+                     | A_Return_Variable_Specification
                      | A_Constant_Declaration
+                     | A_Return_Constant_Specification
                      | A_Deferred_Constant_Declaration
                      | A_Component_Declaration
                      | A_Discriminant_Specification
@@ -6638,6 +6640,9 @@ package body Thick_Queries is
 
                   when An_Element_Iterator_Specification =>
                      Item := Iteration_Scheme_Name (Item);
+
+                  when An_Entry_Declaration =>  -- Case of entry Family
+                     Item := Entry_Family_Definition (Item);
 
                   when others =>
                      Report_Error ("Discrete_Constraining_Bounds: Bad declaration "
@@ -7269,6 +7274,10 @@ package body Thick_Queries is
    -- Therefore, if one queries Minimum and Maximum in a row for the same allocator, it won't return
    -- different values. Not perfectly fool proof, but sufficient in practice.
 
+   -----------------------------------
+   -- Static_Expression_Value_Image --
+   -----------------------------------
+
    function Static_Expression_Value_Image (Expression : Asis.Expression;
                                            Wanted     : Expression_Info := Exact;
                                            RM_Static  : Boolean         := False)
@@ -7455,7 +7464,7 @@ package body Thick_Queries is
 
          when An_Enumeration_Literal
             | A_Character_Literal
-           =>
+            =>
             return Position_Number_Image (Corresponding_Name_Definition (Expression));
 
          when A_Null_Literal =>
@@ -8073,9 +8082,15 @@ package body Thick_Queries is
                   -- TBSL check case of real values
                   -- Constraint_Kind (Current_Choice) is A_Simple_Expression_Range or A_Range_Attribute_Reference
                   if Element_Kind (Current_Choice) = An_Expression and then Is_True_Expression (Current_Choice) then
+                     -- Single value, we need the exact value, not the range of possible values
+                     --## Rule off Assignments ## Don't use aggregate to avoid double evaluation
+                     Bounds (1) := Discrete_Static_Expression_Value (Current_Choice, Exact);
+                     Bounds (2) := Bounds (1);
+                     --## Rule on Assignments
                   else
                      Bounds := Discrete_Constraining_Values (Current_Choice);
                   end if;
+
                   declare
                      -- with negative values being possible, it is easier to compare using actual values
                      -- digits, delta, float...etc will lead to Constraint_Error
@@ -8093,12 +8108,13 @@ package body Thick_Queries is
                         -- Left known to be within interval of right
                         return Bool_Pos (Is_In_Membership);
                      elsif (Max_Left /= Not_Static and Min_Right /= Not_Static) and then Max_Left < Min_Right then
-                        -- sure not applicable
+                        -- surely not applicable
                         null;
                      elsif (Min_Left /= Not_Static and Max_Right /= Not_Static) and then Min_Left > Max_Right then
-                        -- sure not applicable
+                        -- surely not applicable
                         null;
                      else
+                        -- Not decidable
                         return "";
                      end if;
                   end;
