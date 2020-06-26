@@ -33,8 +33,9 @@
 ----------------------------------------------------------------------
 with -- Standard Ada units
   Ada.Characters.Handling,
-  Ada.Directories,
   Ada.Command_Line,
+  Ada.Directories,
+  Ada.Environment_Variables,
   Ada.Strings.Wide_Fixed,
   Ada.Strings.Wide_Unbounded;
 
@@ -78,8 +79,10 @@ package body Implementation_Options is
          Append (Default_Options, " -F" & Default_F_Parameter);
       end if;
 
-      -- Case of new ASIS: must provide the executable for asis-gcc
-      Append (Default_Options, " --GCC=" & Tree_Generator);
+      -- Case of new ASIS: must provide the executable for asis-gcc, unless give in the ASIS options
+      if Index (Other_Options, "--GCC") = 0 and then Tree_Generator /= "" then
+         Append (Default_Options, " --GCC=" & Tree_Generator);
+      end if;
 
       if Project /= null then  -- There is a project file
          Append (Default_Options, ' ' & Project.I_Options & ' ' & Project.T_Options);
@@ -110,7 +113,12 @@ package body Implementation_Options is
          return Containing_Directory (To_String (Full_Path_Command));
       end Command_Directory;
    begin  -- Tree_Generator
-      -- We assume asis-gcc is installed in the same tree as AdaControl or in the same tree as gcc
+      -- Provided by user?
+      if Ada.Environment_Variables.Exists ("ASISGCC") then
+         return To_Wide_String (Ada.Environment_Variables.Value ("ASISGCC"));
+      end if;
+
+      -- Otherwise, we assume asis-gcc is installed in the same tree as AdaControl or in the same tree as gcc
       -- If not found, we assume it is the old ASIS technology, using regular gcc.
       if        Exists (Command_Directory (Command_Name) & Asis_Gcc_Path)
         or else Exists (Command_Directory (Command_Name) & Asis_Gcc_Path & ".exe")
