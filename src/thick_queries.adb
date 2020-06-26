@@ -5748,7 +5748,7 @@ package body Thick_Queries is
    -- Is_Real_Expression --
    ------------------------
 
-   function Is_Real_Expression (Expr : Asis.Expression) return Boolean is
+   function Is_True_Expression (Expr : Asis.Expression) return Boolean is
       use Asis.Expressions;
    begin
       if Expression_Kind (Expr) not in An_Identifier | A_Selected_Component then
@@ -5757,7 +5757,7 @@ package body Thick_Queries is
 
       return Declaration_Kind (Corresponding_Name_Declaration (Ultimate_Name (Expr)))
              in A_Variable_Declaration .. An_Element_Iterator_Specification;
-   end Is_Real_Expression;
+   end Is_True_Expression;
 
    -------------------
    -- Matching_Name --
@@ -8072,10 +8072,7 @@ package body Thick_Queries is
 
                   -- TBSL check case of real values
                   -- Constraint_Kind (Current_Choice) is A_Simple_Expression_Range or A_Range_Attribute_Reference
-                  if Element_Kind (Current_Choice) = An_Expression and then Is_Real_Expression (Current_Choice) then
-                     -- Single value
-                     Bounds := (Discrete_Static_Expression_Value (Current_Choice, Minimum),
-                                Discrete_Static_Expression_Value (Current_Choice, Maximum));
+                  if Element_Kind (Current_Choice) = An_Expression and then Is_True_Expression (Current_Choice) then
                   else
                      Bounds := Discrete_Constraining_Values (Current_Choice);
                   end if;

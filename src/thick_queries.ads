@@ -987,7 +987,7 @@ package Thick_Queries is
    -- return Nil_Element if not found
    -- Useful to check defining names between spec and body, f.e.
 
-   function Is_Real_Expression (Expr : Asis.Expression) return Boolean;
+   function Is_True_Expression (Expr : Asis.Expression) return Boolean;
    -- Returns True if Expr is a real expression with a value
    -- Returns False if Expr is a name that ultimately denotes a type, a label, a subprogram, etc.
 
