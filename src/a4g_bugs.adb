@@ -86,7 +86,11 @@ package body A4G_Bugs is
                                                       (Component_Definition_View
                                                        (Object_Declaration_View (Result))));
 
-         when A_Type_Declaration | A_Subtype_Declaration | A_Formal_Type_Declaration =>
+         when A_Type_Declaration
+            | A_Subtype_Declaration
+            | A_Formal_Type_Declaration
+            | A_Formal_Incomplete_Type_Declaration
+            =>
             -- OK
             null;
 

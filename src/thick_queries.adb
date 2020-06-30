@@ -2496,6 +2496,10 @@ package body Thick_Queries is
                           The_Type);
       end case;
       Type_Decl := A4G_Bugs.Corresponding_First_Subtype (Type_Decl);
+      if Declaration_Kind (Type_Decl) in A_Formal_Type_Declaration | A_Formal_Incomplete_Type_Declaration then
+         -- Cannot be primitive of a formal type
+         return False;
+      end if;
 
       case Element_Kind (Simple_Name (The_Callable)) is
          when A_Declaration =>
@@ -3084,14 +3088,22 @@ package body Thick_Queries is
    ---------------
 
    function Is_Tagged (Component : Asis.Defining_Name) return Boolean is
-      Category : constant Type_Categories := Type_Category (Component);
+      use Asis.Limited_Views;
+      Good_Decl : Asis.Defining_Name := Component;
+      Category  : Type_Categories;
    begin
+      if Is_From_Limited_View (Good_Decl) then
+         Good_Decl := A4G_Bugs.Get_Nonlimited_View (Good_Decl);
+      end if;
+      Good_Decl := Corresponding_Full_Type_Declaration (Enclosing_Element (Component));
+      Category  := Type_Category (Good_Decl);
+
       case Category is
          when A_Task_Type | A_Protected_Type =>
-            return Declaration_Interface_List (Enclosing_Element (Component))'Length > 0;
+            return Declaration_Interface_List (Good_Decl)'Length > 0;
          when A_Private_Type =>
             declare
-               Private_Def : constant Asis.Definition := Type_Declaration_View (Enclosing_Element (Component));
+               Private_Def : constant Asis.Definition := Type_Declaration_View (Good_Decl);
             begin
                case Definition_Kind (Private_Def) is
                   when A_Tagged_Private_Type_Definition
@@ -3788,6 +3800,8 @@ package body Thick_Queries is
                   Result.First_Constraint := Subtype_Constraint (Type_Declaration_View (Result.Ultimate_Type));
                end if;
                Result.Ultimate_Type := A4G_Bugs.Corresponding_First_Subtype (Result.Ultimate_Type);
+            when A_Formal_Incomplete_Type_Declaration =>
+               exit;
             when others =>
                Report_Error ("Corresponding_Derivation_Description: bad kind", Result.Ultimate_Type);
          end case;
@@ -4331,6 +4345,7 @@ package body Thick_Queries is
                                                                       (Strip_Attributes
                                                                        (Subtype_Simple_Name (Elem)))));
                when A_Private_Type_Definition
+                  | A_Tagged_Private_Type_Definition
                   | A_Private_Extension_Definition
                   | A_Formal_Type_Definition
                   =>
@@ -4410,7 +4425,9 @@ package body Thick_Queries is
          end if;
          Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
       end if;
+      if Declaration_Kind (Good_Elem) = A_Subtype_Declaration then
          Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Good_Elem);
+      end if;
 
       loop -- because of derived and incomplete types
          case Declaration_Kind (Good_Elem) is
@@ -5351,6 +5368,10 @@ package body Thick_Queries is
 
 
       Local_Elem := A4G_Bugs.Corresponding_First_Subtype (Local_Elem);
+      if Declaration_Kind (Local_Elem) = A_Formal_Incomplete_Type_Declaration then
+         -- we have no definition...
+         return Nil_Element;
+      end if;
       Local_Elem := Type_Declaration_View (Local_Elem);
 
       if Definition_Kind (Local_Elem) in
