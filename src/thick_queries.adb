@@ -7170,8 +7170,24 @@ package body Thick_Queries is
 
                when An_Identifier =>
                   Good_Name := Ultimate_Name (Good_Name);
-                  Def       := Corresponding_Name_Definition (Good_Name);
+                  Def       := Corresponding_Name_Definition  (Good_Name);
                   Decl      := Corresponding_Name_Declaration (Good_Name);
+
+               when A_Function_Call =>
+                  declare
+                     Result_Type : Asis.Element := Corresponding_Called_Function (Good_Name);
+                  begin
+                     if Is_Nil (Result_Type) then  -- Some predefined stuff, like 'Input, give up
+                        return "";
+                     end if;
+
+                     Result_Type := Result_Profile (Result_Type);
+                     if Element_Kind (Result_Type) = A_Definition then
+                        -- Anonymous (hence access) type, give up
+                        return "";
+                     end if;
+                     return Size_Value_Image (Result_Type);
+                  end;
 
                when others =>
                   Report_Error ("Size_Value_Image: wrong expression", Name);
