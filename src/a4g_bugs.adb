@@ -114,6 +114,20 @@ package body A4G_Bugs is
       return Result;
    end Corresponding_Expression_Type;
 
+   ---------------------------------
+   -- Corresponding_First_Subtype --
+   ---------------------------------
+
+   function Corresponding_First_Subtype (Declaration : Asis.Declaration) return Asis.Declaration is
+      use Asis.Elements;
+   begin
+      case Declaration_Kind (Declaration) is
+         when A_Formal_Incomplete_Type_Declaration | A_Tagged_Incomplete_Type_Declaration =>
+            return Declaration;
+         when others =>
+            return Asis.Declarations.Corresponding_First_Subtype (Declaration);
+      end case;
+   end Corresponding_First_Subtype;
 
    ------------------
    -- Element_Span --

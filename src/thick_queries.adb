@@ -57,6 +57,7 @@ with   -- ASIS units
   Asis.Limited_Views,
   Asis.Statements,
   Asis.Text;
+
 package body Thick_Queries is
    use Asis, Asis.Elements, Asis.Declarations, Asis.Statements;
 
@@ -195,7 +196,7 @@ package body Thick_Queries is
                     (Simple_Name
                      (Strip_Attributes
                       (Anonymous_Access_To_Object_Subtype_Mark (Good_Def))));
-            return Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
+            return A4G_Bugs.Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
          when A_Type_Definition =>
             if Type_Kind (Good_Def) = An_Access_Type_Definition then
                Good_Def := Type_Declaration_View (Ultimate_Type_Declaration (Enclosing_Element (Good_Def)));
@@ -207,7 +208,7 @@ package body Thick_Queries is
                          (Strip_Attributes
                           (Subtype_Simple_Name
                            (Asis.Definitions.Access_To_Object_Definition (Good_Def)))));
-               return  Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
+               return  A4G_Bugs.Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
             end if;
          when A_Formal_Type_Definition =>
             if Formal_Type_Kind (Good_Def) = A_Formal_Access_Type_Definition then
@@ -219,7 +220,7 @@ package body Thick_Queries is
                              (Type_Declaration_View
                               (Ultimate_Type_Declaration
                                (Enclosing_Element (Good_Def))))))));
-               return Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
+               return A4G_Bugs.Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
             end if;
          when others =>
             null;
@@ -549,12 +550,12 @@ package body Thick_Queries is
                if Is_Nil (Decl) then
                   Decl := Corresponding_Name_Declaration (Good_Mark);
                else
-                  Decl := Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
+                  Decl := A4G_Bugs.Corresponding_First_Subtype (Corresponding_Full_Type_Declaration (Decl));
                end if;
             when A_Formal_Incomplete_Type_Declaration =>
                null;
             when others =>
-               Decl := Corresponding_First_Subtype (Decl);
+               Decl := A4G_Bugs.Corresponding_First_Subtype (Decl);
          end case;
          return (Access_Form  => Not_An_Access_Definition,
                  General_Name => (Attribute => Attribute, Name => Names (Decl) (1)),
@@ -1935,7 +1936,7 @@ package body Thick_Queries is
                         Type_Name := Subtype_Simple_Name (Component_Definition_View (Element_Type_Definition));
                         if Expression_Kind (Type_Name) /= An_Attribute_Reference then
                            Result := Result or Corresponding_Pragma_Set (Names
-                                                                         (Corresponding_First_Subtype
+                                                                         (A4G_Bugs.Corresponding_First_Subtype
                                                                           (Corresponding_Name_Declaration
                                                                            (Type_Name)))(1));
                         end if;
@@ -1943,7 +1944,7 @@ package body Thick_Queries is
                         Type_Name := Subtype_Simple_Name (Element_Type_Definition);
                         if Expression_Kind (Type_Name) /= An_Attribute_Reference then
                            Result := Result or Corresponding_Pragma_Set (Names
-                                                                         (Corresponding_First_Subtype
+                                                                         (A4G_Bugs.Corresponding_First_Subtype
                                                                           (Corresponding_Name_Declaration
                                                                            (Type_Name)))(1));
                         end if;
@@ -2494,7 +2495,7 @@ package body Thick_Queries is
                           & Element_Kinds'Wide_Image (Element_Kind (The_Type)),
                           The_Type);
       end case;
-      Type_Decl := Corresponding_First_Subtype (Type_Decl);
+      Type_Decl := A4G_Bugs.Corresponding_First_Subtype (Type_Decl);
 
       case Element_Kind (Simple_Name (The_Callable)) is
          when A_Declaration =>
@@ -2543,7 +2544,7 @@ package body Thick_Queries is
                            -- not a comparison, get the type from the result type of the expression
                            Parameter_Type_Decl := A4G_Bugs.Corresponding_Expression_Type (The_Call);
                         end if;
-                        return Is_Equal (Corresponding_Full_Type_Declaration (Corresponding_First_Subtype
+                        return Is_Equal (Corresponding_Full_Type_Declaration (A4G_Bugs.Corresponding_First_Subtype
                                                                               (Parameter_Type_Decl)),
                                          Corresponding_Full_Type_Declaration (Type_Decl));
                      end;
@@ -2562,7 +2563,7 @@ package body Thick_Queries is
                      -- Not an attribute whose prefix is a type...
                      return False;
                   end if;
-                  return Is_Equal (Type_Decl, Corresponding_First_Subtype (Callable_Decl));
+                  return Is_Equal (Type_Decl, A4G_Bugs.Corresponding_First_Subtype (Callable_Decl));
                when others =>
                   Report_Error ("Is_Callable_Construct called on "
                                 & Expression_Kinds'Wide_Image (Expression_Kind (The_Callable)),
@@ -2709,9 +2710,9 @@ package body Thick_Queries is
                                  return Nil_Element_List;
                               end if;
                            end;
-                           return (1 => Corresponding_First_Subtype (Param_Type));
+                           return (1 => A4G_Bugs.Corresponding_First_Subtype (Param_Type));
                         when others =>
-                           return (1 => Corresponding_First_Subtype (A4G_Bugs.Corresponding_Expression_Type
+                           return (1 => A4G_Bugs.Corresponding_First_Subtype (A4G_Bugs.Corresponding_Expression_Type
                                                                      (Enclosing_Element (The_Callable))));
                      end case;
 
@@ -3484,7 +3485,7 @@ package body Thick_Queries is
                   when A_Type_Declaration =>
                      exit;
                   when A_Subtype_Declaration =>
-                     The_Subtype := Corresponding_First_Subtype (The_Subtype);
+                     The_Subtype := A4G_Bugs.Corresponding_First_Subtype (The_Subtype);
                   when A_Variable_Declaration
                      | A_Constant_Declaration
                      | A_Deferred_Constant_Declaration
@@ -3632,7 +3633,7 @@ package body Thick_Queries is
                      | A_Private_Extension_Declaration
                      | A_Subtype_Declaration
                        =>
-                     Decl := Type_Declaration_View (Corresponding_First_Subtype (Decl));
+                     Decl := Type_Declaration_View (A4G_Bugs.Corresponding_First_Subtype (Decl));
                   when A_Task_Type_Declaration
                      | A_Protected_Type_Declaration
                        =>
@@ -3786,7 +3787,7 @@ package body Thick_Queries is
                if Is_Nil (Result.First_Constraint) then
                   Result.First_Constraint := Subtype_Constraint (Type_Declaration_View (Result.Ultimate_Type));
                end if;
-               Result.Ultimate_Type := Corresponding_First_Subtype (Result.Ultimate_Type);
+               Result.Ultimate_Type := A4G_Bugs.Corresponding_First_Subtype (Result.Ultimate_Type);
             when others =>
                Report_Error ("Corresponding_Derivation_Description: bad kind", Result.Ultimate_Type);
          end case;
@@ -3835,7 +3836,7 @@ package body Thick_Queries is
                                   then Enclosing_Element (The_Subtype)
                                   else The_Subtype);
    begin
-      Decl := Corresponding_First_Subtype (Decl);
+      Decl := A4G_Bugs.Corresponding_First_Subtype (Decl);
       if Type_Kind (Type_Declaration_View (Decl)) = A_Derived_Type_Definition then
          Decl := Corresponding_Root_Type (Type_Declaration_View (Decl));
       end if;
@@ -4046,7 +4047,7 @@ package body Thick_Queries is
       end case;
 
       if Declaration_Kind (Decl) = An_Ordinary_Type_Declaration then
-         Decl := Corresponding_First_Subtype (Decl);
+         Decl := A4G_Bugs.Corresponding_First_Subtype (Decl);
       end if;
       if Is_Nil (Decl) then
          return Nil_Element;
@@ -4198,7 +4199,7 @@ package body Thick_Queries is
                            =>
                            return An_Array_Type;
                         when others =>
-                           Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
+                           Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
                      end case;
                   when A_Task_Definition =>
                      return A_Task_Type;
@@ -4209,20 +4210,20 @@ package body Thick_Queries is
                   when A_Subtype_Indication =>
                      -- Note: we don't care about attributes ('Base or 'Range or 'Class), since they can't
                      --       change the category of the type
-                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
-                                                               (Simple_Name
-                                                                (Strip_Attributes
-                                                                 (Subtype_Simple_Name (Good_Elem)))));
+                     Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Corresponding_Name_Declaration
+                                                                        (Simple_Name
+                                                                         (Strip_Attributes
+                                                                          (Subtype_Simple_Name (Good_Elem)))));
                   when A_Component_Definition =>
                      Good_Elem := Component_Definition_View (Good_Elem);
                      if Definition_Kind (Good_Elem) = An_Access_Definition then
                         return An_Access_Type;
                      end if;
-                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
-                                                               (Strip_Attributes
-                                                                (Subtype_Simple_Name (Good_Elem))));
+                     Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Corresponding_Name_Declaration
+                                                                        (Strip_Attributes
+                                                                         (Subtype_Simple_Name (Good_Elem))));
                   when others =>
-                     Good_Elem := Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
+                     Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Enclosing_Element (Good_Elem));
                end case;
             end if;
 
@@ -4325,10 +4326,10 @@ package body Thick_Queries is
                when A_Subtype_Indication =>
                   -- Note: we don't care about attributes ('Base or 'Range or 'Class), since they can't
                   --       change the category of the type
-                  Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration
-                                                            (Simple_Name
-                                                             (Strip_Attributes
-                                                              (Subtype_Simple_Name (Elem)))));
+                  Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Corresponding_Name_Declaration
+                                                                     (Simple_Name
+                                                                      (Strip_Attributes
+                                                                       (Subtype_Simple_Name (Elem)))));
                when A_Private_Type_Definition
                   | A_Private_Extension_Definition
                   | A_Formal_Type_Definition
@@ -4409,7 +4410,7 @@ package body Thick_Queries is
          end if;
          Good_Elem := Corresponding_Full_Type_Declaration (Good_Elem);
       end if;
-      Good_Elem := Corresponding_First_Subtype (Good_Elem);
+         Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Good_Elem);
 
       loop -- because of derived and incomplete types
          case Declaration_Kind (Good_Elem) is
@@ -4431,7 +4432,7 @@ package body Thick_Queries is
                         when others =>
                            Report_Error ("Bad attribute in Type_Category", Good_Elem);
                      end case;
-                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration (Good_Elem));
+                     Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Corresponding_Name_Declaration (Good_Elem));
                   when An_Enumeration_Type_Definition =>
                      return An_Enumeration_Type;
                   when A_Signed_Integer_Type_Definition =>
@@ -4508,7 +4509,7 @@ package body Thick_Queries is
                         when others =>
                            Report_Error ("Bad attribute in Type_Category", Good_Elem);
                      end case;
-                     Good_Elem := Corresponding_First_Subtype (Corresponding_Name_Declaration (Good_Elem));
+                     Good_Elem := A4G_Bugs.Corresponding_First_Subtype (Corresponding_Name_Declaration (Good_Elem));
                   when A_Formal_Discrete_Type_Definition =>
                      return An_Enumeration_Type;
                   when A_Formal_Signed_Integer_Type_Definition =>
@@ -4597,7 +4598,7 @@ package body Thick_Queries is
             when A_Subtype_Indication =>
                -- Check first subtype instead
                Pre_Declaration_Kind (Type_Declaration_View
-                                     (Corresponding_First_Subtype
+                                     (A4G_Bugs.Corresponding_First_Subtype
                                       (Corresponding_Name_Declaration
                                        (Strip_Attributes
                                         (Subtype_Simple_Name (Element))))),
@@ -4747,7 +4748,7 @@ package body Thick_Queries is
                   Good_Decl := Corresponding_Full_Type_Declaration (Good_Decl);
                   Good_Def  := Type_Declaration_View (Good_Decl);
                when A_Subtype_Declaration =>
-                  Good_Decl := Corresponding_First_Subtype (Good_Decl);
+                  Good_Decl := A4G_Bugs.Corresponding_First_Subtype (Good_Decl);
                   Good_Def  := Type_Declaration_View (Good_Decl);
                when others =>
                   exit;
@@ -5063,7 +5064,7 @@ package body Thick_Queries is
       Local_Elem := Corresponding_Full_Type_Declaration (Local_Elem);
       if not Is_Nil (Local_Elem) then
          -- Normal case, we have a type declaration
-         return Type_Declaration_View (Corresponding_First_Subtype (Local_Elem));
+         return Type_Declaration_View (A4G_Bugs.Corresponding_First_Subtype (Local_Elem));
       end if;
 
       -- No type declaration, see if we can retrieve the definition of an anonymous type
@@ -5348,14 +5349,16 @@ package body Thick_Queries is
          Local_Elem := Corresponding_Full_Type_Declaration (Local_Elem);
       end if;
 
-      Local_Elem := Type_Declaration_View (Corresponding_First_Subtype (Local_Elem));
+
+      Local_Elem := A4G_Bugs.Corresponding_First_Subtype (Local_Elem);
+      Local_Elem := Type_Declaration_View (Local_Elem);
 
       if Definition_Kind (Local_Elem) in
         A_Private_Type_Definition .. A_Private_Extension_Definition
       then
-         Local_Elem := Type_Declaration_View (Corresponding_First_Subtype
-                                                (Corresponding_Full_Type_Declaration
-                                                   (Enclosing_Element (Local_Elem))));
+         Local_Elem := Type_Declaration_View (A4G_Bugs.Corresponding_First_Subtype
+                                              (Corresponding_Full_Type_Declaration
+                                               (Enclosing_Element (Local_Elem))));
       end if;
 
       if Type_Kind (Local_Elem) in
@@ -7096,7 +7099,7 @@ package body Thick_Queries is
                      when A_Base_Attribute =>
                         -- The prefix has to be scalar
                         -- The base type is at least the first named subtype => go there
-                        Decl := Corresponding_First_Subtype
+                        Decl := A4G_Bugs.Corresponding_First_Subtype
                                 (Corresponding_Name_Declaration
                                  (Simple_Name (Prefix (Good_Name))));
                         case Scalar_Types (Type_Category (Decl)) is
@@ -7161,7 +7164,7 @@ package body Thick_Queries is
       -- Do we have a size clause (type or object)?
       Expr := Attribute_Clause_Expression (A_Size_Attribute, Good_Name);
       if not Is_Nil (Expr) then
-         -- we have a size clauseie
+         -- we have a size clause
          return Static_Expression_Value_Image (Expr, RM_Static => True);
       end if;
 

@@ -91,6 +91,13 @@ package A4G_Bugs is  --##rule line off NAMING_CONVENTION -- This is an acronym f
    -- function Renamed_Entity (Declaration : in Asis.Declaration) return Asis.Expression;
 
 
+   -- Reason      : case of A_Formal_Incomplete_Type omitted
+   -- Bug report  : [T629-020]
+   -- Gnat version: GNATPro 21.0w (20200507-93)
+   -- Fixed in    :
+   -- Removed from:
+   function Corresponding_First_Subtype (Declaration : Asis.Declaration) return Asis.Declaration;
+
    --
    -- From Asis.Definitions
    --
