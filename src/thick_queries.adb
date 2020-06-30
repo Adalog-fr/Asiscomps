@@ -1788,6 +1788,9 @@ package body Thick_Queries is
                                                                                              Normalized => False);
                         Formal : constant Asis.Expression := Formal_Parameter (Kludge (1));
                      begin
+                        if Kludge'Length = 1 then -- Unary operator
+                           return Kludge;
+                        end if;
                         if not Is_Nil (Formal) and then To_Upper (Name_Image (Formal)) = "RIGHT" then
                            return (Kludge (2), Kludge (1));
                         else
