@@ -5643,7 +5643,11 @@ package body Thick_Queries is
             end if;
          when A_Discriminant_Specification =>
             -- The discriminant specification is inside a discriminant part inside the type declaration
-            Other_Decl := Enclosing_Element (Enclosing_Element (Decl));
+            -- Ticket [T630-012]: sometimes the discriminant part is missing, hence the loop:
+            Other_Decl := Enclosing_Element (Decl);
+            while Declaration_Kind (Other_Decl) not in A_Type_Declaration | A_Formal_Type_Declaration loop
+               Other_Decl := Enclosing_Element (Other_Decl);
+            end loop;
             if Declaration_Kind (Other_Decl) not in An_Incomplete_Type_Declaration | A_Formal_Type_Declaration then
                Other_Decl := Corresponding_Type_Partial_View (Other_Decl);
             end if;
