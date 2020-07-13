@@ -7582,12 +7582,11 @@ package body Thick_Queries is
 
          when A_Function_Call =>
             -- If an expression function, replace with the corresponding expression
+            -- but don't go as far as trying to get at the body for the case where the spec is
+            -- implemented with an expression function, it causes tree swapping.
             Decl := Corresponding_Called_Function (Expression);
-            if not Is_Nil (Decl) and then Declaration_Kind (Decl) /= A_Formal_Function_Declaration then
-               Decl := Corresponding_Body (Decl);
-               if Declaration_Kind (Decl) = An_Expression_Function_Declaration then
-                  return Static_Expression_Value_Image (Result_Expression (Decl), Wanted);
-               end if;
+            if Declaration_Kind (Decl) = An_Expression_Function_Declaration then
+               return Static_Expression_Value_Image (Result_Expression (Decl), Wanted);
             end if;
 
             -- Evaluate predefined operators
@@ -7601,7 +7600,6 @@ package body Thick_Queries is
                      -- For predefined operations, either there is no "fake" declaration and
                      -- Corresponding_Name_Declaration returns Nil_Element (GNAT case), or the
                      -- Declaration_Origin is An_Implicit_Predefined_Declaration.
-                     Decl := Corresponding_Called_Function (Expression);
                      if not Is_Nil (Decl)
                        and then Declaration_Origin (Decl) /= An_Implicit_Predefined_Declaration
                      then
