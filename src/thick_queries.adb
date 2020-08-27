@@ -8384,10 +8384,6 @@ package body Thick_Queries is
          end loop;
       end Descriptor;
 
-      ---------------------------
-      -- Descriptors_Proximity --
-      ---------------------------
-
       function Descriptors_Proximity (L_Descr, R_Descr : Name_Descriptor) return Proximity is
          -- Note that L_Descr'First and R_Descr'First are always 1
          Best_Proximity    : Proximity;
@@ -8758,15 +8754,43 @@ package body Thick_Queries is
                   -- Dynamic renaming...
                   return False;
                end if;
-               if Same_Constant (Left_Obj, Right_Obj) then
-                  -- We have the same constant objects, but for records we must make sure
-                  -- that the renamings target the same components. The following test duplicates
-                  -- the previous one if it is NOT the renaming of a component, but what's the heck..
-                  return Is_Equal (Corresponding_Name_Definition (Ultimate_Name (Left_C,  No_Component => False)),
-                                   Corresponding_Name_Definition (Ultimate_Name (Right_C, No_Component => False)));
-               else
+
+               if not Same_Constant (Left_Obj, Right_Obj) then
                   return False;
                end if;
+
+               -- We have the same constant objects, but for records we must make sure
+               -- that the renamings target the same components. The following test duplicates
+               -- the previous one if it is NOT the renaming of a component, but what's the heck..
+               Left_Obj  := Ultimate_Name (Left_C,  No_Component => False);
+               Right_Obj := Ultimate_Name (Right_C, No_Component => False);
+               if not Is_Equal (Corresponding_Name_Definition (Left_Obj),
+                                Corresponding_Name_Definition (Right_Obj))
+               then
+                  return False;
+               end if;
+
+               -- Same component, but beware: the component might be an indexed array, in which case we must
+               -- check that the indices are the same
+               loop
+                  Left_Obj  := Enclosing_Element (Left_Obj);
+                  Right_Obj := Enclosing_Element (Right_Obj);
+                  exit when Expression_Kind (Left_Obj) /= A_Selected_Component;
+               end loop;
+               if Expression_Kind (Left_Obj) /= An_Indexed_Component then
+                  return True;
+               end if;
+               declare
+                  L_Exprs : constant Asis.Expression_List := Index_Expressions (Left_Obj);
+                  R_Exprs : constant Asis.Expression_List := Index_Expressions (Right_Obj);
+               begin
+                  for E in L_Exprs'Range loop
+                     if Static_Expression_Value_Image (L_Exprs (E)) /= Static_Expression_Value_Image (R_Exprs (E)) then
+                        return False;
+                     end if;
+                  end loop;
+               end;
+               return True;
             when others =>
                return False;
          end case;
