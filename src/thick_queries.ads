@@ -932,10 +932,13 @@ package Thick_Queries is
    --   - In the case of a renaming whose target is part of a record (or protected) type:
    --        if No_Component is False, returns the name of the component
    --        if No_Component is True, returns the name of the object the field belongs to
-   --   - In the case of a renaming whose target is part of an array, returns the name of
-   --     array object
-   --        (i.e. X : T renames V.Field (2) => Field if No_Component is false,
-     --                                      => V if No_Component is True).
+   --        (i.e. X : T renames V.Field => Field if No_Component is false,
+   --                                    => V     if No_Component is True).
+   --   - In the case of a renaming whose target is part of an array:
+   --        if No_Component is False, returns Nil_Element (there is no appropriate name)
+   --        if No_Component is True, returns the name of the array object
+   --        (i.e. X : T renames Tab (3) => Nil_Element if No_Component is false,
+   --                                    => Tab         if No_Component is True).
    --   - In the case of a renaming whose target is (or includes) a dereference, returns Nil_Element
    --     (the target is statically unknown)
    --   - In the case of a renaming whose target is A_Function_Call, returns Nil_Element

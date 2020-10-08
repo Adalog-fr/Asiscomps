@@ -5517,7 +5517,12 @@ package body Thick_Queries is
                      exit Going_Up_Renamings;
                   end if;
 
-                  Result := Prefix (Result);
+                  if No_Component then    --## rule line off SIMPLIFIABLE_STATEMENTS ## avoid "not No_Component"
+                     Result := Prefix (Result);
+                  else
+                     Result := Nil_Element;
+                     exit Going_Up_Renamings;
+                  end if;
                when An_Explicit_Dereference
                   | A_Function_Call =>
                   Result := Nil_Element;
@@ -8765,6 +8770,10 @@ package body Thick_Queries is
                -- the previous one if it is NOT the renaming of a component, but what's the heck..
                Left_Obj  := Ultimate_Name (Left_C,  No_Component => False);
                Right_Obj := Ultimate_Name (Right_C, No_Component => False);
+               if Is_Nil (Left_Obj) or Is_Nil (Right_Obj) then
+                  -- Dynamic renaming, can happen with array components
+                  return False;
+               end if;
                if not Is_Equal (Corresponding_Name_Definition (Left_Obj),
                                 Corresponding_Name_Definition (Right_Obj))
                then
