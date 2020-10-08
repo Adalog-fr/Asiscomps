@@ -6098,6 +6098,7 @@ package body Thick_Queries is
                      | A_Component_Declaration
                      | A_Discriminant_Specification
                      | A_Parameter_Specification
+                     | A_Formal_Object_Declaration
                      | A_Single_Task_Declaration
                      | A_Single_Protected_Declaration
                      =>
