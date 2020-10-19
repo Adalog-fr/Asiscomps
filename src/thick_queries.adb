@@ -7331,6 +7331,12 @@ package body Thick_Queries is
    -- Static_Expression_Value_Image --
    -----------------------------------
 
+   -- The static evaluator replaces calls to expression function with the body of the function.
+   -- However, this means that identifiers part of the expression must be evaluated in their state at the point of
+   -- the call, and not where they seem to appear (in the expression of the expression function).
+   -- This counter registers the depth of such expansion, in order to warn the objec evaluator function.
+   Function_Expansion_Nesting : Biggest_Natural := 0;
+
    function Static_Expression_Value_Image (Expression : Asis.Expression;
                                            Wanted     : Expression_Info := Exact;
                                            RM_Static  : Boolean         := False)
@@ -7546,7 +7552,7 @@ package body Thick_Queries is
                   if Object_Value_Image = Def_Object_Value_Image'Access then
                      return Static_Expression_Value_Image (Initialization_Expression (Decl), Wanted, RM_Static => True);
                   else
-                     return Object_Value_Image (Expression, Wanted);
+                     return Object_Value_Image (Expression, Wanted, From_Expansion => Function_Expansion_Nesting > 0);
                   end if;
 
                when A_Variable_Declaration
@@ -7555,7 +7561,7 @@ package body Thick_Queries is
                   if RM_Static then
                      return "";
                   else
-                     return Object_Value_Image (Expression, Wanted);
+                     return Object_Value_Image (Expression, Wanted, From_Expansion => Function_Expansion_Nesting > 0);
                   end if;
                when others =>
                   return "";
@@ -7565,7 +7571,7 @@ package body Thick_Queries is
             if Is_Expanded_Name (Expression) then
                return Static_Expression_Value_Image (Selector (Expression), Wanted);
             else
-               return Object_Value_Image (Expression, Wanted);
+               return Object_Value_Image (Expression, Wanted, From_Expansion => Function_Expansion_Nesting > 0);
             end if;
 
          when A_Type_Conversion
@@ -7592,7 +7598,18 @@ package body Thick_Queries is
             -- implemented with an expression function, it causes tree swapping.
             Decl := Corresponding_Called_Function (Expression);
             if Declaration_Kind (Decl) = An_Expression_Function_Declaration then
-               return Static_Expression_Value_Image (Result_Expression (Decl), Wanted);
+               begin
+                  Function_Expansion_Nesting := Function_Expansion_Nesting + 1;
+                  return
+                    Result : constant Wide_String := Static_Expression_Value_Image (Result_Expression (Decl), Wanted)
+                  do
+                     Function_Expansion_Nesting := Function_Expansion_Nesting - 1;
+                  end return;
+               exception
+                  when others =>
+                     Function_Expansion_Nesting := Function_Expansion_Nesting - 1;
+                     raise;
+               end;
             end if;
 
             -- Evaluate predefined operators
