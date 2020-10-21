@@ -6676,7 +6676,18 @@ package body Thick_Queries is
                      Item := Renamed_Entity (Item);
 
                   when An_Element_Iterator_Specification =>
-                     Item := Iteration_Scheme_Name (Item);
+                     declare
+                        Temp : Asis.Element;
+                     begin
+                        Temp := Thick_Queries.Corresponding_Expression_Type_Definition (Iteration_Scheme_Name (Item));
+                        -- Temp is either an array object or an object of an iterable type
+                        if Is_Array_Subtype (Temp) then
+                           Item := Subtype_Simple_Name (Component_Definition_View (Array_Component_Definition (Temp)));
+                        else
+                        -- Generalized element iterators
+                           Item := A4G_Bugs.Corresponding_Expression_Type (Iteration_Scheme_Name (Item));
+                        end if;
+                     end;
 
                   when An_Entry_Declaration =>  -- Case of entry Family
                      Item := Entry_Family_Definition (Item);
