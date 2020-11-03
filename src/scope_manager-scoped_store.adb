@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------
---  Framework.Scope_Manager.Scoped_Store - Package body             --
+--  Scope_Manager.Scoped_Store - Package body                       --
 --  Copyright (C) 2004-2015 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
