@@ -72,6 +72,10 @@ package Scope_Manager is
    -- Make sure the same holds in your application
    --
 
+   Scope_Manager_Failure : exception;
+   -- Raised for internal errors of the scope manager
+   -- Incorrect uses of the scope manager raise Program_Error
+   -- Exhausted iterator accesses raise Constraint_Error
 
    -----------------------------------------------------------------------------------
    -- Scopes

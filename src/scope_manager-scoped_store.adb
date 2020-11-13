@@ -584,7 +584,8 @@ package body Scoped_Store is
          end if;
       exception
          when Not_Present =>
-            raise Not_Present with "Parent not found in Restore_Parent_Context for unit " & To_String (Unit_Name);
+            raise Scope_Manager_Failure
+              with "Parent not found in Restore_Parent_Context for unit " & To_String (Unit_Name);
       end Restore_Parent_Context;
 
       use Ada.Wide_Characters.Handling;
@@ -743,7 +744,8 @@ package body Scoped_Store is
 
       exception
          when Not_Present =>
-            raise Not_Present with "Parent not found in Restore_Parent_Private_Context: " & To_String (Parent_Name);
+            raise Scope_Manager_Failure
+              with "Parent not found in Restore_Parent_Private_Context: " & To_String (Parent_Name);
       end Restore_Parent_Private_Context;
 
       use Asis.Compilation_Units, Asis.Elements;
