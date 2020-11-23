@@ -7568,6 +7568,7 @@ package body Thick_Queries is
 
                when A_Variable_Declaration
                   | A_Loop_Parameter_Specification
+                  | A_Parameter_Specification
                   =>
                   if RM_Static then
                      return "";
