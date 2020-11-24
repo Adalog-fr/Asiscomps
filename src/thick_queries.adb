@@ -6131,6 +6131,9 @@ package body Thick_Queries is
                   when A_Type_Definition
                      | A_Constraint
                      | A_Discrete_Range
+                     | A_Private_Type_Definition
+                     | A_Tagged_Private_Type_Definition
+                     | A_Private_Extension_Definition
                      =>
                      return Current;
                   when others =>
