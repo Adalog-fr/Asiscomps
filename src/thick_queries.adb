@@ -6141,7 +6141,16 @@ package body Thick_Queries is
                   when A_Qualified_Expression | A_Type_Conversion =>
                      Current := Converted_Or_Qualified_Subtype_Mark (Current);
                   when An_Attribute_Reference =>
-                     return Nil_Element; --TBSL T'Base might or might not match T ...
+                     case Attribute_Kind (Current) is
+                        when A_Class_Attribute =>
+                           -- Possible (known) constraints on a class-wide type are those of its associated type
+                           Current := Prefix (Current);
+                        when A_Base_Attribute =>
+                           return Nil_Element; --TBSL T'Base might or might not match T ...
+                        when others =>
+                           -- expression attribute (not type attribute), do as for any expression
+                           Current := A4G_Bugs.Corresponding_Expression_Type (Current);
+                     end case;
                   when A_Selected_Component =>
                      Current := Selector (Current);
                   when An_Identifier =>
