@@ -6134,6 +6134,8 @@ package body Thick_Queries is
                      | A_Private_Type_Definition
                      | A_Tagged_Private_Type_Definition
                      | A_Private_Extension_Definition
+                     | A_Task_Definition
+                     | A_Protected_Definition
                      =>
                      return Current;
                   when others =>
