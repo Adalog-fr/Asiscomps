@@ -6725,8 +6725,9 @@ package body Thick_Queries is
    -----------------------------------
 
    function Discrete_Constraining_Values (Elem          : Asis.Element;
-                                          Follow_Access : Boolean := False;
-                                          RM_Static     : Boolean := False)
+                                          Follow_Access : Boolean         := False;
+                                          Wanted        : Expression_Info := Exact;
+                                          RM_Static     : Boolean         := False)
                                           return Extended_Biggest_Int_List
    is
       Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Elem, Follow_Access);
@@ -6741,7 +6742,7 @@ package body Thick_Queries is
          begin
             case Element_Kind (Bounds (I)) is
                when An_Expression =>
-                  Result (I) := Discrete_Static_Expression_Value (Bounds (I), RM_Static => RM_Static);
+                  Result (I) := Discrete_Static_Expression_Value (Bounds (I), Wanted => Wanted, RM_Static => RM_Static);
                   if Modular_Type then
                      -- The value returned for the upper bound by discrete_constraining_bounds is the mod expression
                      -- => 1 more than the upper bound
@@ -6781,12 +6782,24 @@ package body Thick_Queries is
    -----------------------------------
 
    function Discrete_Constraining_Lengths (Elem          : Asis.Element;
-                                           Follow_Access : Boolean := False;
-                                           RM_Static     : Boolean := False)
+                                           Follow_Access : Boolean         := False;
+                                           Wanted        : Expression_Info := Exact;
+                                           RM_Static     : Boolean         := False)
                                            return Extended_Biggest_Natural_List
    is
-      Bounds : constant Extended_Biggest_Int_List := Discrete_Constraining_Values (Elem, Follow_Access, RM_Static);
-      Result : Extended_Biggest_Natural_List (1 .. Bounds'Length / 2);
+      Low_Bounds  : constant Extended_Biggest_Int_List
+        := (case Wanted is
+               when Minimum | Maximum =>
+                 Discrete_Constraining_Values (Elem, Follow_Access, Minimum, RM_Static),
+               when Exact             =>
+                 Discrete_Constraining_Values (Elem, Follow_Access, Exact, RM_Static));
+      High_Bounds : constant Extended_Biggest_Int_List
+        := (case Wanted is
+               when Minimum | Maximum =>
+                 Discrete_Constraining_Values (Elem, Follow_Access, Maximum, RM_Static),
+               when Exact             =>
+                 Nil_Extended_Biggest_Int_List);
+      Result : Extended_Biggest_Natural_List (1 .. Low_Bounds'Length / 2);
    begin
       if Result'Length = 0 then
          return Nil_Extended_Biggest_Natural_List;
@@ -6794,8 +6807,12 @@ package body Thick_Queries is
 
       for I in Result'Range loop
          declare
-            Low  : constant Extended_Biggest_Int := Bounds (2 * I - 1);
-            High : constant Extended_Biggest_Int := Bounds (2 * I);
+            Low  : constant Extended_Biggest_Int := (case Wanted is
+                                                        when Minimum         => High_Bounds (2 * I - 1),
+                                                        when Exact | Maximum => Low_Bounds  (2 * I - 1));
+            High : constant Extended_Biggest_Int := (case Wanted is
+                                                        when Exact | Minimum => Low_Bounds  (2 * I),
+                                                        when Maximum         => High_Bounds (2 * I));
          begin
             if Low = Not_Static or High = Not_Static then
                -- Some bound is dynamic
@@ -7471,9 +7488,9 @@ package body Thick_Queries is
       -- we compare only integer values, due to the necessity of handling signs
       begin
          if S1 = "" then
-            return S2;
+            return "";
          elsif S2 = "" then
-            return S1;
+            return "";
          else
             return Biggest_Int_Img (Extended_Biggest_Int'Min (Biggest_Int'Wide_Value (S1),
                                                               Biggest_Int'Wide_Value (S2)));
@@ -7487,9 +7504,9 @@ package body Thick_Queries is
       -- we compare only integer values, due to the necessity of handling signs
       begin
          if S1 = "" then
-            return S2;
+            return "";
          elsif S2 = "" then
-            return S1;
+            return "";
          else
             return Biggest_Int_Img (Extended_Biggest_Int'Max (Biggest_Int'Wide_Value (S1),
                                                               Biggest_Int'Wide_Value (S2)));

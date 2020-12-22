@@ -1613,8 +1613,9 @@ package Thick_Queries is
 
 
    function Discrete_Constraining_Values (Elem          : Asis.Element;
-                                          Follow_Access : Boolean := False;
-                                          RM_Static     : Boolean := False)
+                                          Follow_Access : Boolean         := False;
+                                          Wanted        : Expression_Info := Exact;
+                                          RM_Static     : Boolean         := False)
                                           return Extended_Biggest_Int_List;
    -- Like Discrete_Constraining_Bounds, but returns the actual values of the bounds
    -- if statically determinable.
@@ -1623,8 +1624,9 @@ package Thick_Queries is
 
 
    function Discrete_Constraining_Lengths (Elem          : Asis.Element;
-                                           Follow_Access : Boolean := False;
-                                           RM_Static     : Boolean := False)
+                                           Follow_Access : Boolean         := False;
+                                           Wanted        : Expression_Info := Exact;
+                                           RM_Static     : Boolean         := False)
                                            return Extended_Biggest_Natural_List;
    -- Like Discrete_Constraining_Bounds, but returns the number of values in the range instead of
    -- the bounds if statically determinable
