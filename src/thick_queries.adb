@@ -5593,6 +5593,10 @@ package body Thick_Queries is
                   | A_Protected_Body_Declaration
                   | A_Body_Stub
 
+                  | A_Package_Renaming_Declaration
+                  | A_Procedure_Renaming_Declaration
+                  | A_Function_Renaming_Declaration
+
                   | A_Generic_Declaration
                   | A_Generic_Instantiation
                   =>
