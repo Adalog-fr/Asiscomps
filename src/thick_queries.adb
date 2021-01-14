@@ -7592,15 +7592,26 @@ package body Thick_Queries is
                   -- These are always RM_Static
                   return Static_Expression_Value_Image (Initialization_Expression (Decl), Wanted, RM_Static => True);
                when A_Constant_Declaration =>
-                  -- A constant may be initialized with a dynamic value, containing a reference to a variable f.e.
-                  -- If there is a user-provided Object_Value_Image, assume it deals with this case
-                  -- Otherwise, force to RM_Static, since at the point of evaluation of the constant, the variable
-                  -- may have changed
-                  if Object_Value_Image = Def_Object_Value_Image'Access then
-                     return Static_Expression_Value_Image (Initialization_Expression (Decl), Wanted, RM_Static => True);
-                  else
-                     return Object_Value_Image (Expression, Wanted, From_Expansion => Function_Expansion_Nesting > 0);
-                  end if;
+                  declare
+                     Result : constant Wide_String := Static_Expression_Value_Image (Initialization_Expression (Decl),
+                                                                                     Wanted,
+                                                                                     RM_Static => True);
+                  begin
+                     if Result /= "" then
+                        return Result;
+                     end if;
+
+                     -- Here, the constant is initialized with a dynamic value, using a reference to a variable f.e.
+                     -- If there is a user-provided Object_Value_Image, assume it deals with this case by tracking the
+                     -- constant. We cannot pass the initialization expression to the evaluator with RM_Static => False,
+                     -- since at the point of evaluation of the constant, the variable may have changed
+                     if Object_Value_Image = Def_Object_Value_Image'Access then -- no user Object_Value_Image
+                        return "";
+                     else
+                        return
+                          Object_Value_Image (Expression, Wanted, From_Expansion => Function_Expansion_Nesting > 0);
+                     end if;
+                  end;
 
                when A_Variable_Declaration
                   | A_Loop_Parameter_Specification
