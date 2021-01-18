@@ -5262,7 +5262,10 @@ package body Thick_Queries is
                -- A component whose type is an anonymous access type
                return Def;
             else
-               return Type_Declaration_View (Corresponding_Name_Declaration (Simple_Name (Strip_Attributes (Def))));
+               return Type_Declaration_View (Corresponding_Name_Declaration
+                                             (Simple_Name
+                                              (Strip_Attributes   -- Ignore 'Base if any, 'Class not allowed
+                                               (Subtype_Simple_Name (Def)))));
             end if;
          when A_Single_Protected_Declaration
             | A_Single_Task_Declaration
