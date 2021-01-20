@@ -7451,28 +7451,31 @@ package body Thick_Queries is
 
       Bool_Pos : constant array (Boolean) of Wide_String (1..1) := ("0", "1");
       generic
-         with function Op_Int (Left, Right : Biggest_Int) return Boolean;
-         with function Op_Float (Left, Right : Biggest_Float) return Boolean;
+         with function Op_Int    (Left, Right : Biggest_Int)   return Boolean;
+         with function Op_Float  (Left, Right : Biggest_Float) return Boolean;
+         with function Op_String (Left, Right : Wide_String)   return Boolean;
       function String_Comparison_Op (Left, Right : Wide_String) return Wide_String;
       function String_Comparison_Op (Left, Right : Wide_String) return Wide_String is
       begin
          if Left = "" or Right = "" then
             return "";
          end if;
-         if Is_Float_String(Left) or Is_Float_String(Right) then
+         if Is_Float_String(Left) or Is_Float_String(Right) then   -- Real comparison
             return Bool_Pos (Op_Float (Biggest_Float'Wide_Value (Left),
                                        Biggest_Float'Wide_Value (Right)));
-         else
+         elsif Left (Left'First) = '"' then                        -- String comparison
+            return Bool_Pos (Op_String (Left, Right));
+         else                                                      -- Integer comparison
             return Bool_Pos (Op_Int (Biggest_Int'Wide_Value (Left),
                                      Biggest_Int'Wide_Value (Right)));
          end if;
       end String_Comparison_Op;
-      function "="  is new String_Comparison_Op ("=",  "=");
-      function "/=" is new String_Comparison_Op ("/=", "/=");
-      function "<"  is new String_Comparison_Op ("<",  "<");
-      function "<=" is new String_Comparison_Op ("<=", "<=");
-      function ">"  is new String_Comparison_Op (">",  ">");
-      function ">=" is new String_Comparison_Op (">=", ">=");
+      function "="  is new String_Comparison_Op ("=",  "=",  "=");
+      function "/=" is new String_Comparison_Op ("/=", "/=", "/=");
+      function "<"  is new String_Comparison_Op ("<",  "<",  "<");
+      function "<=" is new String_Comparison_Op ("<=", "<=", "<=");
+      function ">"  is new String_Comparison_Op (">",  ">",  ">");
+      function ">=" is new String_Comparison_Op (">=", ">=", ">=");
 
       function String_Is_True (Left : Wide_String) return Boolean is
         (Left = Bool_Pos (True));
@@ -7537,23 +7540,7 @@ package body Thick_Queries is
          return Result (Result'First .. R_Inx);
       end Strip_Underscores;
 
-      function Strip_Quotes (Item : Wide_String) return Wide_String is
-         Result : Wide_String (Item'First + 1 .. Item'Last - 1);
-         R_Inx  : Natural := Item'First;
-         Quote  : Boolean := False;
-      begin
-         for C : Wide_Character of Item (Item'First + 1 .. Item'Last - 1) loop
-            if C = '"' and not Quote then
-               Quote := True;
-            else    -- Normal character, or second of two quotes in a row
-               Quote := False;
-               R_Inx := R_Inx + 1;
-               Result (R_Inx) := C;
-            end if;
-         end loop;
-
-         return Result (Result'First .. R_Inx);
-      end Strip_Quotes;
+      function Strip_Quotes (Item : Wide_String) return Wide_String is (Item (Item'First + 1 .. Item'Last - 1));
 
       Decl : Asis.Declaration;
    begin  -- Static_Expression_Value_Image
@@ -7569,7 +7556,7 @@ package body Thick_Queries is
             return Strip_Underscores (Value_Image (Expression));
 
          when A_String_Literal =>
-            return Strip_Quotes (Value_Image (Expression));
+            return Value_Image (Expression);
 
          when An_Enumeration_Literal
             | A_Character_Literal
@@ -7728,8 +7715,19 @@ package body Thick_Queries is
                                                                  RM_Static);
 
                         when A_Concatenate_Operator =>   -- Only Exact makes sense anyway
-                           return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Exact, RM_Static)
-                                & Static_Expression_Value_Image (Actual_Parameter (Params (2)), Exact, RM_Static);
+                           declare
+                              L : constant Wide_String := Static_Expression_Value_Image (Actual_Parameter (Params (1)),
+                                                                                         Exact,
+                                                                                         RM_Static);
+                              R : constant Wide_String := Static_Expression_Value_Image (Actual_Parameter (Params (2)),
+                                                                                         Exact,
+                                                                                         RM_Static);
+                           begin
+                              if L = "" or R = "" then
+                                 return "";
+                              end if;
+                              return '"' & Strip_Quotes (L) & Strip_Quotes (R) & '"';
+                           end;
 
                         when A_Multiply_Operator =>
                            case Wanted is
