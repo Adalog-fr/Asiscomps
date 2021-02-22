@@ -5798,8 +5798,13 @@ package body Thick_Queries is
          return True;
       end if;
 
-      return Declaration_Kind (Corresponding_Name_Declaration (Ultimate_Name (Expr)))
-             in A_Variable_Declaration .. An_Element_Iterator_Specification;
+      return Declaration_Kind (Corresponding_Name_Declaration (Expr))
+         in A_Variable_Declaration .. An_Element_Iterator_Specification
+          | A_Parameter_Specification
+          | A_Return_Variable_Specification
+          | A_Return_Constant_Specification
+          | An_Object_Renaming_Declaration
+          | A_Formal_Object_Declaration;
    end Is_True_Expression;
 
    -------------------
