@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
 --  Thick_Queries - Package specification                           --
---  Copyright (C) 2002-2009 Adalog                                  --
+--  Copyright (C) 2002-2021 Adalog                                  --
 --  Author: J-P. Rosen                                              --
 --                                                                  --
 --  ADALOG   is   providing   training,   consultancy,   expertise, --
@@ -1072,6 +1072,11 @@ package Thick_Queries is
    -- If the element is (a defining name of) a variable or a component of a record type, returns the
    -- corresponding components
    -- Return Nil_Element_List otherwise
+
+   function Corresponding_Target (Target_Name : Asis.Expression) return Asis.Expression;
+   -- Return the name which is the target of Target_Name
+   -- Appropriate Expression_Kind:
+   --   A_Target_Name
 
    function Ultimate_Expression_Type (The_Element : Asis.Expression) return Asis.Definition;
    -- return the type definition of the ultimate ancestor type of The_Element

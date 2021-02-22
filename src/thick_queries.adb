@@ -5337,6 +5337,19 @@ package body Thick_Queries is
       end case;
    end Corresponding_Components;
 
+   --------------------------
+   -- Corresponding_Target --
+   --------------------------
+
+   function Corresponding_Target (Target_Name : Asis.Expression) return Asis.Expression is
+      Elem : Asis.Element := Target_Name;
+   begin
+      while Statement_Kind (Elem) /= An_Assignment_Statement loop
+         Elem := Enclosing_Element (Elem);
+      end loop;
+      return Assignment_Variable_Name (Elem);
+   end Corresponding_Target;
+
    ------------------------------
    -- Ultimate_Expression_Type --
    ------------------------------
@@ -5788,7 +5801,7 @@ package body Thick_Queries is
    end First_Defining_Name;
 
    ------------------------
-   -- Is_Real_Expression --
+   -- Is_True_Expression --
    ------------------------
 
    function Is_True_Expression (Expr : Asis.Expression) return Boolean is
