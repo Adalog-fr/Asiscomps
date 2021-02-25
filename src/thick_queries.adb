@@ -1662,32 +1662,34 @@ package body Thick_Queries is
    -- Are_Equivalent_Expressions --
    --------------------------------
 
-   function Are_Equivalent_Expressions (Left, Right : Asis.Expression) return Boolean is
+   function Are_Equivalent_Expressions (Left, Right : Asis.Expression; RM_Static : Boolean := False) return Boolean is
       use Asis.Expressions;
 
+      Kind_Left    : constant Asis.Expression_Kinds := Expression_Kind (Simple_Name (Left));
+      Kind_Right   : constant Asis.Expression_Kinds := Expression_Kind (Simple_Name (Right));
       Called_Left  : Asis.Element;
       Called_Right : Asis.Element;
       Def_Left     : Asis.Defining_Name;
       Def_Right    : Asis.Defining_Name;
    begin
       -- Parentheses don't count
-      if Expression_Kind (Left) = A_Parenthesized_Expression then
+      if Kind_Left = A_Parenthesized_Expression then
          return Are_Equivalent_Expressions (Expression_Parenthesized (Left), Right);
       end if;
-      if Expression_Kind (Right) = A_Parenthesized_Expression then
+      if Kind_Right = A_Parenthesized_Expression then
          return Are_Equivalent_Expressions (Left, Expression_Parenthesized (Right));
       end if;
 
-      if Same_Value (Left, Right) then
+      if Same_Value (Left, Right, RM_Static) then
          -- Statically same value
          return True;
       end if;
 
-      if Expression_Kind (Left) /= Expression_Kind (Right) then
+      if Kind_Left /= Kind_Right then
          return False;
       end if;
 
-      case Expression_Kind (Left) is
+      case Kind_Left is
          when An_Enumeration_Literal
             | A_Character_Literal
             | An_Integer_Literal
@@ -1697,8 +1699,24 @@ package body Thick_Queries is
             -- If Execution comes to here, Left and Right have different values
             return False;
 
-         when An_Identifier =>
+         when An_Identifier | A_Selected_Component =>
             return Variables_Proximity (Left, Right) = Same_Variable;
+
+         when An_Indexed_Component =>
+            if not Are_Equivalent_Expressions (Prefix (Left), Prefix (Right)) then
+               return False;
+            end if;
+            declare
+               Left_Inx  : constant Asis.Expression_List := Index_Expressions (Left);
+               Right_Inx : constant Asis.Expression_List := Index_Expressions (Right);
+            begin
+               for I in Left_Inx'Range loop
+                  if not Are_Equivalent_Expressions (Left_Inx (I), Right_Inx (I)) then
+                     return False;
+                  end if;
+               end loop;
+            end;
+            return True;
 
          when An_And_Then_Short_Circuit | An_Or_Else_Short_Circuit =>
             return Are_Equivalent_Expressions (Short_Circuit_Operation_Left_Expression (Left),
@@ -1818,9 +1836,7 @@ package body Thick_Queries is
             | An_Extension_Aggregate
             | A_Positional_Array_Aggregate
             | A_Named_Array_Aggregate
-            | An_Indexed_Component
             | A_Slice
-            | A_Selected_Component
             | An_Attribute_Reference
             | An_In_Membership_Test
             | A_Not_In_Membership_Test
