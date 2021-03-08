@@ -8126,6 +8126,8 @@ package body Thick_Queries is
                         -- Let's give it another chance.
                         if To_Upper (Full_Name_Image (Prefix (Expression))) = "STANDARD.WIDE_CHARACTER" then
                            return " 0";
+                        elsif To_Upper (Full_Name_Image (Prefix (Expression))) = "STANDARD.WIDE_WIDE_CHARACTER" then
+                           return " 0";
                         end if;
                         -- something else...
                         raise;
@@ -8171,6 +8173,8 @@ package body Thick_Queries is
                         -- Let's give it another chance.
                         if To_Upper (Full_Name_Image (Prefix (Expression))) = "STANDARD.WIDE_CHARACTER" then
                            return " 65535";
+                        elsif To_Upper (Full_Name_Image (Prefix (Expression))) = "STANDARD.WIDE_WIDE_CHARACTER" then
+                           return " 2147483647";
                         end if;
                         -- something else...
                         raise;
