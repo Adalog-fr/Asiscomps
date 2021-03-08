@@ -6515,7 +6515,18 @@ package body Thick_Queries is
                      Item := Selector (Item);
                   when An_Indexed_Component =>
                      -- We must go to the declaration of the component type of the array
-                     Item := A4G_Bugs.Corresponding_Expression_Type (Item);
+                     -- But beware of implicit dereference
+                     if Follow_Access and then Is_Access_Expression (Item) then
+                        Item := Access_Target_Type (Corresponding_Expression_Type_Definition (Item));
+                        if Is_Nil (Item) then
+                           -- Access to SP...
+                           return Nil_Element_List;
+                        end if;
+                        No_Unconstrained := True; -- This is an object
+                     else
+                        Item := A4G_Bugs.Corresponding_Expression_Type (Item);
+                     end if;
+
                   when A_Slice =>
                      Item := Slice_Range (Item);
                   when An_Explicit_Dereference =>
