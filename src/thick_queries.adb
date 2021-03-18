@@ -6363,7 +6363,12 @@ package body Thick_Queries is
                            declare
                               Literals : constant Asis.Declaration_List := Enumeration_Literal_Declarations (Item);
                            begin
-                              return (Names (Literals (Literals'First)) (1), Names (Literals (Literals'Last)) (1));
+                              if Literals = Nil_Element_List then
+                                 -- Special case of enumeration: presumably [Wide_]Wide_Character
+                                 return (Nil_Element, Nil_Element);
+                              else
+                                 return (Names (Literals (Literals'First)) (1), Names (Literals (Literals'Last)) (1));
+                              end if;
                            end;
                         when A_Modular_Type_Definition =>
                            return (Nil_Element, Mod_Static_Expression (Item));
