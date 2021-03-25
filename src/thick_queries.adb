@@ -1674,10 +1674,10 @@ package body Thick_Queries is
    begin
       -- Parentheses don't count
       if Kind_Left = A_Parenthesized_Expression then
-         return Are_Equivalent_Expressions (Expression_Parenthesized (Left), Right);
+         return Are_Equivalent_Expressions (Expression_Parenthesized (Left), Right, RM_Static);
       end if;
       if Kind_Right = A_Parenthesized_Expression then
-         return Are_Equivalent_Expressions (Left, Expression_Parenthesized (Right));
+         return Are_Equivalent_Expressions (Left, Expression_Parenthesized (Right), RM_Static);
       end if;
 
       if Same_Value (Left, Right, RM_Static) then
@@ -1703,7 +1703,7 @@ package body Thick_Queries is
             return Variables_Proximity (Left, Right) = Same_Variable;
 
          when An_Indexed_Component =>
-            if not Are_Equivalent_Expressions (Prefix (Left), Prefix (Right)) then
+            if not Are_Equivalent_Expressions (Prefix (Left), Prefix (Right), RM_Static) then
                return False;
             end if;
             declare
@@ -1711,7 +1711,7 @@ package body Thick_Queries is
                Right_Inx : constant Asis.Expression_List := Index_Expressions (Right);
             begin
                for I in Left_Inx'Range loop
-                  if not Are_Equivalent_Expressions (Left_Inx (I), Right_Inx (I)) then
+                  if not Are_Equivalent_Expressions (Left_Inx (I), Right_Inx (I), RM_Static) then
                      return False;
                   end if;
                end loop;
@@ -1720,10 +1720,12 @@ package body Thick_Queries is
 
          when An_And_Then_Short_Circuit | An_Or_Else_Short_Circuit =>
             return Are_Equivalent_Expressions (Short_Circuit_Operation_Left_Expression (Left),
-                                               Short_Circuit_Operation_Left_Expression (Right))
+                                               Short_Circuit_Operation_Left_Expression (Right),
+                                               RM_Static)
               and then
                    Are_Equivalent_Expressions (Short_Circuit_Operation_Right_Expression (Left),
-                                               Short_Circuit_Operation_Right_Expression (Right));
+                                               Short_Circuit_Operation_Right_Expression (Right),
+                                               RM_Static);
 
          when A_Function_Call =>
             if Is_Dispatching_Call (Left) or else Is_Dispatching_Call (Right) then
@@ -1823,7 +1825,8 @@ package body Thick_Queries is
             begin
                for Index in Params_Left'Range loop
                   if not Are_Equivalent_Expressions (Actual_Parameter (Params_Left  (Index)),
-                                                     Actual_Parameter (Params_Right (Index)))
+                                                     Actual_Parameter (Params_Right (Index)),
+                                                     RM_Static)
                   then
                      return False;
                   end if;
