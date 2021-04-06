@@ -1685,6 +1685,24 @@ package body Thick_Queries is
          return True;
       end if;
 
+      -- Don't be fooled by renamings...
+      if Kind_Left = An_Identifier
+        and then Declaration_Kind (Corresponding_Name_Declaration (Simple_Name (Left))) in A_Renaming_Declaration
+      then
+         return Are_Equivalent_Expressions (Corresponding_Base_Entity (Corresponding_Name_Declaration
+                                                                       (Simple_Name (Left))),
+                                            Right,
+                                            RM_Static);
+      end if;
+      if Kind_Right = An_Identifier
+        and then Declaration_Kind (Corresponding_Name_Declaration (Simple_Name (Right))) in A_Renaming_Declaration
+      then
+         return Are_Equivalent_Expressions (Left,
+                                            Corresponding_Base_Entity (Corresponding_Name_Declaration
+                                                                       (Simple_Name (Right))),
+                                            RM_Static);
+      end if;
+
       if Kind_Left /= Kind_Right then
          return False;
       end if;
@@ -8607,8 +8625,9 @@ package body Thick_Queries is
                     (Descriptor (Prefix (E))
                      &  Name_Part'(Dereference, Corresponding_Expression_Type_Definition (E)));
 
-               when A_Type_Conversion =>
-                  -- type conversions don't change variables, and have to be ignored for matching purpose
+               when A_Qualified_Expression | A_Type_Conversion =>
+                  -- qualifications and type conversions don't change variables, and have to be ignored
+                  -- for matching purpose
                   E := Converted_Or_Qualified_Expression (E);
 
                when others =>
