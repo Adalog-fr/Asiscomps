@@ -7732,6 +7732,11 @@ package body Thick_Queries is
             Decl := Corresponding_Called_Function (Expression);
             if Declaration_Kind (Decl) = An_Expression_Function_Declaration then
                begin
+                  if not Is_Equal (Enclosing_Program_Unit (Decl), Enclosing_Program_Unit (Expression)) then
+                     -- the call is nested in a different program unit than the expression function
+                     -- cannot make the substitution
+                     return "";
+                  end if;
                   Function_Expansion_Nesting := Function_Expansion_Nesting + 1;
                   return
                     Result : constant Wide_String := Static_Expression_Value_Image (Result_Expression (Decl),
