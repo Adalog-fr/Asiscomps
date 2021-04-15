@@ -955,6 +955,7 @@ package Thick_Queries is
    --    An_Expression
    -- Appropriate Expression_Kinds:
    --    An_Identifier
+   --    An_Operator_Symbol
    --    A_Selected_Component (operates on selector)
    --    An_Attribute_Reference
 

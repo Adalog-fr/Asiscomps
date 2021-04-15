@@ -6330,6 +6330,23 @@ package body Thick_Queries is
          end if;
       end Choice_Bounds;
 
+      function Has_Predicate (Def : Asis.Definition) return Boolean is
+      -- Appropriate definition kinds: A_Subtype_Indication, A_Type_Definition
+         Decl : constant Asis.Element := Enclosing_Element (Def);
+      begin
+         if Element_Kind (Decl) /= A_Declaration then
+            -- Def is a subtype indication nested in something more complex, it cannot have predicates
+            return False;
+         end if;
+         if not Is_Nil (Corresponding_Aspects (Decl, "STATIC_PREDICATE")) then
+            return True;
+         end if;
+         if not Is_Nil (Corresponding_Aspects (Decl, "DYNAMIC_PREDICATE")) then
+            return True;
+         end if;
+         return False;
+      end Has_Predicate;
+
       Item             : Asis.Element := Elem; -- This item will navigate until we find the appropriate definition
       Old_Item         : Asis.Element;
       Constraint       : Asis.Definition;
@@ -6356,6 +6373,9 @@ package body Thick_Queries is
                      return Discrete_Range_Bounds (Item);
 
                   when A_Subtype_Indication =>
+                     if Has_Predicate (Item) then  -- Better consider this dynamic than lying about possible values
+                        return (Nil_Element, Nil_Element);
+                     end if;
                      Constraint := Subtype_Constraint (Item);
                      if Is_Nil (Constraint) then
                         Item := Subtype_Simple_Name (Item);
@@ -6364,6 +6384,9 @@ package body Thick_Queries is
                      end if;
 
                   when A_Type_Definition =>
+                     if Has_Predicate (Item) then  -- Better consider this dynamic than lying about possible values
+                        return (Nil_Element, Nil_Element);
+                     end if;
                      case Type_Kind (Item) is
                         when Not_A_Type_Definition =>
                            Report_Error ("Discrete_Constraining_Bounds: not a type definition", Item);
@@ -8071,7 +8094,6 @@ package body Thick_Queries is
 
                         when others =>
                            -- Not implemented, or Not_An_Operator
-
                            return "";
                      end case;
 
