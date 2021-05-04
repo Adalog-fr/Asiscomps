@@ -6573,7 +6573,7 @@ package body Thick_Queries is
                         end if;
                         No_Unconstrained := True; -- This is an object
                      else
-                        Item := A4G_Bugs.Corresponding_Expression_Type (Item);
+                        Item := Corresponding_Expression_Type_Definition (Item);
                      end if;
 
                   when A_Slice =>
