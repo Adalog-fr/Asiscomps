@@ -466,6 +466,18 @@ package Thick_Queries is
    --    A_Definition  (of a (sub)type, or an access definition)
    --    A_Defining_Name (of a (sub)type)
 
+   function Is_Null_Excluding_Subtype (The_Subtype : Asis.Element) return Boolean;
+   -- Returns True if The_Subtype is a declaration (or a definition, or a name) of an access type or
+   -- of a formal access type, or an access definition that excludes null (either directly, or because
+   -- it is a subtype / derived type of a type that excludes null.
+   -- Returns False in all other cases
+   --
+   -- Appropriate Element_Kinds:
+   --    A_Declaration
+   --    A_Definition
+   --    A_Defining_Name
+   --    An_Expression
+
    function Is_Array_Subtype (The_Subtype : Asis.Element) return Boolean;
    -- Returns True if The_Subtype is a declaration (or a definition) of an array type, or a name of an array type
    -- Returns False in all other cases

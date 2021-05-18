@@ -3774,6 +3774,48 @@ package body Thick_Queries is
    end Is_Limited;
 
 
+   -------------------------------
+   -- Is_Null_Excluding_Subtype --
+   -------------------------------
+
+   function Is_Null_Excluding_Subtype (The_Subtype : Asis.Element) return Boolean is
+      use Asis.Definitions, Asis.Expressions;
+      Good_Def : Asis.Definition := The_Subtype;
+   begin
+      loop
+         case Element_Kind (Good_Def) is
+            when A_Declaration =>
+               if Trait_Kind (Good_Def) = A_Null_Exclusion_Trait then
+                  return True;
+               end if;
+               Good_Def := Type_Declaration_View (Good_Def);
+            when A_Definition =>
+               if Trait_Kind (Good_Def) = A_Null_Exclusion_Trait then
+                  return True;
+               end if;
+               case Definition_Kind (Good_Def) is
+                  when A_Subtype_Indication =>
+                     return Is_Null_Excluding_Subtype (Subtype_Simple_Name (Good_Def));
+                  when A_Type_Definition =>
+                     if Type_Kind (Good_Def) = A_Derived_Type_Definition then
+                        return Is_Null_Excluding_Subtype (Parent_Subtype_Indication (Good_Def));
+                     else
+                        return False;
+                     end if;
+                  when others =>
+                     return False;
+               end case;
+            when A_Defining_Name =>
+               Good_Def := Enclosing_Element (Good_Def);
+            when An_Expression =>
+               Good_Def := Corresponding_Name_Declaration (Simple_Name (Good_Def));
+            when others =>
+               return False;
+         end case;
+      end loop;
+   end Is_Null_Excluding_Subtype;
+
+
    -----------------------------------------
    -- Corresponding_Full_Type_Declaration --
    -----------------------------------------
