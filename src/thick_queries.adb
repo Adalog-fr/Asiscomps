@@ -3292,6 +3292,8 @@ package body Thick_Queries is
    -----------------------
 
    function Is_Access_Subtype (The_Subtype : Asis.Element) return Boolean is
+      use Asis.Expressions;
+
       Decl     : Asis.Declaration;
       Good_Def : Asis.Definition;
    begin
@@ -3305,24 +3307,34 @@ package body Thick_Queries is
                when An_Access_Definition => -- ASIS 2005
                -- No declaration here, but cannot be a derived type
                   return True;
-               when A_Task_Definition
-                  | A_Protected_Definition
-                  =>
-                  return False;
+               when A_Subtype_Indication =>
+                  -- We can strip 'Base and 'Class, they don't change whether it is an access type or not
+                  Decl := Corresponding_Name_Declaration (Simple_Name
+                                                          (Strip_Attributes
+                                                           (Subtype_Simple_Name (The_Subtype))));
                when A_Type_Definition =>
                   if Type_Kind (The_Subtype) in An_Unconstrained_Array_Definition .. A_Constrained_Array_Definition then
                      return False;
                   end if;
+                  Decl := Enclosing_Element (The_Subtype);
                when A_Formal_Type_Definition =>
                   if Formal_Type_Kind (The_Subtype)
                      in A_Formal_Unconstrained_Array_Definition .. A_Formal_Constrained_Array_Definition
                   then
                      return False;
                   end if;
+                  Decl := Enclosing_Element (The_Subtype);
+               when A_Private_Type_Definition
+                  | A_Tagged_Private_Type_Definition
+                  | A_Private_Extension_Definition
+                  | A_Task_Definition
+                  | A_Protected_Definition
+                  =>
+                  return False;
                when others =>
-                  null;
+                 Report_Error ("Is_Access_Subtype: bad element", The_Subtype);
             end case;
-            Decl := Enclosing_Element (The_Subtype);
+
             while Element_Kind (Decl) /= A_Declaration loop -- There might be several levels of nested definitions
                Decl := Enclosing_Element (Decl);
             end loop;
