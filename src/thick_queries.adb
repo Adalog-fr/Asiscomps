@@ -1672,13 +1672,23 @@ package body Thick_Queries is
       Def_Left     : Asis.Defining_Name;
       Def_Right    : Asis.Defining_Name;
    begin
-      -- Parentheses don't count
-      if Kind_Left = A_Parenthesized_Expression then
-         return Are_Equivalent_Expressions (Expression_Parenthesized (Left), Right, RM_Static);
-      end if;
-      if Kind_Right = A_Parenthesized_Expression then
-         return Are_Equivalent_Expressions (Left, Expression_Parenthesized (Right), RM_Static);
-      end if;
+      -- Parentheses, conversions and qualifications don't count
+      case Kind_Left is
+         when A_Parenthesized_Expression =>
+            return Are_Equivalent_Expressions (Expression_Parenthesized (Left), Right, RM_Static);
+         when A_Qualified_Expression | A_Type_Conversion =>
+            return Are_Equivalent_Expressions (Converted_Or_Qualified_Expression (Left), Right, RM_Static);
+         when others =>
+            null;
+      end case;
+      case Kind_Right is
+         when A_Parenthesized_Expression =>
+            return Are_Equivalent_Expressions (Left, Expression_Parenthesized (Right), RM_Static);
+         when A_Qualified_Expression | A_Type_Conversion =>
+            return Are_Equivalent_Expressions (Left, Converted_Or_Qualified_Expression (Right), RM_Static);
+         when others =>
+            null;
+      end case;
 
       if Same_Value (Left, Right, RM_Static) then
          -- Statically same value
@@ -1703,7 +1713,10 @@ package body Thick_Queries is
                                             RM_Static);
       end if;
 
-      if Kind_Left /= Kind_Right then
+      if (   Kind_Left  not in A_Record_Aggregate | An_Extension_Aggregate
+          or Kind_Right not in A_Record_Aggregate | An_Extension_Aggregate)
+        and then Kind_Left /= Kind_Right
+      then
          return False;
       end if;
 
@@ -1855,24 +1868,84 @@ package body Thick_Queries is
             return Variables_Proximity (Prefix (Left), Prefix (Right)) = Same_Variable;
          when A_Record_Aggregate
             | An_Extension_Aggregate
-            | A_Positional_Array_Aggregate
-            | A_Named_Array_Aggregate
+            =>
+            declare
+               function Flatten (Aggr : Asis.Expression) return Asis.Association_List is
+               begin
+                  case Expression_Kind (Aggr) is
+                     when A_Record_Aggregate =>
+                        return Record_Component_Associations (Aggr, Normalized => True);
+                     when An_Extension_Aggregate =>
+                        return Flatten (Extension_Aggregate_Expression (Aggr))
+                               & Record_Component_Associations (Aggr, Normalized => True);
+                     when A_Type_Conversion | A_Qualified_Expression =>
+                        return Flatten (Converted_Or_Qualified_Expression (Aggr));
+                     when others =>
+                        Report_Error ("Bad aggregate in Flatten", Aggr);
+                  end case;
+               end Flatten;
+
+               Compos_Left  : constant Asis.Association_List := Flatten (Left);
+               Compos_Right : constant Asis.Association_List := Flatten (Right);
+            begin
+               for Index in Compos_Left'Range loop
+                  if not Are_Equivalent_Expressions (Component_Expression (Compos_Left  (Index)),
+                                                     Component_Expression (Compos_Right (Index)),
+                                                     RM_Static)
+                  then
+                     return False;
+                  end if;
+               end loop;
+            end;
+            return True;
+
+         when An_Allocation_From_Subtype
+            | An_Allocation_From_Qualified_Expression
+            =>
+            -- Never equivalent
+            return False;
+
+         when A_Positional_Array_Aggregate =>
+            declare
+               Compos_Left  : constant Asis.Association_List := Array_Component_Associations (Left);
+               Compos_Right : constant Asis.Association_List := Array_Component_Associations (Right);
+            begin
+               if Compos_Left'Length /= Compos_Right'Length then
+                  return False;
+               end if;
+               for Index in Compos_Left'Range loop
+                  if not Are_Equivalent_Expressions (Component_Expression (Compos_Left  (Index)),
+                                                     Component_Expression (Compos_Right (Index)),
+                                                     RM_Static)
+                  then
+                     return False;
+                  end if;
+               end loop;
+               if   Array_Component_Choices (Compos_Left  (Compos_Left 'Last))'Length
+                 /= Array_Component_Choices (Compos_Right (Compos_Right'Last))'Length
+               then
+                  -- For a positional aggregate, the choices can only be Nil_Element or (1 => An_Others_Choice)
+                  -- This requires that the choice of the last element (only place where "when others" is
+                  -- allowed) be the same in both aggregates.
+                  return False;
+               end if;
+            end;
+            return True;
+
+         when A_Named_Array_Aggregate
             | A_Slice
             | An_Attribute_Reference
             | An_In_Membership_Test
             | A_Not_In_Membership_Test
             | A_Raise_Expression
-            | A_Type_Conversion
-            | A_Qualified_Expression
-            | An_Allocation_From_Subtype
-            | An_Allocation_From_Qualified_Expression
             | A_Case_Expression
             | An_If_Expression
             | A_For_All_Quantified_Expression
             | A_For_Some_Quantified_Expression
             =>
-            -- TBSL
+            -- TBSL, could be analyzed
             return False;
+
          when others =>
             Report_Error ("Expression should have been handled", Left);
       end case;
