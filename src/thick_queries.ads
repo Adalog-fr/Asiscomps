@@ -9,7 +9,7 @@
 --  ADALOG                          Tel: +33 1 45 29 21 52          --
 --  2 rue du Docteur Lombard        Fax: +33 1 45 29 25 00          --
 --  92441 ISSY LES MOULINEAUX CEDEX E-m: info@adalog.fr             --
---  FRANCE                          URL: http://www.adalog.fr       --
+--  FRANCE                          URL: https://www.adalog.fr      --
 --                                                                  --
 --  This  unit is  free software;  you can  redistribute  it and/or --
 --  modify  it under  terms of  the GNU  General Public  License as --
@@ -1127,7 +1127,8 @@ package Thick_Queries is
    --   - names are considered equivalent if they denote the same element (i.e. not fooled by renamings)
    --   - static subexpressions are considered equivalent if they have the same value
    --     (definition of "static" depends on RM_Static)
-   -- i.e. two equivalent expressions always provide the same result
+   -- i.e. two equivalent expressions always provide the same result as long as the referenced variables are known
+   -- to have the same value from both expressions.
 
    function Includes_Renaming (Path : Asis.Expression) return Boolean;
    -- Checks whether any element in the Path is a renaming

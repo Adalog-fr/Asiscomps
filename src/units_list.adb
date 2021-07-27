@@ -550,7 +550,7 @@ package body Units_List is
 
       Unit_Found      : Boolean := False;
       Specified_Limit : Unit_Order;  -- Order of last node from Unit_Spec
-                                    -- Following nodes are added from stubs/with clauses
+                                     -- Following nodes are added from stubs/with clauses
    begin  -- Register
       -- Build list of units
 
