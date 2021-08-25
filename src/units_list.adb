@@ -358,14 +358,15 @@ package body Units_List is
          procedure Process_Unit (My_Unit : Compilation_Unit) is
             use Asis.Clauses, Asis.Elements;
 
-            procedure Add_Withed_Unit (Withed_Name : Asis.Expression) is
-               use Asis.Expressions;
+            procedure Add_Withed_Unit (Withed_Name : Asis.Expression; Is_Limited : Boolean) is
+               use Ada.Strings.Wide_Fixed;
+               use Asis.Expressions, Asis.Text;
                use Thick_Queries;
                Unit_Name : Asis.Expression;
             begin
                if Expression_Kind (Withed_Name) = A_Selected_Component then
                   -- Must add all units in the prefix
-                  Add_Withed_Unit (Prefix (Withed_Name));
+                  Add_Withed_Unit (Prefix (Withed_Name), Is_Limited);
 
                   -- Treat this one
                   Unit_Name := Selector (Withed_Name);
@@ -373,22 +374,36 @@ package body Units_List is
                   Unit_Name := Withed_Name;
                end if;
 
-               declare
-                  Name_Def : constant Asis.Definition := Corresponding_Name_Definition (Unit_Name);
-               begin
-                  if Unit_Origin (Enclosing_Compilation_Unit         --## rule line off Use_Ultimate_Origin
-                                  (Name_Def)) = An_Application_Unit  --   we want to keep library unit renamings
-                  then
-                     Add (Full_Name_Image (Name_Def));
-                  end if;
-               end;
+               if Is_Limited then
+                  -- Horrible kludge to work around ASIS bugs with limited with
+                  -- Get the name of the package from the text, to get the (full) unit
+                  -- This assumes that the name is "reasonable" (not partial due to use clauses, not spanned over
+                  -- several lines...)
+                  declare
+                     Full_Name: constant Wide_String := Trim (Element_Image (Withed_Name), Both);
+                  begin
+                     if Unit_Origin (Library_Unit_Declaration (Full_Name, My_Context.all)) = An_Application_Unit then
+                        Add (Full_Name);
+                     end if;
+                  end;
+               else
+                  declare
+                     Name_Def : constant Asis.Definition := Corresponding_Name_Definition (Unit_Name);
+                  begin
+                     if Unit_Origin (Enclosing_Compilation_Unit         --## rule line off Use_Ultimate_Origin
+                                     (Name_Def)) = An_Application_Unit  --   we want to keep library unit renamings
+                     then
+                        Add (Full_Name_Image (Name_Def));
+                     end if;
+                  end;
+               end if;
             end Add_Withed_Unit;
 
          begin   -- Process_Unit
             for CC : Asis.Element of Context_Clause_Elements (My_Unit) loop
                if Clause_Kind (CC) = A_With_Clause then
                   for Unit : Asis.Name of Clause_Names (CC) loop
-                     Add_Withed_Unit (Unit);
+                     Add_Withed_Unit (Unit, Trait_Kind (CC) = A_Limited_Trait);
                   end loop;
                end if;
             end loop;
