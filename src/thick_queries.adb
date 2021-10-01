@@ -6749,7 +6749,7 @@ package body Thick_Queries is
                      | A_String_Literal
                      =>
                      declare
-                        Item_Def : Asis.Definition := Corresponding_Expression_Type_Definition (Item);
+                        Item_Def : constant Asis.Definition := Corresponding_Expression_Type_Definition (Item);
                      begin
                         if Is_Nil (Item_Def) then
                            -- Type cannot be determined, may be that this aggregate is assigned to
@@ -6762,12 +6762,10 @@ package body Thick_Queries is
 
                            -- Assignment: the bounds are the same as the LHS
                            --  TBSL: is that really true (sliding)?
-                           Item_Def := Corresponding_Expression_Type_Definition
-                                          (Assignment_Variable_Name
-                                           (Enclosing_Element (Item)));
-                        end if;
+                           Item := Corresponding_Expression_Type_Definition (Assignment_Variable_Name
+                                                                             (Enclosing_Element (Item)));
 
-                        if Expression_Kind (Item) = A_Named_Array_Aggregate then
+                        elsif Expression_Kind (Item) = A_Named_Array_Aggregate then
                            -- Named aggregates may (sometimes) have their bounds defined
                            -- from the aggregate itself ...
                            -- TBSL for the moment, we deal only with the first dimension, and consider
@@ -6801,46 +6799,77 @@ package body Thick_Queries is
                                  elsif Declaration_Kind (Encl) in A_Variable_Declaration .. A_Constant_Declaration then
                                     return Discrete_Constraining_Bounds (Encl);
                                  end if;
+                              end if;
+
+                              -- No "when others" here (all branches above end with return)
+                              if Assocs'Length = 1 and then Array_Component_Choices (Assocs (1))'Length = 1 then
+                                 -- Only case where the bounds can be dynamic
+                                 return Choice_Bounds (Array_Component_Choices (Assocs (1)) (1))
+                                   & (3 .. 2 * Dimensionality (Item_Def) => Nil_Element);
                               else
-                                 if Assocs'Length = 1 and then Array_Component_Choices (Assocs (1))'Length = 1 then
-                                    -- Only case where the bounds can be dynamic
-                                    return Choice_Bounds (Array_Component_Choices (Assocs (1)) (1))
-                                           & (3 .. 2 * Dimensionality (Item_Def) => Nil_Element);
-                                 else
-                                    -- All bounds (and ranges) static: find the extremes
-                                    for A : Asis.Association of Assocs loop
-                                       for C : Asis.Expression of Array_Component_Choices (A) loop
-                                          Current_Bounds :=  Choice_Bounds (C);
-                                          -- Low
-                                          Value := Discrete_Static_Expression_Value (Current_Bounds (1),
-                                                                                     RM_Static => True);
-                                          if Value < Extreme_Vals (1) then
-                                             Extreme_Vals   (1) := Value;
-                                             Extreme_Bounds (1) := Current_Bounds (1);
-                                          end if;
-                                          --High
-                                          Value := Discrete_Static_Expression_Value (Current_Bounds (2));
-                                          if Value > Extreme_Vals (2) then
-                                             Extreme_Vals   (2) := Value;
-                                             Extreme_Bounds (2) := Current_Bounds (2);
-                                          end if;
-                                       end loop;
+                                 -- All bounds (and ranges) static: find the extremes
+                                 for A : Asis.Association of Assocs loop
+                                    for C : Asis.Expression of Array_Component_Choices (A) loop
+                                       Current_Bounds :=  Choice_Bounds (C);
+                                       -- Low
+                                       Value := Discrete_Static_Expression_Value (Current_Bounds (1),
+                                                                                  RM_Static => True);
+                                       if Value < Extreme_Vals (1) then
+                                          Extreme_Vals   (1) := Value;
+                                          Extreme_Bounds (1) := Current_Bounds (1);
+                                       end if;
+                                       --High
+                                       Value := Discrete_Static_Expression_Value (Current_Bounds (2));
+                                       if Value > Extreme_Vals (2) then
+                                          Extreme_Vals   (2) := Value;
+                                          Extreme_Bounds (2) := Current_Bounds (2);
+                                       end if;
                                     end loop;
-                                    return Extreme_Bounds
-                                      & (3 .. 2 * Dimensionality (Item_Def) => Nil_Element);
-                                 end if;
+                                 end loop;
+                                 return Extreme_Bounds
+                                   & (3 .. 2 * Dimensionality (Item_Def) => Nil_Element);
                               end if;
                            end;
-                        end if;
 
-                        Item := Item_Def;
+                        else
+                           -- Positional aggregate or string litteral
+                           -- First is first of (sub)type definition, Last is First+Length-1 But we have no node
+                           -- corresponding to Last... Return Nil_Element for Last of each dimension, as if it were
+                           -- dynamic
+                           declare
+                              Result : Asis.Element_List := Discrete_Constraining_Bounds (Item_Def);
+                           begin
+                              for I in List_Index range 1 .. Result'Length / 2 loop
+                                 Result (2 * I) := Nil_Element;
+                              end loop;
+                              return Result;
+                           end;
+                        end if;
                      end;
 
                   when A_Qualified_Expression
                      | A_Type_Conversion
                      =>
-                     -- Easy: use the given type!
-                     Item := Converted_Or_Qualified_Subtype_Mark (Item);
+                     declare
+                        Target_Type : Asis.Declaration := Corresponding_Name_Declaration
+                                                             (Converted_Or_Qualified_Subtype_Mark (Item));
+                     begin
+                        -- skip subtypes without constraint, they would leave an unconstrained array type unconstrained
+                        while Declaration_Kind (Target_Type) = A_Subtype_Declaration
+                          and then Is_Nil (Subtype_Constraint (Type_Declaration_View (Target_Type)))
+                        loop
+                           Target_Type := Corresponding_Name_Declaration (Subtype_Simple_Name
+                                                                          (Type_Declaration_View (Target_Type)));
+                        end loop;
+
+                        if Type_Kind (Type_Declaration_View (Target_Type)) = An_Unconstrained_Array_Definition then
+                           --Conversion or qualification to unconstrained array type doesn't change bounds
+                           Item := Converted_Or_Qualified_Expression (Item);
+                        else
+                           -- Bounds are the ones from the target type!
+                           Item := Target_Type;
+                        end if;
+                     end;
 
                   when A_Parenthesized_Expression =>
                      Item := Expression_Parenthesized (Item);
@@ -6982,6 +7011,7 @@ package body Thick_Queries is
       Bounds : constant Asis.Element_List := Discrete_Constraining_Bounds (Elem, Follow_Access);
       Result : Extended_Biggest_Int_List (Bounds'Range);
       Modular_Type : Boolean := False;
+
    begin
       if Result'Length = 0 then
          return Nil_Extended_Biggest_Int_List;
@@ -7008,8 +7038,35 @@ package body Thick_Queries is
                      Result (I)   := 0;
                      Modular_Type := True;
                   else
-                     Result (I)   := Not_Static;
                      Modular_Type := False;
+                     if I rem 2 = 0 and then Result (I-1) /= Not_Static then
+                        -- Possibly the upper bound of a string literal or positional array aggregate
+                        declare
+                           use Asis.Expressions;
+                           Good_Elem : Asis.Element := Elem;
+
+                           function True_Length (S : Wide_String) return Extended_Biggest_Int is
+                           -- Quotes are surrounding the literal, and inner quotes are doubled
+                              use Ada.Strings.Wide_Fixed;
+                           begin
+                              return Extended_Biggest_Int (S'Length - Count (S, """") / 2 - 1);
+                           end True_Length;
+                        begin
+                           while Expression_Kind (Good_Elem) in A_Type_Conversion | A_Qualified_Expression loop
+                              Good_Elem := Converted_Or_Qualified_Expression (Good_Elem);
+                           end loop;
+                           case Expression_Kind (Good_Elem) is
+                              when A_String_Literal =>
+                                 Result (I) := Result (I - 1) + True_Length (Value_Image (Good_Elem)) - 1;
+                              when A_Positional_Array_Aggregate =>
+                                 Result (I) := Not_Static; --TBSL
+                              when others =>
+                                 Result (I) := Not_Static;
+                           end case;
+                        end;
+                     else
+                        Result (I) := Not_Static;
+                     end if;
                   end if;
                when others =>
                   Report_Error ("Bad return from Discrete_Range_Bounds", Bounds (2));
