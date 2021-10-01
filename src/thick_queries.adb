@@ -7633,9 +7633,15 @@ package body Thick_Queries is
             when Minimum => Maximum,
             when Maximum => Minimum);
 
+      function No_Float_Operator (Left, Right : Biggest_Float) return Biggest_Float is
+      begin
+         Report_Error ("Call of non-existent float operator");
+         return 0.0;
+      end No_Float_Operator;
+
       generic
          with function Op_Int (Left, Right : Biggest_Int) return Biggest_Int;
-         with function Op_Float (Left, Right : Biggest_Float) return Biggest_Float;
+         with function Op_Float (Left, Right : Biggest_Float) return Biggest_Float is No_Float_Operator;
       function String_Arithmetic_Op (Left, Right : Wide_String) return Wide_String;
       function String_Arithmetic_Op (Left, Right : Wide_String) return Wide_String is
       begin
@@ -7651,10 +7657,13 @@ package body Thick_Queries is
          end if;
       end String_Arithmetic_Op;
 
-      function "+" is new String_Arithmetic_Op ("+","+");
-      function "-" is new String_Arithmetic_Op ("-","-");
-      function "*" is new String_Arithmetic_Op ("*","*");
-      function "/" is new String_Arithmetic_Op ("/","/");
+      function "+"   is new String_Arithmetic_Op ("+","+");
+      function "-"   is new String_Arithmetic_Op ("-","-");
+      function "*"   is new String_Arithmetic_Op ("*","*");
+      function "/"   is new String_Arithmetic_Op ("/", "/");
+      function "mod" is new String_Arithmetic_Op ("mod");
+      function "rem" is new String_Arithmetic_Op ("rem");
+
       -- Cannot do the same for "**", since Right is always Natural
       function "**" (Left, Right : Wide_String) return Wide_String is
       begin
@@ -7670,7 +7679,16 @@ package body Thick_Queries is
          end if;
       end "**";
 
-      Bool_Pos : constant array (Boolean) of Wide_String (1..1) := ("0", "1");
+      function "abs" (Left : Wide_String) return Wide_String is
+      begin
+         if Left (Left'First) = '-' then
+            return Left (Left'First + 1 .. Left'Last);
+         else
+            return Left;
+         end if;
+      end "abs";
+
+      Bool_Pos : constant array (Boolean) of Wide_String (1 .. 1) := ("0", "1");
       generic
          with function Op_Int    (Left, Right : Biggest_Int)   return Boolean;
          with function Op_Float  (Left, Right : Biggest_Float) return Boolean;
@@ -7930,6 +7948,11 @@ package body Thick_Queries is
                                                                    Opposite (Wanted),
                                                                    RM_Static);
 
+                        when An_Abs_Operator =>
+                           return "abs" (Static_Expression_Value_Image (Actual_Parameter (Params (1)),
+                                         Wanted,
+                                         RM_Static));
+
                         when A_Plus_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted, RM_Static)
                                 + Static_Expression_Value_Image (Actual_Parameter (Params (2)), Wanted, RM_Static);
@@ -7939,6 +7962,13 @@ package body Thick_Queries is
                                 - Static_Expression_Value_Image (Actual_Parameter (Params (2)),
                                                                  Opposite (Wanted),
                                                                  RM_Static);
+                        when A_Mod_Operator =>
+                           return   Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted, RM_Static)
+                                mod Static_Expression_Value_Image (Actual_Parameter (Params (2)), Wanted, RM_Static);
+
+                        when A_Rem_Operator =>
+                           return   Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted, RM_Static)
+                           rem Static_Expression_Value_Image (Actual_Parameter (Params (2)), Wanted, RM_Static);
 
                         when A_Concatenate_Operator =>   -- Only Exact makes sense anyway
                            declare
