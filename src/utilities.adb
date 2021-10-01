@@ -846,6 +846,8 @@ package body Utilities is
                Raw_Trace ("(implicit) " & Extended_Name_Image (Element, Silent_If_Inappropriate => True));
             elsif Is_Part_Of_Instance (Element) then
                Raw_Trace ("(from instance) " & Extended_Name_Image (Element, Silent_If_Inappropriate => True));
+            elsif not Is_Text_Available (Element) then
+               Raw_Trace ("(No text available)");
             else
                begin
                   Raw_Trace (Element_Image (Element));
