@@ -7639,6 +7639,11 @@ package body Thick_Queries is
          return 0.0;
       end No_Float_Operator;
 
+      Operator_Modulus : Biggest_Natural;
+      -- This variable must contain the modulus of the type of the operation (or 0) before calling any
+      -- of the instantiations of the generic String_Arithmetic_Op (and corresponding unary operations)
+      -- Passing it as a global variable may be frowned upon, but it's the only way to preserve operators.
+
       generic
          with function Op_Int (Left, Right : Biggest_Int) return Biggest_Int;
          with function Op_Float (Left, Right : Biggest_Float) return Biggest_Float is No_Float_Operator;
@@ -7651,9 +7656,14 @@ package body Thick_Queries is
          if Is_Float_String(Left) or Is_Float_String(Right) then
             return Biggest_Float'Wide_Image (Op_Float (Biggest_Float'Wide_Value (Left),
                                                        Biggest_Float'Wide_Value (Right)));
-         else
+         elsif Operator_Modulus = 0 then
             return Biggest_Int_Img (Op_Int (Biggest_Int'Wide_Value (Left),
                                             Biggest_Int'Wide_Value (Right)));
+         else
+            -- it's a modular type
+            return Biggest_Int_Img (Op_Int (Biggest_Int'Wide_Value (Left),
+                                            Biggest_Int'Wide_Value (Right))
+                                    mod Operator_Modulus);
          end if;
       end String_Arithmetic_Op;
 
@@ -7664,7 +7674,7 @@ package body Thick_Queries is
       function "mod" is new String_Arithmetic_Op ("mod");
       function "rem" is new String_Arithmetic_Op ("rem");
 
-      -- Cannot do the same for "**", since Right is always Natural
+      -- Cannot use the generic for "**", since Right is always Natural
       function "**" (Left, Right : Wide_String) return Wide_String is
       begin
          if Left = "" or Right = "" then
@@ -7673,13 +7683,18 @@ package body Thick_Queries is
          if Is_Float_String(Left) then
             return Biggest_Float'Wide_Image ("**" (Biggest_Float'Wide_Value (Left),
                                                    Natural'Wide_Value (Right)));
-         else
+         elsif Operator_Modulus = 0 then
             return Biggest_Int_Img ("**" (Biggest_Int'Wide_Value (Left),
                                           Natural'Wide_Value (Right)));
+         else
+            return Biggest_Int_Img ("**" (Biggest_Int'Wide_Value (Left),
+                                          Natural'Wide_Value (Right))
+                                    mod Operator_Modulus);
          end if;
       end "**";
 
       function "abs" (Left : Wide_String) return Wide_String is
+         -- No need to check for modular types, they are always positive
       begin
          if Left (Left'First) = '-' then
             return Left (Left'First + 1 .. Left'Last);
@@ -7925,6 +7940,25 @@ package body Thick_Queries is
                Params  : constant Association_List := Function_Call_Parameters (Expression);
                Op_Name : constant Asis.Expression  := Simple_Name (Prefix (Expression));
             begin
+               -- Initialize Operator_Modulus
+               -- We must do that not only for operators, but also for attributes that are functions
+               -- since they use operator functions
+               declare
+                  use Asis.Definitions;
+                  Op_Type_Decl : constant Asis.Declaration := Ultimate_Type_Declaration
+                                                                 (A4G_Bugs.Corresponding_Expression_Type (Expression));
+                  -- Op_Type_Decl is Nil_Element for universal expressions
+                  Op_Type_Def  : constant Asis.Definition  := (if Is_Nil (Op_Type_Decl)
+                                                               then Nil_Element
+                                                               else Type_Declaration_View (Op_Type_Decl));
+               begin
+                  if Type_Kind (Op_Type_Def) = A_Modular_Type_Definition then
+                     Operator_Modulus := Discrete_Static_Expression_Value (Mod_Static_Expression (Op_Type_Def));
+                  else
+                     Operator_Modulus := 0;
+                  end if;
+               end;
+
                case Expression_Kind (Op_Name) is
                   when An_Operator_Symbol =>
                      -- Check that the operator is the real one, not some user-defined function
@@ -7939,19 +7973,22 @@ package body Thick_Queries is
 
                      case Operator_Kind (Op_Name) is
                         when A_Unary_Plus_Operator =>
+                           -- Modular types: "+" is a no_op
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)),
                                                                  Wanted,
                                                                  RM_Static);
                         when A_Unary_Minus_Operator =>
+                           -- Modular types: we use the binary operator here
                            return "0"
                                   - Static_Expression_Value_Image (Actual_Parameter (Params (1)),
                                                                    Opposite (Wanted),
                                                                    RM_Static);
 
                         when An_Abs_Operator =>
+                           -- Modular types: "abs" is a no_op
                            return "abs" (Static_Expression_Value_Image (Actual_Parameter (Params (1)),
-                                         Wanted,
-                                         RM_Static));
+                                                                        Wanted,
+                                                                        RM_Static));
 
                         when A_Plus_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted, RM_Static)
