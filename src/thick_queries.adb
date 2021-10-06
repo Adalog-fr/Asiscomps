@@ -128,6 +128,27 @@ package body Thick_Queries is
       end if;
    end Biggest_Int_Img;
 
+   ---------------
+   -- Debug_Img --
+   ---------------
+
+   function Debug_Img (Item : Extended_Biggest_Int_List) return Wide_String is
+      function CDR_Img (Rest : Extended_Biggest_Int_List) return Wide_String is
+      begin
+         if Rest'Length  = 0 then
+            return "";
+         else
+            return ',' & Debug_Img (Rest (Rest'First)) & CDR_Img (Rest (Rest'First + 1 .. Rest'Last));
+         end if;
+      end CDR_Img;
+   begin  -- Debug_Img
+      if Item'Length = 0 then
+         return "(empty list)";
+      else
+         return '(' & Debug_Img (Item (Item'First)) & CDR_Img (Item (Item'First + 1 .. Item'Last)) & ')';
+      end if;
+   end Debug_Img;
+
    ---------
    -- "=" --
    ---------

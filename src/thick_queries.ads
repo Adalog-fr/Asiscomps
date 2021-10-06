@@ -1447,6 +1447,9 @@ package Thick_Queries is
    type Extended_Biggest_Natural_List is array (Asis.List_Index range <>) of Extended_Biggest_Natural;
    Nil_Extended_Biggest_Natural_List : constant Extended_Biggest_Natural_List (1 .. 0) := (others => 0);
 
+   function Debug_Img (Item : Extended_Biggest_Int_List) return Wide_String;
+   -- Same as Debug_img for a list
+
    type Biggest_Float is digits System.Max_Digits; -- The same for floatting point numbers
 
 
