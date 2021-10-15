@@ -9451,6 +9451,51 @@ package body Thick_Queries is
       return Result;
    end Strip_Parentheses;
 
+   --------------------------------
+   -- Is_Known_To_Be_Constrained --
+   --------------------------------
+
+   function Is_Known_To_Be_Constrained (Obj : Asis.Element) return Boolean is
+      use Asis.Definitions, Asis.Expressions;
+      Obj_Def : Asis.Element;
+   begin
+      if Element_Kind (Obj) = A_Defining_Name then
+         Obj_Def := Object_Declaration_View (Enclosing_Element (Obj));
+      else
+         Obj_Def := Object_Declaration_View (Corresponding_Name_Declaration (Simple_Name (Obj)));
+      end if;
+
+      if Is_Class_Wide_Subtype (Obj_Def) then
+         return False;
+      end if;
+
+      if Expression_Kind (Obj_Def) = An_Attribute_Reference then
+         -- Since 'Class has been eliminated above, it can only be 'Base
+         return False;
+      end if;
+
+      if Expression_Kind (Obj_Def) in An_Identifier | A_Selected_Component then
+         -- Obj is a formal parameter, no constraint in declaration
+         -- Note: if it is an attribute, it can only be 'Class, since 'Base is only for scalar subtypes
+         if Is_Nil (Corresponding_Derivation_Description
+                    (Corresponding_Name_Declaration (Simple_Name (Obj_Def))).First_Constraint)
+         then
+            -- a formal parameter of an unconstrained subtype
+            return False;
+         end if;
+
+      else -- a regular (non formal) object)
+         if Is_Nil (Subtype_Constraint (Obj_Def))
+           and then Is_Nil (Corresponding_Derivation_Description
+                            (Corresponding_Name_Declaration
+                               (Subtype_Simple_Name (Obj_Def))).First_Constraint)
+         then
+            return False;
+         end if;
+      end if;
+      return True;
+   end Is_Known_To_Be_Constrained;
+
 
    ----------------------
    -- Used_Identifiers --

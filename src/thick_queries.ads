@@ -1023,6 +1023,13 @@ package Thick_Queries is
    -- (including, f.e., statically indexed array components).
    -- Return False in all other cases, including when Obj does not designate an Object
 
+   function Is_Known_To_Be_Constrained (Obj : Asis.Element) return Boolean;
+   -- Return True if a constraint is given in the declaration of Obj or of its subtype (including cascaded ones)
+   -- Appropriate Defining_Name_kinds:
+   --    A_Definining_Identifier
+   -- Appropriate Expression_Kinds:
+   --    An_Identifier
+   --    A_Selected_Component (applies to selector)
 
    function Used_Identifiers (Name : Asis.Expression) return Asis.Expression_List;
    -- Return all identifiers corresponding to entities accessed by the use of the name.
