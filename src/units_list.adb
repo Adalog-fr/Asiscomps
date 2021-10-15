@@ -382,9 +382,11 @@ package body Units_List is
                   declare
                      Full_Name: constant Wide_String := Trim (Element_Image (Withed_Name), Both);
                   begin
+                     --## rule off use_ultimate_origin ## We have no element to call Ultimate_Origin with
                      if Unit_Origin (Library_Unit_Declaration (Full_Name, My_Context.all)) = An_Application_Unit then
                         Add (Full_Name);
                      end if;
+                     --## rule on use_ultimate_origin
                   end;
                else
                   declare
