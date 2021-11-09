@@ -7623,7 +7623,10 @@ package body Thick_Queries is
                H            : Extended_Biggest_Int;
             begin
                if Is_Nil (Compo_Clause) then
-                  return "";
+                  -- Try (sub) type
+                  return Size_Value_Image (First_Subtype_Name
+                                           (Subtype_Simple_Name
+                                            (Component_Definition_View (Object_Declaration_View (Decl)))));
                end if;
 
                R := Component_Clause_Range (Compo_Clause);
@@ -7771,10 +7774,12 @@ package body Thick_Queries is
          end if;
       end "**";
 
+      function Is_Negative (Left : Wide_String) return Boolean is (Left /= "" and then Left (Left'First) = '-');
+
       function "abs" (Left : Wide_String) return Wide_String is
          -- No need to check for modular types, they are always positive
       begin
-         if Left (Left'First) = '-' then
+         if Is_Negative (Left) then
             return Left (Left'First + 1 .. Left'Last);
          else
             return Left;
@@ -8064,9 +8069,30 @@ package body Thick_Queries is
 
                         when An_Abs_Operator =>
                            -- Modular types: "abs" is a no_op
-                           return "abs" (Static_Expression_Value_Image (Actual_Parameter (Params (1)),
-                                                                        Wanted,
-                                                                        RM_Static));
+                           case Wanted is
+                              when Exact =>
+                                 return abs Static_Expression_Value_Image (Actual_Parameter (Params (1)),
+                                                                           Exact,
+                                                                           RM_Static);
+                              when Minimum | Maximum =>
+                                 declare
+                                    Min : constant Wide_String := abs Static_Expression_Value_Image
+                                                                       (Actual_Parameter (Params (1)),
+                                                                        Minimum,
+                                                                        RM_Static);
+                                    Max : constant Wide_String := abs Static_Expression_Value_Image
+                                                                       (Actual_Parameter (Params (1)),
+                                                                        Maximum,
+                                                                        RM_Static);
+                                 begin
+                                    if Wanted = Minimum then
+                                       return String_Min (Min, Max);
+                                    else  -- Maximum
+                                       return String_Max (Min, Max);
+                                    end if;
+                                 end;
+                           end case;
+
 
                         when A_Plus_Operator =>
                            return Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted, RM_Static)
@@ -8078,12 +8104,62 @@ package body Thick_Queries is
                                                                  Opposite (Wanted),
                                                                  RM_Static);
                         when A_Mod_Operator =>
-                           return   Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted, RM_Static)
-                                mod Static_Expression_Value_Image (Actual_Parameter (Params (2)), Wanted, RM_Static);
+                           declare
+                              B : constant Wide_String := Static_Expression_Value_Image (Actual_Parameter (Params (2)),
+                                                                                         Wanted,
+                                                                                         RM_Static);
+                           begin
+                              -- 4.5.5(8/3) A mod B ... has the sign of B and an absolute value
+                              --            less than the absolute value of B
+                              case Wanted is
+                                 when Minimum =>
+                                    if Is_Negative (B) then
+                                       return B + "1";
+                                    else
+                                       return "0";
+                                    end if;
+                                 when Maximum =>
+                                    if Is_Negative (B) then
+                                       return "0";
+                                    else
+                                       return B - "1";
+                                    end if;
+                                 when Exact =>
+                                    return Static_Expression_Value_Image (Actual_Parameter (Params (1)),
+                                                                          Exact,
+                                                                          RM_Static)
+                                           mod B;
+                              end case;
+                           end;
 
                         when A_Rem_Operator =>
-                           return   Static_Expression_Value_Image (Actual_Parameter (Params (1)), Wanted, RM_Static)
-                           rem Static_Expression_Value_Image (Actual_Parameter (Params (2)), Wanted, RM_Static);
+                           declare
+                              A : constant Wide_String := Static_Expression_Value_Image (Actual_Parameter (Params (1)),
+                                                                                         Wanted,
+                                                                                         RM_Static);
+                              B : constant Wide_String := Static_Expression_Value_Image (Actual_Parameter (Params (2)),
+                                                                                         Wanted,
+                                                                                         RM_Static);
+                           begin
+                              -- 4.5.5(6) A rem B ... has the sign of A and an absolute value
+                              --          less than the absolute value of B
+                              case Wanted is
+                                 when Minimum =>
+                                    if Is_Negative (A) then
+                                       return "0" - (abs B + "1");
+                                    else
+                                       return "0";
+                                    end if;
+                                 when Maximum =>
+                                    if Is_Negative (A) then
+                                       return "0";
+                                    else
+                                       return abs B - "1";
+                                    end if;
+                                 when Exact =>
+                                    return A mod B;
+                              end case;
+                           end;
 
                         when A_Concatenate_Operator =>   -- Only Exact makes sense anyway
                            declare
