@@ -7753,7 +7753,6 @@ package body Thick_Queries is
       function "*"   is new String_Arithmetic_Op ("*","*");
       function "/"   is new String_Arithmetic_Op ("/", "/");
       function "mod" is new String_Arithmetic_Op ("mod");
-      function "rem" is new String_Arithmetic_Op ("rem");
 
       -- Cannot use the generic for "**", since Right is always Natural
       function "**" (Left, Right : Wide_String) return Wide_String is
@@ -7808,7 +7807,6 @@ package body Thick_Queries is
          end if;
       end String_Comparison_Op;
       function "="  is new String_Comparison_Op ("=",  "=",  "=");
-      function "/=" is new String_Comparison_Op ("/=", "/=", "/=");
       function "<"  is new String_Comparison_Op ("<",  "<",  "<");
       function "<=" is new String_Comparison_Op ("<=", "<=", "<=");
       function ">"  is new String_Comparison_Op (">",  ">",  ">");
@@ -8037,6 +8035,17 @@ package body Thick_Queries is
                begin
                   if Type_Kind (Op_Type_Def) = A_Modular_Type_Definition then
                      Operator_Modulus := Discrete_Static_Expression_Value (Mod_Static_Expression (Op_Type_Def));
+                     -- It is impossible to perform range arithmetic on modular types
+                     -- (if you know how to do it, please write to rosen@adalog and compete for the fields medal)
+                     -- If the required Info is not Exact, just return the bounds from the type
+                     case Wanted is
+                        when Minimum =>
+                           return "0";
+                        when Maximum =>
+                           return Biggest_Int_Img (Operator_Modulus - 1);
+                        when Exact =>
+                           null;
+                     end case;
                   else
                      Operator_Modulus := 0;
                   end if;
@@ -8076,19 +8085,24 @@ package body Thick_Queries is
                                                                            RM_Static);
                               when Minimum | Maximum =>
                                  declare
-                                    Min : constant Wide_String := abs Static_Expression_Value_Image
-                                                                       (Actual_Parameter (Params (1)),
-                                                                        Minimum,
-                                                                        RM_Static);
-                                    Max : constant Wide_String := abs Static_Expression_Value_Image
-                                                                       (Actual_Parameter (Params (1)),
-                                                                        Maximum,
-                                                                        RM_Static);
+                                    Min : constant Wide_String := Static_Expression_Value_Image
+                                                                   (Actual_Parameter (Params (1)),
+                                                                    Minimum,
+                                                                    RM_Static);
+                                    Max : constant Wide_String := Static_Expression_Value_Image
+                                                                   (Actual_Parameter (Params (1)),
+                                                                    Maximum,
+                                                                    RM_Static);
                                  begin
                                     if Wanted = Minimum then
-                                       return String_Min (Min, Max);
+                                       -- if the range includes 0, the minimum is always 0
+                                       if Is_Negative (Min) and not Is_Negative (Max) then
+                                          return "0";
+                                       else
+                                          return String_Min (abs Min, abs Max);
+                                       end if;
                                     else  -- Maximum
-                                       return String_Max (Min, Max);
+                                       return String_Max (abs Min, abs Max);
                                     end if;
                                  end;
                            end case;
