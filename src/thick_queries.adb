@@ -1021,7 +1021,9 @@ package body Thick_Queries is
                when A_Protected_Body_Declaration =>
                   return Protected_Operation_Items (Element, Include_Pragmas);
                when others =>
-                  Report_Error ("Declarative_Items: invalid declaration kind", Element);
+                  Report_Error ("Declarative_Items: invalid declaration kind "
+                                & Declaration_Kind (Element)'Wide_Image,
+                                Element);
             end case;
 
          when A_Statement =>
@@ -1029,10 +1031,14 @@ package body Thick_Queries is
                when A_Block_Statement =>
                   return Block_Declarative_Items (Element, Include_Pragmas);
                when others =>
-                  Report_Error ("Declarative_Items: invalid statement kind", Element);
+                  Report_Error ("Declarative_Items: invalid statement kind "
+                                & Statement_Kind (Element)'Wide_Image,
+                                Element);
             end case;
          when others =>
-            Report_Error ("Declarative_Items: invalid element kind", Element);
+            Report_Error ("Declarative_Items: invalid element kind "
+                          & Element_Kind (Element)'Wide_Image,
+                          Element);
       end case;
    end Declarative_Items;
 
