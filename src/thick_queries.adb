@@ -8100,15 +8100,16 @@ package body Thick_Queries is
                                                                     Maximum,
                                                                     RM_Static);
                                  begin
-                                    if Wanted = Minimum then
-                                       -- if the range includes 0, the minimum is always 0
-                                       if Is_Negative (Min) and not Is_Negative (Max) then
-                                          return "0";
-                                       else
-                                          return String_Min (abs Min, abs Max);
-                                       end if;
-                                    else  -- Maximum
+                                    if Wanted = Maximum then
                                        return String_Max (abs Min, abs Max);
+                                    end if;
+
+                                    -- Minimum
+                                    -- if the range includes 0, the minimum is always 0
+                                    if Is_Negative (Min) and not Is_Negative (Max) then
+                                       return "0";
+                                    else
+                                       return String_Min (abs Min, abs Max);
                                     end if;
                                  end;
                            end case;
