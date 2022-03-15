@@ -3403,6 +3403,7 @@ package body Thick_Queries is
          when A_Definition =>
             -- This may be a definition of an anonymous access or array type for which there is
             -- no declaration
+
             case Definition_Kind (The_Subtype) is
                when An_Access_Definition => -- ASIS 2005
                -- No declaration here, but cannot be a derived type
@@ -3962,7 +3963,7 @@ package body Thick_Queries is
                -- NB: the only attribute possible here is 'Base, which is not interesting for us
                Parent := Parent_Subtype_Indication (Type_Declaration_View (Result.Ultimate_Type));
                Result. Ultimate_Type := Corresponding_Name_Declaration
-                                         (Strip_Attributes (Subtype_Simple_Name (Parent)));
+                                         (Simple_Name (Strip_Attributes (Subtype_Simple_Name (Parent))));
                Result.Derivation_Depth := Result.Derivation_Depth + 1;
                if Is_Nil (Result.First_Constraint) then
                   Result.First_Constraint := Subtype_Constraint (Parent);
