@@ -4062,7 +4062,7 @@ package body Thick_Queries is
       use Elements_Set;
 
       Decl : Asis.Declaration;
-      Discrs_Set : Set;
+      Discrs_Set : Set;  -- Initially empty
 
       type Nothing is null record;
       procedure Pre_Operation  (Element :        Asis.Element;
@@ -4132,6 +4132,45 @@ package body Thick_Queries is
       Traverse (Object_Declaration_View (Decl), Control, State);
       return Elements_In_Set (Discrs_Set);
    end Governing_Discriminants;
+
+   ----------------------------------
+   -- Path_Selection_Discriminants --
+   ----------------------------------
+
+   function Path_Selection_Discriminants (Elem : Asis.Element) return Asis.Defining_Name_List is
+      use Asis.Definitions, Asis.Expressions;
+      use Elements_Set;
+      Decl : Asis.Declaration := Elem;
+      Def  : Asis.Definition;
+      Discrs_Set : Set;  -- Initially empty
+   begin
+      case Element_Kind (Decl) is
+         when A_Declaration =>
+            null;
+         when A_Defining_Name =>
+            Decl := Enclosing_Element (Decl);
+         when An_Expression =>
+            while Expression_Kind (Decl) = An_Indexed_Component loop
+               Decl := Prefix (Decl);
+            end loop;
+            Decl := Corresponding_Name_Declaration (Simple_Name (Decl));
+         when others =>
+            Report_Error ("Path_Selection_Discriminants: Incorrect parameter", Elem);
+      end case;
+
+      if Declaration_Kind (Decl) /= A_Component_Declaration then
+         -- Only components can belong to variant parts
+         return Nil_Element_List;
+      end if;
+
+      Def := Enclosing_Element (Decl);
+      while Definition_Kind (Def) = A_Variant loop
+         Def := Enclosing_Element (Def); -- A_Variant_Part;
+         Add (To => Discrs_Set, Element => Discriminant_Direct_Name (Def));
+         Def := Enclosing_Element (Def);
+      end loop;
+      return Elements_In_Set (Discrs_Set);
+   end Path_Selection_Discriminants;
 
    --------------------------------
    -- Matching_Discriminant_Name --

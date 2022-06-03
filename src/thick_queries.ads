@@ -731,6 +731,20 @@ package Thick_Queries is
    --       An_Identifier
    --       A_Selected_Component (applies to selector)
 
+   function Path_Selection_Discriminants (Elem : Asis.Element) return Asis.Defining_Name_List;
+   -- returns the defining names of discriminants that govern the variant(s) to which Elem belongs
+   -- returns Nil_Element_List if Elem is not part of a variant
+   --
+   -- Appropriate Element_Kinds:
+   --     A_Declaration
+   --     A_Defining_Name
+   --     An_Expression
+   --
+   --  Appropriate Expression_Kinds:
+   --       An_Identifier
+   --       A_Selected_Component (applies to selector)
+
+
    function Matching_Discriminant_Name (Name      : Asis.Defining_Name;
                                         From_Decl : Asis.Declaration)
                                         return Asis.Defining_Name;
