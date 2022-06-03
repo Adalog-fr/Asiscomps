@@ -9583,6 +9583,9 @@ package body Thick_Queries is
          end if;
 
       else -- a regular (non formal) object)
+         if Definition_Kind (Obj_Def) = A_Component_Definition then
+            Obj_Def := Component_Definition_View (Obj_Def);
+         end if;
          if Is_Nil (Subtype_Constraint (Obj_Def))
            and then Is_Nil (Corresponding_Derivation_Description
                             (Corresponding_Name_Declaration

@@ -687,7 +687,7 @@ package Thick_Queries is
    procedure Traverse_Data_Structure (Element : in     Asis.Element;
                                       Control : in out Asis.Traverse_Control;
                                       State   : in out State_Information);
-   -- Calls Pre_Operation on the definition of Element, a type declaration or  a (possibly anonymous) type definition,
+   -- Calls Pre_Operation on the definition of Element, a type declaration or a (possibly anonymous) type definition,
    -- and recursively to all type definitions of its subcomponents, then Post_Operation on the definition of Element.
    -- The element passed to Pre/Post operations is the type definition of the subtype indication of each component.
    -- Control works exactly as defined for Asis.Iterator.Traverse_Element.
