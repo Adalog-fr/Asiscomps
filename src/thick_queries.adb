@@ -1534,12 +1534,11 @@ package body Thick_Queries is
       -- A predefined operator
       -- A name of a dispatching call
       if Is_Nil (Decl_Name) then
-         -- Predefined operators are declared in Standard. If no profile is required, we can
-         -- still build an image...
+         -- Predefined operators are declared at the same place as the type they operate on.
+         -- If no profile is required, we can still build an image...
          if Expression_Kind (The_Name) /= An_Operator_Symbol or With_Profile then
             return "";
          end if;
-
          Parent := Enclosing_Element (The_Name);
          while Expression_Kind (Parent) = A_Selected_Component loop
             Parent := Enclosing_Element (Parent);
@@ -1547,9 +1546,37 @@ package body Thick_Queries is
          if Is_Dispatching_Call (Parent) then
             -- Too bad! A dispatching operator...
             return "";
+         elsif Declaration_Kind (Parent) in A_Function_Renaming_Declaration | A_Formal_Function_Declaration then
+            -- This is the target of a renaming of a predefined operator
+            -- The type is the same as in the renaming
+            Parent := Enclosing_Element (Types_Profile (Parent).Formals (1).General_Name.Name);
+         elsif Association_Kind (Parent) = A_Generic_Association then
+            -- Actual to a formal function, get the type from the formal's profile
+            Parent := Enclosing_Element (Types_Profile (Enclosing_Element (Formal_Name (Parent)))
+                                         .Formals (1).General_Name.Name);
+         else
+            Parent := A4G_Bugs.Corresponding_Expression_Type (Actual_Expressions (Parent) (1));
          end if;
 
-         return "STANDARD." & Name_Image (The_Name);
+         if Is_Nil (Parent) or Is_Part_Of_Implicit (Parent) then
+            -- Universal type, or ???
+            return "";
+         end if;
+
+         declare
+            use Ada.Strings, Ada.Strings.Wide_Fixed;
+            Type_Name : constant Wide_String := Full_Name_Image (Names (Parent) (1));
+            Point_Pos : constant Natural     := Index (Type_Name, ".", Going => Backward);
+         begin
+            if Point_Pos = 0 then
+               -- Happens with universal types with a declaration
+               return "";
+            else
+               return Overwrite (Source   => Type_Name,
+                                 Position => Point_Pos,
+                                 New_Item => '.' & Name_Image (The_Name));
+            end if;
+         end;
       end if;
 
       -- Get rid of another annoying special case:
@@ -1582,7 +1609,7 @@ package body Thick_Queries is
                -- But can still be a proper body
                if Is_Subunit (Decl_Name_Enclosing) then
                   -- The full name is the same as the name of the stub
-                  return Full_Name_Image (Names (Corresponding_Body_Stub(Decl_Name_Enclosing))(1),
+                  return Full_Name_Image (Names (Corresponding_Body_Stub (Decl_Name_Enclosing)) (1),
                                           With_Profile);
                else
                   return Simple_Name_Image (Decl_Name);
@@ -1665,7 +1692,7 @@ package body Thick_Queries is
 
                      Anonymous_Count := Anonymous_Count + 1;
                   when An_Accept_Statement =>
-                     return Full_Name_Image (Names (Corresponding_Entry (Parent))(1), With_Profile)
+                     return Full_Name_Image (Names (Corresponding_Entry (Parent)) (1), With_Profile)
                        & '.'
                        & Simple_Name_Image (Decl_Name);
                   when An_Extended_Return_Statement =>
